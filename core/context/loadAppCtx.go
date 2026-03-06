@@ -2,8 +2,8 @@ package appCtx
 
 import (
 	"context"
-	"go-socket/config"
-	"go-socket/constant"
+	"go-socket/core/shared/config"
+	"go-socket/core/shared/constant"
 	"go-socket/core/shared/infra/cache"
 	dbinfra "go-socket/core/shared/infra/db"
 	"go-socket/core/shared/infra/redis"

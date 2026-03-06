@@ -3,9 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
-	"go-socket/config"
 	appCtx "go-socket/core/context"
 	notificationassembly "go-socket/core/modules/notification/assembly"
+	"go-socket/core/shared/config"
 	"go-socket/core/shared/pkg/logging"
 	httptransport "go-socket/core/shared/transport/http"
 )

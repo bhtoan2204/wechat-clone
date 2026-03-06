@@ -2,7 +2,7 @@ package redis
 
 import (
 	"fmt"
-	"go-socket/config"
+	"go-socket/core/shared/config"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 	"time"
 

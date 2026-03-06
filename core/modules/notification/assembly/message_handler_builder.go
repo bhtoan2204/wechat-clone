@@ -1,9 +1,9 @@
 package assembly
 
 import (
-	"go-socket/config"
 	appCtx "go-socket/core/context"
 	notificationmessaging "go-socket/core/modules/notification/application/messaging"
+	"go-socket/core/shared/config"
 )
 
 func BuildMessageHandler(cfg *config.Config, appCtx *appCtx.AppContext) (notificationmessaging.MessageHandler, error) {

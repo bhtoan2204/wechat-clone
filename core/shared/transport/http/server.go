@@ -3,11 +3,11 @@ package http
 import (
 	"context"
 	"fmt"
-	"go-socket/config"
-	"go-socket/constant"
 	appCtx "go-socket/core/context"
 	accountassembly "go-socket/core/modules/account/assembly"
 	roomassembly "go-socket/core/modules/room/assembly"
+	"go-socket/core/shared/config"
+	"go-socket/core/shared/constant"
 	"go-socket/core/shared/infra/idempotency"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/server"

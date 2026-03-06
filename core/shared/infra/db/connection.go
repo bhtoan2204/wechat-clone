@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"go-socket/config"
+	"go-socket/core/shared/config"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 

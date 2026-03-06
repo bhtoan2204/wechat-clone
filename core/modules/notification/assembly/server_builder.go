@@ -1,9 +1,9 @@
 package assembly
 
 import (
-	"go-socket/config"
 	appCtx "go-socket/core/context"
 	notificationserver "go-socket/core/modules/notification/transport/server"
+	"go-socket/core/shared/config"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 )
 
