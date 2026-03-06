@@ -2,19 +2,14 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"go-socket/config"
 	"go-socket/constant"
 	appCtx "go-socket/core/context"
-	accountcommand "go-socket/core/modules/account/application/command"
-	accountquery "go-socket/core/modules/account/application/query"
 	accountassembly "go-socket/core/modules/account/assembly"
-	accounthttp "go-socket/core/modules/account/transport/http"
-	roomcommand "go-socket/core/modules/room/application/command"
-	roomquery "go-socket/core/modules/room/application/query"
 	roomassembly "go-socket/core/modules/room/assembly"
-	roomhttp "go-socket/core/modules/room/transport/http"
-	roomsocket "go-socket/core/modules/room/transport/websocket"
 	"go-socket/core/shared/infra/idempotency"
+	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/server"
 	"go-socket/core/shared/transport/http/middleware"
 	"net/http"
@@ -30,16 +25,18 @@ type App interface {
 	Start(ctx context.Context, appCtx *appCtx.AppContext) error
 }
 
+type moduleServer interface {
+	RegisterPublicRoutes(routes *gin.RouterGroup)
+	RegisterPrivateRoutes(routes *gin.RouterGroup)
+	Stop(ctx context.Context) error
+}
+
 type Server struct {
-	cfg            *config.Config
-	router         *gin.Engine
-	httpServer     *http.Server
-	accountCommand accountcommand.Bus
-	accountQuery   accountquery.Bus
-	roomCommand    roomcommand.Bus
-	roomQuery      roomquery.Bus
-	roomHub        roomsocket.IHub
-	appCtx         *appCtx.AppContext
+	cfg           *config.Config
+	router        *gin.Engine
+	httpServer    *http.Server
+	moduleServers []moduleServer
+	appCtx        *appCtx.AppContext
 }
 
 func NewServer(cfg *config.Config) *Server {
@@ -99,12 +96,10 @@ func (s *Server) Routes(ctx context.Context, appCtx *appCtx.AppContext) *gin.Eng
 }
 
 func (s *Server) Start(ctx context.Context, appCtx *appCtx.AppContext) error {
-	if err := s.buildUsecases(ctx, appCtx); err != nil {
+	if err := s.buildModuleServers(ctx, appCtx); err != nil {
 		return err
 	}
-	if s.roomHub != nil {
-		defer s.roomHub.Close(context.Background())
-	}
+	defer s.stopModuleServers(ctx)
 
 	srv, err := server.New(s.cfg.HttpConfig.Port)
 	if err != nil {
@@ -114,25 +109,40 @@ func (s *Server) Start(ctx context.Context, appCtx *appCtx.AppContext) error {
 	return srv.ServeHTTPHandler(ctx, s.Routes(ctx, appCtx))
 }
 
-func (s *Server) buildUsecases(ctx context.Context, appContext *appCtx.AppContext) error {
-	accountBuses := accountassembly.BuildBuses(appContext)
-	s.accountCommand = accountBuses.Command
-	s.accountQuery = accountBuses.Query
-	roomUsecases := roomassembly.BuildBuses(appContext)
-	s.roomCommand = roomUsecases.Command
-	s.roomQuery = roomUsecases.Query
-	s.roomHub = roomsocket.NewHub(ctx, appContext)
+func (s *Server) buildModuleServers(ctx context.Context, appContext *appCtx.AppContext) error {
+	accountServer, err := accountassembly.BuildServer(appContext)
+	if err != nil {
+		return fmt.Errorf("build account server failed: %w", err)
+	}
+
+	roomServer, err := roomassembly.BuildServer(ctx, appContext)
+	if err != nil {
+		return fmt.Errorf("build room server failed: %w", err)
+	}
+
+	s.moduleServers = []moduleServer{accountServer, roomServer}
 	return nil
 }
 
 func (s *Server) registerPublicAPI() {
 	apiV1 := s.router.Group("/api/v1")
-	accounthttp.RegisterPublicRoutes(apiV1, s.accountCommand)
+	for _, moduleServer := range s.moduleServers {
+		moduleServer.RegisterPublicRoutes(apiV1)
+	}
 }
 
 func (s *Server) registerPrivateAPI() {
 	apiV1 := s.router.Group("/api/v1")
 	apiV1.Use(middleware.AuthenMiddleware(s.appCtx))
-	accounthttp.RegisterPrivateRoutes(apiV1, s.accountCommand, s.accountQuery)
-	roomhttp.RegisterPrivateRoutes(apiV1, s.roomCommand, s.roomQuery, s.roomHub)
+	for _, moduleServer := range s.moduleServers {
+		moduleServer.RegisterPrivateRoutes(apiV1)
+	}
+}
+
+func (s *Server) stopModuleServers(ctx context.Context) {
+	for i := len(s.moduleServers) - 1; i >= 0; i-- {
+		if err := s.moduleServers[i].Stop(ctx); err != nil {
+			logging.FromContext(ctx).Errorw("failed to stop http module server", "error", err)
+		}
+	}
 }
