@@ -5,6 +5,10 @@ import (
 	"flag"
 	"fmt"
 	appCtx "go-socket/core/context"
+	accountassembly "go-socket/core/modules/account/assembly"
+	notificationassembly "go-socket/core/modules/notification/assembly"
+	paymentassembly "go-socket/core/modules/payment/assembly"
+	roomassembly "go-socket/core/modules/room/assembly"
 	"go-socket/core/shared/config"
 	"go-socket/core/shared/infra/db"
 	"go-socket/core/shared/pkg/logging"
@@ -44,7 +48,12 @@ func main() {
 		return
 	}
 
-	appServer := apptransport.NewServer(cfg)
+	appServer := apptransport.NewServer(cfg, apptransport.WithHTTPModuleBuilders(
+		accountassembly.BuildHTTPServer,
+		notificationassembly.BuildHTTPServer,
+		roomassembly.BuildHTTPServer,
+		paymentassembly.BuildHTTPServer,
+	))
 	if err := appServer.Start(ctx, appContext); err != nil {
 		logger.Errorw("Failed to start app server", "error", err)
 		return

@@ -48,12 +48,19 @@ type KafkaConfig struct {
 	KafkaServers              string `env:"KAFKA_SERVERS"`
 	KafkaOffsetReset          string `env:"KAFKA_OFFSET_RESET"`
 	KafkaNotificationConsumer KafkaNotificationConsumer
+	KafkaPaymentConsumer      KafkaPaymentConsumer
 }
 
 type KafkaNotificationConsumer struct {
 	NotificationGroup string `env:"KAFKA_NOTIFICATION_CONSUMER_GROUP"`
 
-	AccountTopic string `env:"KAFKA_NOTIFICATION_CONSUMER_ACCOUNT_TOPIC"`
+	AccountTopic string `env:"KAFKA_CONSUMER_ACCOUNT_TOPIC"`
+}
+
+type KafkaPaymentConsumer struct {
+	PaymentGroup string `env:"KAFKA_PAYMENT_CONSUMER_GROUP"`
+
+	AccountTopic string `env:"KAFKA_CONSUMER_ACCOUNT_TOPIC"`
 }
 
 type SecurityConfig struct {

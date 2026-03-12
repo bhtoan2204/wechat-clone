@@ -2,11 +2,7 @@ package http
 
 import (
 	"context"
-	"fmt"
 	appCtx "go-socket/core/context"
-	accountassembly "go-socket/core/modules/account/assembly"
-	notificationassembly "go-socket/core/modules/notification/assembly"
-	roomassembly "go-socket/core/modules/room/assembly"
 	"go-socket/core/shared/config"
 	"go-socket/core/shared/constant"
 	"go-socket/core/shared/infra/idempotency"
@@ -26,24 +22,23 @@ type App interface {
 	Start(ctx context.Context, appCtx *appCtx.AppContext) error
 }
 
-type moduleServer interface {
-	RegisterPublicRoutes(routes *gin.RouterGroup)
-	RegisterPrivateRoutes(routes *gin.RouterGroup)
-	Stop(ctx context.Context) error
-}
-
 type Server struct {
-	cfg           *config.Config
-	router        *gin.Engine
-	httpServer    *http.Server
-	moduleServers []moduleServer
-	appCtx        *appCtx.AppContext
+	cfg            *config.Config
+	router         *gin.Engine
+	httpServer     *http.Server
+	moduleServers  []HTTPServer
+	moduleBuilders []ModuleBuilder
+	appCtx         *appCtx.AppContext
 }
 
-func NewServer(cfg *config.Config) *Server {
-	return &Server{
+func NewServer(cfg *config.Config, opts ...Option) *Server {
+	s := &Server{
 		cfg: cfg,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 func (s *Server) Routes(ctx context.Context, appCtx *appCtx.AppContext) *gin.Engine {
@@ -111,22 +106,16 @@ func (s *Server) Start(ctx context.Context, appCtx *appCtx.AppContext) error {
 }
 
 func (s *Server) buildModuleServers(ctx context.Context, appContext *appCtx.AppContext) error {
-	accountServer, err := accountassembly.BuildServer(appContext)
-	if err != nil {
-		return fmt.Errorf("build account server failed: %w", err)
+	if len(s.moduleBuilders) == 0 {
+		s.moduleServers = []HTTPServer{}
+		return nil
 	}
 
-	notificationServer, err := notificationassembly.BuildHTTPServer(appContext)
+	servers, err := BuildModuleServers(ctx, appContext, s.moduleBuilders...)
 	if err != nil {
-		return fmt.Errorf("build notification server failed: %w", err)
+		return err
 	}
-
-	roomServer, err := roomassembly.BuildServer(ctx, appContext)
-	if err != nil {
-		return fmt.Errorf("build room server failed: %w", err)
-	}
-
-	s.moduleServers = []moduleServer{accountServer, notificationServer, roomServer}
+	s.moduleServers = servers
 	return nil
 }
 

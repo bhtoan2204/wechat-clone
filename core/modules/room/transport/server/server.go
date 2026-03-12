@@ -8,15 +8,10 @@ import (
 	roomhttp "go-socket/core/modules/room/transport/http"
 	roomsocket "go-socket/core/modules/room/transport/websocket"
 	stackerr "go-socket/core/shared/pkg/stackErr"
+	infrahttp "go-socket/core/shared/transport/http"
 
 	"github.com/gin-gonic/gin"
 )
-
-type Server interface {
-	RegisterPublicRoutes(routes *gin.RouterGroup)
-	RegisterPrivateRoutes(routes *gin.RouterGroup)
-	Stop(ctx context.Context) error
-}
 
 type roomServer struct {
 	commandBus roomcommand.Bus
@@ -24,7 +19,7 @@ type roomServer struct {
 	roomHub    roomsocket.IHub
 }
 
-func NewServer(commandBus roomcommand.Bus, queryBus roomquery.Bus, roomHub roomsocket.IHub) (Server, error) {
+func NewHTTPServer(commandBus roomcommand.Bus, queryBus roomquery.Bus, roomHub roomsocket.IHub) (infrahttp.HTTPServer, error) {
 	if roomHub == nil {
 		return nil, stackerr.Error(fmt.Errorf("room hub can not be nil"))
 	}

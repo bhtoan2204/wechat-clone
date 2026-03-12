@@ -5,6 +5,7 @@ import (
 	"fmt"
 	appCtx "go-socket/core/context"
 	notificationassembly "go-socket/core/modules/notification/assembly"
+	paymentassembly "go-socket/core/modules/payment/assembly"
 	"go-socket/core/shared/config"
 	"go-socket/core/shared/pkg/logging"
 	httptransport "go-socket/core/shared/transport/http"
@@ -22,14 +23,35 @@ type moduleServer interface {
 type appServer struct {
 	cfg           *config.Config
 	httpServer    *httptransport.Server
+	httpOptions   []httptransport.Option
 	moduleServers []moduleServer
 }
 
-func NewServer(cfg *config.Config) Server {
-	return &appServer{
-		cfg:        cfg,
-		httpServer: httptransport.NewServer(cfg),
+type Option func(*appServer)
+
+func WithHTTPServer(server *httptransport.Server) Option {
+	return func(s *appServer) {
+		s.httpServer = server
 	}
+}
+
+func WithHTTPModuleBuilders(builders ...httptransport.ModuleBuilder) Option {
+	return func(s *appServer) {
+		s.httpOptions = append(s.httpOptions, httptransport.WithModuleBuilders(builders...))
+	}
+}
+
+func NewServer(cfg *config.Config, opts ...Option) Server {
+	s := &appServer{
+		cfg: cfg,
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	if s.httpServer == nil {
+		s.httpServer = httptransport.NewServer(cfg, s.httpOptions...)
+	}
+	return s
 }
 
 func (s *appServer) Start(ctx context.Context, appContext *appCtx.AppContext) error {
@@ -51,7 +73,12 @@ func (s *appServer) buildModuleServers(appContext *appCtx.AppContext) error {
 		return fmt.Errorf("build notification server failed: %w", err)
 	}
 
-	s.moduleServers = []moduleServer{notificationServer}
+	paymentProcessor, err := paymentassembly.BuildProcessors(s.cfg, appContext)
+	if err != nil {
+		return fmt.Errorf("build payment processor failed: %w", err)
+	}
+
+	s.moduleServers = []moduleServer{notificationServer, paymentProcessor}
 	return nil
 }
 

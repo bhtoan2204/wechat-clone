@@ -5,22 +5,17 @@ import (
 	accountcommand "go-socket/core/modules/account/application/command"
 	accountquery "go-socket/core/modules/account/application/query"
 	accounthttp "go-socket/core/modules/account/transport/http"
+	"go-socket/core/shared/transport/http"
 
 	"github.com/gin-gonic/gin"
 )
-
-type Server interface {
-	RegisterPublicRoutes(routes *gin.RouterGroup)
-	RegisterPrivateRoutes(routes *gin.RouterGroup)
-	Stop(ctx context.Context) error
-}
 
 type accountServer struct {
 	commandBus accountcommand.Bus
 	queryBus   accountquery.Bus
 }
 
-func NewServer(commandBus accountcommand.Bus, queryBus accountquery.Bus) (Server, error) {
+func NewServer(commandBus accountcommand.Bus, queryBus accountquery.Bus) (http.HTTPServer, error) {
 	return &accountServer{
 		commandBus: commandBus,
 		queryBus:   queryBus,

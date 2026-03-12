@@ -1,12 +1,14 @@
 package assembly
 
 import (
+	"context"
 	appCtx "go-socket/core/context"
 	accountserver "go-socket/core/modules/account/transport/server"
 	stackerr "go-socket/core/shared/pkg/stackErr"
+	"go-socket/core/shared/transport/http"
 )
 
-func BuildServer(appContext *appCtx.AppContext) (accountserver.Server, error) {
+func BuildHTTPServer(_ context.Context, appContext *appCtx.AppContext) (http.HTTPServer, error) {
 	buses := BuildBuses(appContext)
 
 	server, err := accountserver.NewServer(buses.Command, buses.Query)
