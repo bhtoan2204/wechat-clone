@@ -1,6 +1,6 @@
 run:
-	@./script/bin.sh run
-	@./gateway/script/bin.sh run
+	@go run cmd/main.go
+	@cd gateway && make run
 .PHONY: run
 
 up:
