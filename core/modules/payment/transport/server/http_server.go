@@ -2,25 +2,39 @@ package server
 
 import (
 	"context"
-	"go-socket/core/modules/payment/application/command"
-	"go-socket/core/modules/payment/application/query"
+	paymentin "go-socket/core/modules/payment/application/dto/in"
+	paymentout "go-socket/core/modules/payment/application/dto/out"
 	paymenthttp "go-socket/core/modules/payment/transport/http"
 	"go-socket/core/modules/payment/transport/http/handler"
+	"go-socket/core/shared/pkg/cqrs"
 	infrahttp "go-socket/core/shared/transport/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 type paymentHTTPServer struct {
-	commandBus             command.Bus
-	queryBus               query.Bus
+	deposit                cqrs.Dispatcher[*paymentin.DepositRequest, *paymentout.DepositResponse]
+	rebuildProjection      cqrs.Dispatcher[*paymentin.RebuildProjectionRequest, *paymentout.RebuildProjectionResponse]
+	transfer               cqrs.Dispatcher[*paymentin.TransferRequest, *paymentout.TransferResponse]
+	withdrawal             cqrs.Dispatcher[*paymentin.WithdrawalRequest, *paymentout.WithdrawalResponse]
+	listTransaction        cqrs.Dispatcher[*paymentin.ListTransactionRequest, *paymentout.ListTransactionResponse]
 	providerPaymentHandler *handler.ProviderPaymentHandler
 }
 
-func NewHTTPServer(commandBus command.Bus, queryBus query.Bus, providerPaymentHandler *handler.ProviderPaymentHandler) (infrahttp.HTTPServer, error) {
+func NewHTTPServer(
+	deposit cqrs.Dispatcher[*paymentin.DepositRequest, *paymentout.DepositResponse],
+	rebuildProjection cqrs.Dispatcher[*paymentin.RebuildProjectionRequest, *paymentout.RebuildProjectionResponse],
+	transfer cqrs.Dispatcher[*paymentin.TransferRequest, *paymentout.TransferResponse],
+	withdrawal cqrs.Dispatcher[*paymentin.WithdrawalRequest, *paymentout.WithdrawalResponse],
+	listTransaction cqrs.Dispatcher[*paymentin.ListTransactionRequest, *paymentout.ListTransactionResponse],
+	providerPaymentHandler *handler.ProviderPaymentHandler,
+) (infrahttp.HTTPServer, error) {
 	return &paymentHTTPServer{
-		commandBus:             commandBus,
-		queryBus:               queryBus,
+		deposit:                deposit,
+		rebuildProjection:      rebuildProjection,
+		transfer:               transfer,
+		withdrawal:             withdrawal,
+		listTransaction:        listTransaction,
 		providerPaymentHandler: providerPaymentHandler,
 	}, nil
 }
@@ -30,7 +44,7 @@ func (s *paymentHTTPServer) RegisterPublicRoutes(routes *gin.RouterGroup) {
 }
 
 func (s *paymentHTTPServer) RegisterPrivateRoutes(routes *gin.RouterGroup) {
-	paymenthttp.RegisterPrivateRoutes(routes, s.commandBus, s.queryBus, s.providerPaymentHandler)
+	paymenthttp.RegisterPrivateRoutes(routes, s.deposit, s.rebuildProjection, s.transfer, s.withdrawal, s.listTransaction, s.providerPaymentHandler)
 }
 
 func (s *paymentHTTPServer) Stop(_ context.Context) error {

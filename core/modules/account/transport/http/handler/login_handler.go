@@ -3,8 +3,9 @@ package handler
 
 import (
 	"errors"
-	"go-socket/core/modules/account/application/command"
 	"go-socket/core/modules/account/application/dto/in"
+	"go-socket/core/modules/account/application/dto/out"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -13,12 +14,12 @@ import (
 )
 
 type loginHandler struct {
-	commandBus command.Bus
+	login cqrs.Dispatcher[*in.LoginRequest, *out.LoginResponse]
 }
 
-func NewLoginHandler(commandBus command.Bus) *loginHandler {
+func NewLoginHandler(login cqrs.Dispatcher[*in.LoginRequest, *out.LoginResponse]) *loginHandler {
 	return &loginHandler{
-		commandBus: commandBus,
+		login: login,
 	}
 }
 
@@ -34,7 +35,7 @@ func (h *loginHandler) Handle(c *gin.Context) (interface{}, error) {
 		logger.Errorw("Validate request failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("validate request failed"))
 	}
-	result, err := h.commandBus.Login.Dispatch(ctx, &request)
+	result, err := h.login.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("Login failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("Login failed"))

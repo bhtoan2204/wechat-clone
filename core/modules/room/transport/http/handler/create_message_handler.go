@@ -3,8 +3,9 @@ package handler
 
 import (
 	"errors"
-	"go-socket/core/modules/room/application/command"
 	"go-socket/core/modules/room/application/dto/in"
+	"go-socket/core/modules/room/application/dto/out"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -13,12 +14,12 @@ import (
 )
 
 type createMessageHandler struct {
-	commandBus command.Bus
+	createMessage cqrs.Dispatcher[*in.CreateMessageRequest, *out.CreateMessageResponse]
 }
 
-func NewCreateMessageHandler(commandBus command.Bus) *createMessageHandler {
+func NewCreateMessageHandler(createMessage cqrs.Dispatcher[*in.CreateMessageRequest, *out.CreateMessageResponse]) *createMessageHandler {
 	return &createMessageHandler{
-		commandBus: commandBus,
+		createMessage: createMessage,
 	}
 }
 
@@ -34,7 +35,7 @@ func (h *createMessageHandler) Handle(c *gin.Context) (interface{}, error) {
 		logger.Errorw("Validate request failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("validate request failed"))
 	}
-	result, err := h.commandBus.CreateMessage.Dispatch(ctx, &request)
+	result, err := h.createMessage.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("CreateMessage failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("CreateMessage failed"))

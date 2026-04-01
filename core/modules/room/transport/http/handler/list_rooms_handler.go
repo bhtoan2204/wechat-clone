@@ -4,7 +4,8 @@ package handler
 import (
 	"errors"
 	"go-socket/core/modules/room/application/dto/in"
-	"go-socket/core/modules/room/application/query"
+	"go-socket/core/modules/room/application/dto/out"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -13,12 +14,12 @@ import (
 )
 
 type listRoomsHandler struct {
-	queryBus query.Bus
+	listRoom cqrs.Dispatcher[*in.ListRoomsRequest, *out.ListRoomsResponse]
 }
 
-func NewListRoomsHandler(queryBus query.Bus) *listRoomsHandler {
+func NewListRoomsHandler(listRoom cqrs.Dispatcher[*in.ListRoomsRequest, *out.ListRoomsResponse]) *listRoomsHandler {
 	return &listRoomsHandler{
-		queryBus: queryBus,
+		listRoom: listRoom,
 	}
 }
 
@@ -34,7 +35,7 @@ func (h *listRoomsHandler) Handle(c *gin.Context) (interface{}, error) {
 		logger.Errorw("Validate request failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("validate request failed"))
 	}
-	result, err := h.queryBus.ListRoom.Dispatch(ctx, &request)
+	result, err := h.listRoom.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("ListRooms failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("ListRooms failed"))

@@ -11,6 +11,7 @@ import (
 	repos "go-socket/core/modules/account/domain/repos"
 	valueobject "go-socket/core/modules/account/domain/value_object"
 	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/cqrs"
 	eventpkg "go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/hasher"
 	"go-socket/core/shared/pkg/logging"
@@ -28,7 +29,7 @@ type registerHandler struct {
 	paseto   xpaseto.PasetoService
 }
 
-func NewRegisterHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos) RegisterHandler {
+func NewRegisterHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos) cqrs.Handler[*in.RegisterRequest, *out.RegisterResponse] {
 	return &registerHandler{
 		baseRepo: baseRepo,
 		hasher:   appCtx.GetHasher(),

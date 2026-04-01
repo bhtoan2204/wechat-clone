@@ -4,7 +4,8 @@ package handler
 import (
 	"errors"
 	"go-socket/core/modules/account/application/dto/in"
-	"go-socket/core/modules/account/application/query"
+	"go-socket/core/modules/account/application/dto/out"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -13,12 +14,12 @@ import (
 )
 
 type getProfileHandler struct {
-	queryBus query.Bus
+	getProfile cqrs.Dispatcher[*in.GetProfileRequest, *out.GetProfileResponse]
 }
 
-func NewGetProfileHandler(queryBus query.Bus) *getProfileHandler {
+func NewGetProfileHandler(getProfile cqrs.Dispatcher[*in.GetProfileRequest, *out.GetProfileResponse]) *getProfileHandler {
 	return &getProfileHandler{
-		queryBus: queryBus,
+		getProfile: getProfile,
 	}
 }
 
@@ -34,7 +35,7 @@ func (h *getProfileHandler) Handle(c *gin.Context) (interface{}, error) {
 		logger.Errorw("Validate request failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("validate request failed"))
 	}
-	result, err := h.queryBus.GetProfile.Dispatch(ctx, &request)
+	result, err := h.getProfile.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("GetProfile failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("GetProfile failed"))

@@ -10,6 +10,7 @@ import (
 	"go-socket/core/modules/room/domain/entity"
 	"go-socket/core/modules/room/domain/repos"
 	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/cqrs"
 	eventpkg "go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
@@ -24,7 +25,7 @@ type createMessageHandler struct {
 	baseRepo repos.Repos
 }
 
-func NewCreateMessageHandler(baseRepo repos.Repos) CreateMessageHandler {
+func NewCreateMessageHandler(baseRepo repos.Repos) cqrs.Handler[*in.CreateMessageRequest, *out.CreateMessageResponse] {
 	return &createMessageHandler{
 		baseRepo: baseRepo,
 	}

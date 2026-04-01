@@ -3,8 +3,9 @@ package handler
 import (
 	"net/http"
 
-	"go-socket/core/modules/payment/application/command"
 	"go-socket/core/modules/payment/application/dto/in"
+	"go-socket/core/modules/payment/application/dto/out"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -13,11 +14,11 @@ import (
 )
 
 type rebuildProjectionHandler struct {
-	commandBus command.Bus
+	rebuildProjection cqrs.Dispatcher[*in.RebuildProjectionRequest, *out.RebuildProjectionResponse]
 }
 
-func NewRebuildProjectionHandler(commandBus command.Bus) *rebuildProjectionHandler {
-	return &rebuildProjectionHandler{commandBus: commandBus}
+func NewRebuildProjectionHandler(rebuildProjection cqrs.Dispatcher[*in.RebuildProjectionRequest, *out.RebuildProjectionResponse]) *rebuildProjectionHandler {
+	return &rebuildProjectionHandler{rebuildProjection: rebuildProjection}
 }
 
 func (h *rebuildProjectionHandler) Handle(c *gin.Context) (interface{}, error) {
@@ -36,7 +37,7 @@ func (h *rebuildProjectionHandler) Handle(c *gin.Context) (interface{}, error) {
 		return nil, nil
 	}
 
-	result, err := h.commandBus.RebuildProjection.Dispatch(ctx, &request)
+	result, err := h.rebuildProjection.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("Projection rebuild failed", zap.Error(err))
 		return nil, stackerr.Error(err)

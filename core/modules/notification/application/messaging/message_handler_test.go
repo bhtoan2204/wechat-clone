@@ -2,7 +2,10 @@ package messaging
 
 import (
 	"context"
-	"go-socket/core/shared/contracts/events"
+	"go-socket/core/modules/account/domain/aggregate"
+	"go-socket/core/modules/notification/application/dto/out"
+	"go-socket/core/modules/notification/domain/entity"
+	"go-socket/core/shared/utils"
 	"testing"
 )
 
@@ -13,7 +16,7 @@ func TestDecodeAccountCreatedPayloadObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	payload, ok := payloadAny.(*events.AccountCreatedEvent)
+	payload, ok := payloadAny.(*aggregate.EventAccountCreated)
 	if !ok {
 		t.Fatalf("expected AccountCreatedEvent, got %T", payloadAny)
 	}
@@ -32,7 +35,7 @@ func TestDecodeAccountCreatedPayloadEncodedString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	payload, ok := payloadAny.(*events.AccountCreatedEvent)
+	payload, ok := payloadAny.(*aggregate.EventAccountCreated)
 	if !ok {
 		t.Fatalf("expected AccountCreatedEvent, got %T", payloadAny)
 	}
@@ -66,16 +69,30 @@ func (s *emailSenderStub) Send(_ context.Context, to, subject, body string) erro
 	return nil
 }
 
+type notificationRepoStub struct {
+	created *entity.NotificationEntity
+}
+
+func (s *notificationRepoStub) CreateNotification(_ context.Context, notification *entity.NotificationEntity) error {
+	s.created = notification
+	return nil
+}
+
+func (s *notificationRepoStub) ListNotifications(context.Context, utils.QueryOptions) ([]*out.NotificationResponse, error) {
+	return nil, nil
+}
+
 func TestHandleAccountEventWithLowercaseFields(t *testing.T) {
 	stub := &emailSenderStub{}
-	handler := &messageHandler{emailSender: stub}
+	repo := &notificationRepoStub{}
+	handler := &messageHandler{emailSender: stub, notificationRepo: repo}
 
 	raw := []byte(`{
 		"id": 1,
 		"aggregate_id": "acc-2",
 		"aggregate_type": "account",
 		"version": 1,
-		"event_name": "account.created",
+		"event_name": "EventAccountCreated",
 		"event_data": {"AccountID":"acc-2","Email":"b@example.com","CreatedAt":"2026-03-03T13:05:32.218937909+07:00"},
 		"created_at": "2026-03-03T13:05:32.218937909+07:00"
 	}`)
@@ -92,5 +109,8 @@ func TestHandleAccountEventWithLowercaseFields(t *testing.T) {
 	}
 	if stub.subject != "Welcome to Go Socket" {
 		t.Fatalf("expected welcome subject, got %s", stub.subject)
+	}
+	if repo.created == nil {
+		t.Fatalf("expected notification to be created")
 	}
 }

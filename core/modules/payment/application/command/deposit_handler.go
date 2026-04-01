@@ -7,6 +7,7 @@ import (
 	"go-socket/core/modules/payment/application/dto/in"
 	"go-socket/core/modules/payment/application/dto/out"
 	"go-socket/core/modules/payment/domain/repos"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -18,7 +19,7 @@ type depositHandler struct {
 	baseRepo repos.Repos
 }
 
-func NewDepositHandler(repos repos.Repos) DepositHandler {
+func NewDepositHandler(repos repos.Repos) cqrs.Handler[*in.DepositRequest, *out.DepositResponse] {
 	return &depositHandler{
 		baseRepo: repos,
 	}

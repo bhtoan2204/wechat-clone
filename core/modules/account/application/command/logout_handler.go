@@ -4,11 +4,12 @@ import (
 	"context"
 	"go-socket/core/modules/account/application/dto/in"
 	"go-socket/core/modules/account/application/dto/out"
+	"go-socket/core/shared/pkg/cqrs"
 )
 
 type logoutHandler struct{}
 
-func NewLogoutHandler() LogoutHandler {
+func NewLogoutHandler() cqrs.Handler[*in.LogoutRequest, *out.LogoutResponse] {
 	return &logoutHandler{}
 }
 

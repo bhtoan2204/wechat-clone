@@ -7,6 +7,7 @@ import (
 	"go-socket/core/modules/account/application/dto/out"
 	repos "go-socket/core/modules/account/domain/repos"
 	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 	"time"
@@ -18,7 +19,7 @@ type getProfileHandler struct {
 	accountRepo repos.AccountRepository
 }
 
-func NewGetProfileHandler(baseRepo repos.Repos) GetProfileHandler {
+func NewGetProfileHandler(baseRepo repos.Repos) cqrs.Handler[*in.GetProfileRequest, *out.GetProfileResponse] {
 	return &getProfileHandler{
 		accountRepo: baseRepo.AccountRepository(),
 	}

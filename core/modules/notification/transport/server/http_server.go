@@ -2,27 +2,34 @@ package server
 
 import (
 	"context"
-	notificationcommand "go-socket/core/modules/notification/application/command"
-	notificationquery "go-socket/core/modules/notification/application/query"
+	notificationin "go-socket/core/modules/notification/application/dto/in"
+	notificationout "go-socket/core/modules/notification/application/dto/out"
 	notificationhttp "go-socket/core/modules/notification/transport/http"
+	"go-socket/core/shared/pkg/cqrs"
 	infrahttp "go-socket/core/shared/transport/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 type notificationHTTPServer struct {
-	commandBus notificationcommand.Bus
-	queryBus   notificationquery.Bus
+	savePushSubscription cqrs.Dispatcher[*notificationin.SavePushSubscriptionRequest, *notificationout.SavePushSubscriptionResponse]
+	listNotification     cqrs.Dispatcher[*notificationin.ListNotificationRequest, *notificationout.ListNotificationResponse]
 }
 
-func NewHTTPServer(commandBus notificationcommand.Bus, queryBus notificationquery.Bus) (infrahttp.HTTPServer, error) {
-	return &notificationHTTPServer{commandBus: commandBus, queryBus: queryBus}, nil
+func NewHTTPServer(
+	savePushSubscription cqrs.Dispatcher[*notificationin.SavePushSubscriptionRequest, *notificationout.SavePushSubscriptionResponse],
+	listNotification cqrs.Dispatcher[*notificationin.ListNotificationRequest, *notificationout.ListNotificationResponse],
+) (infrahttp.HTTPServer, error) {
+	return &notificationHTTPServer{
+		savePushSubscription: savePushSubscription,
+		listNotification:     listNotification,
+	}, nil
 }
 
 func (s *notificationHTTPServer) RegisterPublicRoutes(_ *gin.RouterGroup) {}
 
 func (s *notificationHTTPServer) RegisterPrivateRoutes(routes *gin.RouterGroup) {
-	notificationhttp.RegisterPrivateRoutes(routes, s.commandBus, s.queryBus)
+	notificationhttp.RegisterPrivateRoutes(routes, s.savePushSubscription, s.listNotification)
 }
 
 func (s *notificationHTTPServer) Stop(_ context.Context) error {

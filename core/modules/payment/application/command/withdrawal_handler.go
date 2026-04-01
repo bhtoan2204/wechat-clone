@@ -11,6 +11,7 @@ import (
 	"go-socket/core/modules/payment/application/dto/out"
 
 	"github.com/google/uuid"
+	"go-socket/core/shared/pkg/cqrs"
 	"go.uber.org/zap"
 )
 
@@ -18,7 +19,7 @@ type withdrawalHandler struct {
 	baseRepo repos.Repos
 }
 
-func NewWithdrawalHandler(repos repos.Repos) WithdrawalHandler {
+func NewWithdrawalHandler(repos repos.Repos) cqrs.Handler[*in.WithdrawalRequest, *out.WithdrawalResponse] {
 	return &withdrawalHandler{
 		baseRepo: repos,
 	}

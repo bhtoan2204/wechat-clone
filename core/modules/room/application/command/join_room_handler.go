@@ -6,6 +6,7 @@ import (
 	"go-socket/core/modules/room/application/dto/in"
 	"go-socket/core/modules/room/application/dto/out"
 	"go-socket/core/modules/room/domain/repos"
+	"go-socket/core/shared/pkg/cqrs"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 )
 
@@ -13,7 +14,7 @@ type joinRoomHandler struct {
 	roomRepo repos.RoomRepository
 }
 
-func NewJoinRoomHandler(roomRepo repos.RoomRepository) JoinRoomHandler {
+func NewJoinRoomHandler(roomRepo repos.RoomRepository) cqrs.Handler[*in.JoinRoomRequest, *out.JoinRoomResponse] {
 	return &joinRoomHandler{
 		roomRepo: roomRepo,
 	}

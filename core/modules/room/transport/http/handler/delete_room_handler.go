@@ -3,8 +3,9 @@ package handler
 
 import (
 	"errors"
-	"go-socket/core/modules/room/application/command"
 	"go-socket/core/modules/room/application/dto/in"
+	"go-socket/core/modules/room/application/dto/out"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -13,12 +14,12 @@ import (
 )
 
 type deleteRoomHandler struct {
-	commandBus command.Bus
+	deleteRoom cqrs.Dispatcher[*in.DeleteRoomRequest, *out.DeleteRoomResponse]
 }
 
-func NewDeleteRoomHandler(commandBus command.Bus) *deleteRoomHandler {
+func NewDeleteRoomHandler(deleteRoom cqrs.Dispatcher[*in.DeleteRoomRequest, *out.DeleteRoomResponse]) *deleteRoomHandler {
 	return &deleteRoomHandler{
-		commandBus: commandBus,
+		deleteRoom: deleteRoom,
 	}
 }
 
@@ -34,7 +35,7 @@ func (h *deleteRoomHandler) Handle(c *gin.Context) (interface{}, error) {
 		logger.Errorw("Validate request failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("validate request failed"))
 	}
-	result, err := h.commandBus.DeleteRoom.Dispatch(ctx, &request)
+	result, err := h.deleteRoom.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("DeleteRoom failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("DeleteRoom failed"))

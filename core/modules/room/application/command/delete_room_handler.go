@@ -6,6 +6,7 @@ import (
 	"go-socket/core/modules/room/application/dto/in"
 	"go-socket/core/modules/room/application/dto/out"
 	"go-socket/core/modules/room/domain/repos"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -16,7 +17,7 @@ type deleteRoomHandler struct {
 	roomRepo repos.RoomRepository
 }
 
-func NewDeleteRoomHandler(roomRepo repos.RoomRepository) DeleteRoomHandler {
+func NewDeleteRoomHandler(roomRepo repos.RoomRepository) cqrs.Handler[*in.DeleteRoomRequest, *out.DeleteRoomResponse] {
 	return &deleteRoomHandler{
 		roomRepo: roomRepo,
 	}

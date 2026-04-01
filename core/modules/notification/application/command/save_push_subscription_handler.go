@@ -10,6 +10,7 @@ import (
 	"go-socket/core/modules/notification/domain/entity"
 	repos "go-socket/core/modules/notification/domain/repos"
 	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -21,7 +22,7 @@ type savePushSubscriptionHandler struct {
 	pushSubscriptionRepo repos.PushSubscriptionRepository
 }
 
-func NewSavePushSubscriptionHandler(baseRepo repos.Repos) SavePushSubscriptionHandler {
+func NewSavePushSubscriptionHandler(baseRepo repos.Repos) cqrs.Handler[*in.SavePushSubscriptionRequest, *out.SavePushSubscriptionResponse] {
 	return &savePushSubscriptionHandler{pushSubscriptionRepo: baseRepo.PushSubscriptionRepository()}
 }
 

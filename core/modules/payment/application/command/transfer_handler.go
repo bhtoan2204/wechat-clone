@@ -6,6 +6,7 @@ import (
 	"go-socket/core/modules/payment/application/dto/in"
 	"go-socket/core/modules/payment/application/dto/out"
 	"go-socket/core/modules/payment/domain/repos"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 	"time"
@@ -19,7 +20,7 @@ type transferHandler struct {
 	paymentAccountProjectionRepo repos.PaymentAccountProjectionRepository
 }
 
-func NewTransferHandler(repos repos.Repos) TransferHandler {
+func NewTransferHandler(repos repos.Repos) cqrs.Handler[*in.TransferRequest, *out.TransferResponse] {
 	return &transferHandler{
 		baseRepo: repos,
 

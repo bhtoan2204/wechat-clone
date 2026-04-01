@@ -6,6 +6,7 @@ import (
 	"go-socket/core/modules/payment/application/dto/in"
 	"go-socket/core/modules/payment/application/dto/out"
 	paymentrepos "go-socket/core/modules/payment/domain/repos"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -16,7 +17,7 @@ type rebuildProjectionHandler struct {
 	baseRepo paymentrepos.Repos
 }
 
-func NewRebuildProjectionHandler(repos paymentrepos.Repos) RebuildProjectionHandler {
+func NewRebuildProjectionHandler(repos paymentrepos.Repos) cqrs.Handler[*in.RebuildProjectionRequest, *out.RebuildProjectionResponse] {
 	return &rebuildProjectionHandler{
 		baseRepo: repos,
 	}

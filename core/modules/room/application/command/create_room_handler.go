@@ -10,6 +10,7 @@ import (
 	"go-socket/core/modules/room/domain/entity"
 	"go-socket/core/modules/room/domain/repos"
 	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/cqrs"
 	eventpkg "go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
@@ -23,7 +24,7 @@ type createRoomHandler struct {
 	baseRepo repos.Repos
 }
 
-func NewCreateRoomHandler(baseRepo repos.Repos) CreateRoomHandler {
+func NewCreateRoomHandler(baseRepo repos.Repos) cqrs.Handler[*in.CreateRoomRequest, *out.CreateRoomResponse] {
 	return &createRoomHandler{
 		baseRepo: baseRepo,
 	}

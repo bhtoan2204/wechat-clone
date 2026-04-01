@@ -6,8 +6,10 @@ import (
 
 	"go-socket/core/modules/payment/application/command"
 	"go-socket/core/modules/payment/application/dto/in"
+	"go-socket/core/modules/payment/application/dto/out"
 	"go-socket/core/modules/payment/domain/aggregate"
 	paymentrepos "go-socket/core/modules/payment/domain/repos"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -16,11 +18,11 @@ import (
 )
 
 type depositHandler struct {
-	commandBus command.Bus
+	deposit cqrs.Dispatcher[*in.DepositRequest, *out.DepositResponse]
 }
 
-func NewDepositHandler(commandBus command.Bus) *depositHandler {
-	return &depositHandler{commandBus: commandBus}
+func NewDepositHandler(deposit cqrs.Dispatcher[*in.DepositRequest, *out.DepositResponse]) *depositHandler {
+	return &depositHandler{deposit: deposit}
 }
 
 func (h *depositHandler) Handle(c *gin.Context) (interface{}, error) {
@@ -39,7 +41,7 @@ func (h *depositHandler) Handle(c *gin.Context) (interface{}, error) {
 		return nil, nil
 	}
 
-	result, err := h.commandBus.Deposit.Dispatch(ctx, &request)
+	result, err := h.deposit.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("Deposit failed", zap.Error(err))
 		switch {

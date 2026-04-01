@@ -7,6 +7,7 @@ import (
 	"go-socket/core/modules/payment/application/dto/out"
 	"go-socket/core/modules/payment/domain/repos"
 	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/cqrs"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/utils"
 )
@@ -16,7 +17,7 @@ type listTransactionHandler struct {
 	paymentHistoryRepository     repos.PaymentHistoryRepository
 }
 
-func NewListTransactionHandler(repos repos.Repos) ListTransactionHandler {
+func NewListTransactionHandler(repos repos.Repos) cqrs.Handler[*in.ListTransactionRequest, *out.ListTransactionResponse] {
 	return &listTransactionHandler{
 		paymentAccountProjectionRepo: repos.PaymentAccountProjectionRepository(),
 		paymentHistoryRepository:     repos.PaymentHistoryRepository(),

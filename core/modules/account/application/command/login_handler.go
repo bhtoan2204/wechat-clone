@@ -10,6 +10,7 @@ import (
 	repos "go-socket/core/modules/account/domain/repos"
 	valueobject "go-socket/core/modules/account/domain/value_object"
 	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/hasher"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
@@ -24,7 +25,7 @@ type loginHandler struct {
 	paseto      xpaseto.PasetoService
 }
 
-func NewLoginHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos) LoginHandler {
+func NewLoginHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos) cqrs.Handler[*in.LoginRequest, *out.LoginResponse] {
 	return &loginHandler{
 		accountRepo: baseRepo.AccountRepository(),
 		hasher:      appCtx.GetHasher(),

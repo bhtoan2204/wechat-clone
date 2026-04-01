@@ -6,8 +6,10 @@ import (
 
 	"go-socket/core/modules/payment/application/command"
 	"go-socket/core/modules/payment/application/dto/in"
+	"go-socket/core/modules/payment/application/dto/out"
 	"go-socket/core/modules/payment/domain/aggregate"
 	paymentrepos "go-socket/core/modules/payment/domain/repos"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -16,11 +18,11 @@ import (
 )
 
 type withdrawalHandler struct {
-	commandBus command.Bus
+	withdrawal cqrs.Dispatcher[*in.WithdrawalRequest, *out.WithdrawalResponse]
 }
 
-func NewWithdrawalHandler(commandBus command.Bus) *withdrawalHandler {
-	return &withdrawalHandler{commandBus: commandBus}
+func NewWithdrawalHandler(withdrawal cqrs.Dispatcher[*in.WithdrawalRequest, *out.WithdrawalResponse]) *withdrawalHandler {
+	return &withdrawalHandler{withdrawal: withdrawal}
 }
 
 func (h *withdrawalHandler) Handle(c *gin.Context) (interface{}, error) {
@@ -37,7 +39,7 @@ func (h *withdrawalHandler) Handle(c *gin.Context) (interface{}, error) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return nil, nil
 	}
-	result, err := h.commandBus.Withdrawal.Dispatch(ctx, &request)
+	result, err := h.withdrawal.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("Withdrawal failed", zap.Error(err))
 		switch {

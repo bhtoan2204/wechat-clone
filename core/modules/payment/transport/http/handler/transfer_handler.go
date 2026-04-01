@@ -4,8 +4,10 @@ import (
 	"errors"
 	"go-socket/core/modules/payment/application/command"
 	"go-socket/core/modules/payment/application/dto/in"
+	"go-socket/core/modules/payment/application/dto/out"
 	"go-socket/core/modules/payment/domain/aggregate"
 	paymentrepos "go-socket/core/modules/payment/domain/repos"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 	"net/http"
@@ -15,11 +17,11 @@ import (
 )
 
 type transferHandler struct {
-	commandBus command.Bus
+	transfer cqrs.Dispatcher[*in.TransferRequest, *out.TransferResponse]
 }
 
-func NewTransferHandler(commandBus command.Bus) *transferHandler {
-	return &transferHandler{commandBus: commandBus}
+func NewTransferHandler(transfer cqrs.Dispatcher[*in.TransferRequest, *out.TransferResponse]) *transferHandler {
+	return &transferHandler{transfer: transfer}
 }
 
 func (h *transferHandler) Handle(c *gin.Context) (interface{}, error) {
@@ -36,7 +38,7 @@ func (h *transferHandler) Handle(c *gin.Context) (interface{}, error) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return nil, nil
 	}
-	result, err := h.commandBus.Transfer.Dispatch(ctx, &request)
+	result, err := h.transfer.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("Transfer failed", zap.Error(err))
 		switch {

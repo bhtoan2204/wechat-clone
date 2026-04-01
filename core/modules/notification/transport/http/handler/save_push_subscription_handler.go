@@ -2,8 +2,9 @@ package handler
 
 import (
 	"errors"
-	"go-socket/core/modules/notification/application/command"
 	"go-socket/core/modules/notification/application/dto/in"
+	"go-socket/core/modules/notification/application/dto/out"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -12,11 +13,11 @@ import (
 )
 
 type savePushSubscriptionHandler struct {
-	commandBus command.Bus
+	savePushSubscription cqrs.Dispatcher[*in.SavePushSubscriptionRequest, *out.SavePushSubscriptionResponse]
 }
 
-func NewSavePushSubscriptionHandler(commandBus command.Bus) *savePushSubscriptionHandler {
-	return &savePushSubscriptionHandler{commandBus: commandBus}
+func NewSavePushSubscriptionHandler(savePushSubscription cqrs.Dispatcher[*in.SavePushSubscriptionRequest, *out.SavePushSubscriptionResponse]) *savePushSubscriptionHandler {
+	return &savePushSubscriptionHandler{savePushSubscription: savePushSubscription}
 }
 
 func (h *savePushSubscriptionHandler) Handle(c *gin.Context) (interface{}, error) {
@@ -33,7 +34,7 @@ func (h *savePushSubscriptionHandler) Handle(c *gin.Context) (interface{}, error
 		return nil, stackerr.Error(errors.New("validate request failed"))
 	}
 
-	result, err := h.commandBus.SavePushSubscription.Dispatch(ctx, &request)
+	result, err := h.savePushSubscription.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("Save push subscription failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("save push subscription failed"))

@@ -3,8 +3,9 @@ package handler
 
 import (
 	"errors"
-	"go-socket/core/modules/account/application/command"
 	"go-socket/core/modules/account/application/dto/in"
+	"go-socket/core/modules/account/application/dto/out"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -13,12 +14,12 @@ import (
 )
 
 type registerHandler struct {
-	commandBus command.Bus
+	register cqrs.Dispatcher[*in.RegisterRequest, *out.RegisterResponse]
 }
 
-func NewRegisterHandler(commandBus command.Bus) *registerHandler {
+func NewRegisterHandler(register cqrs.Dispatcher[*in.RegisterRequest, *out.RegisterResponse]) *registerHandler {
 	return &registerHandler{
-		commandBus: commandBus,
+		register: register,
 	}
 }
 
@@ -34,7 +35,7 @@ func (h *registerHandler) Handle(c *gin.Context) (interface{}, error) {
 		logger.Errorw("Validate request failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("validate request failed"))
 	}
-	result, err := h.commandBus.Register.Dispatch(ctx, &request)
+	result, err := h.register.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("Register failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("Register failed"))

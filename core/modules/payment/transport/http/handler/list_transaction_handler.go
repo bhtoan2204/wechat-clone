@@ -3,7 +3,8 @@ package handler
 import (
 	"errors"
 	"go-socket/core/modules/payment/application/dto/in"
-	"go-socket/core/modules/payment/application/query"
+	"go-socket/core/modules/payment/application/dto/out"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 	"net/http"
@@ -13,11 +14,11 @@ import (
 )
 
 type listTransactionHandler struct {
-	queryBus query.Bus
+	listTransaction cqrs.Dispatcher[*in.ListTransactionRequest, *out.ListTransactionResponse]
 }
 
-func NewListTransactionHandler(queryBus query.Bus) *listTransactionHandler {
-	return &listTransactionHandler{queryBus: queryBus}
+func NewListTransactionHandler(listTransaction cqrs.Dispatcher[*in.ListTransactionRequest, *out.ListTransactionResponse]) *listTransactionHandler {
+	return &listTransactionHandler{listTransaction: listTransaction}
 }
 
 func (h *listTransactionHandler) Handle(c *gin.Context) (interface{}, error) {
@@ -35,7 +36,7 @@ func (h *listTransactionHandler) Handle(c *gin.Context) (interface{}, error) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return nil, nil
 	}
-	result, err := h.queryBus.ListTransaction.Dispatch(ctx, &request)
+	result, err := h.listTransaction.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("List failed", zap.Error(err))
 		return nil, stackerr.Error(errors.New("list failed"))

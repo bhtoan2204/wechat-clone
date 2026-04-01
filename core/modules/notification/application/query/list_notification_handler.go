@@ -7,6 +7,7 @@ import (
 	"go-socket/core/modules/notification/application/dto/out"
 	"go-socket/core/modules/notification/domain/repos"
 	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/utils"
@@ -18,7 +19,7 @@ type listNotificationHandler struct {
 	notificationRepo repos.NotificationRepository
 }
 
-func NewListNotificationHandler(repos repos.Repos) ListNotificationHandler {
+func NewListNotificationHandler(repos repos.Repos) cqrs.Handler[*in.ListNotificationRequest, *out.ListNotificationResponse] {
 	return &listNotificationHandler{
 		notificationRepo: repos.NotificationRepository(),
 	}
