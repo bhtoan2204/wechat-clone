@@ -11,23 +11,21 @@ import (
 )
 
 type ledgerHTTPServer struct {
-	ledgerHandler  *handler.LedgerHandler
-	paymentHandler *handler.PaymentHandler
+	ledgerHandler *handler.LedgerHandler
 }
 
-func NewHTTPServer(ledgerHandler *handler.LedgerHandler, paymentHandler *handler.PaymentHandler) (infrahttp.HTTPServer, error) {
+func NewHTTPServer(ledgerHandler *handler.LedgerHandler) (infrahttp.HTTPServer, error) {
 	return &ledgerHTTPServer{
-		ledgerHandler:  ledgerHandler,
-		paymentHandler: paymentHandler,
+		ledgerHandler: ledgerHandler,
 	}, nil
 }
 
 func (s *ledgerHTTPServer) RegisterPublicRoutes(routes *gin.RouterGroup) {
-	http.RegisterPublicRoutes(routes, s.paymentHandler)
+	http.RegisterPublicRoutes(routes)
 }
 
 func (s *ledgerHTTPServer) RegisterPrivateRoutes(routes *gin.RouterGroup) {
-	http.RegisterPrivateRoutes(routes, s.ledgerHandler, s.paymentHandler)
+	http.RegisterPrivateRoutes(routes, s.ledgerHandler)
 }
 
 func (s *ledgerHTTPServer) Stop(_ context.Context) error {

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	appCtx "go-socket/core/context"
+	paymentledgerintegration "go-socket/core/integration/paymentledger"
 	accountassembly "go-socket/core/modules/account/assembly"
 	ledgerassembly "go-socket/core/modules/ledger/assembly"
 	notificationassembly "go-socket/core/modules/notification/assembly"
@@ -51,6 +52,8 @@ func main() {
 		logger.Errorw("Failed to migrate database", "error", err)
 		return
 	}
+
+	appContext.RegisterService(paymentledgerintegration.ServiceName, paymentledgerintegration.NewGateway(appContext))
 
 	appServer := apptransport.NewServer(cfg, apptransport.WithHTTPModuleBuilders(
 		accountassembly.BuildHTTPServer,

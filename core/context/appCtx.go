@@ -24,6 +24,7 @@ type AppContext struct {
 	paseto       xpaseto.PasetoService
 	smtp         smtp.SMTP
 	consulClient discovery.ConsulClient
+	services     map[string]interface{}
 }
 
 func NewAppContext(ctx context.Context, opts ...Option) (*AppContext, error) {
@@ -120,4 +121,19 @@ func (appCtx *AppContext) Close() {
 		ins, _ := appCtx.db.DB()
 		ins.Close()
 	}
+}
+
+func (appCtx *AppContext) RegisterService(name string, service interface{}) {
+	if appCtx.services == nil {
+		appCtx.services = make(map[string]interface{})
+	}
+	appCtx.services[name] = service
+}
+
+func (appCtx *AppContext) GetService(name string) (interface{}, bool) {
+	if appCtx.services == nil {
+		return nil, false
+	}
+	service, ok := appCtx.services[name]
+	return service, ok
 }

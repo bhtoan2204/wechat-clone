@@ -44,7 +44,7 @@ func (s *LedgerService) CreateTransaction(ctx context.Context, req *ledgerin.Cre
 func (s *LedgerService) GetAccountBalance(ctx context.Context, accountID string) (*ledgerout.AccountBalanceResponse, error) {
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
-		return nil, fmt.Errorf("%w: account_id is required", ErrValidation)
+		return nil, fmt.Errorf("%v: account_id is required", ErrValidation)
 	}
 
 	balance, err := s.baseRepo.LedgerRepository().GetBalance(ctx, accountID)
@@ -61,12 +61,12 @@ func (s *LedgerService) GetAccountBalance(ctx context.Context, accountID string)
 func (s *LedgerService) GetTransaction(ctx context.Context, transactionID string) (*ledgerout.TransactionResponse, error) {
 	transactionID = strings.TrimSpace(transactionID)
 	if transactionID == "" {
-		return nil, fmt.Errorf("%w: transaction_id is required", ErrValidation)
+		return nil, fmt.Errorf("%v: transaction_id is required", ErrValidation)
 	}
 
 	transaction, err := s.baseRepo.LedgerRepository().GetTransaction(ctx, transactionID)
 	if errors.Is(err, ledgerrepo.ErrNotFound) {
-		return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID)
+		return nil, fmt.Errorf("%v: %s", ErrTransactionNotFound, transactionID)
 	}
 	if err != nil {
 		return nil, stackerr.Error(err)
@@ -87,7 +87,7 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 	}
 	if err := repo.CreateTransaction(ctx, transaction); err != nil {
 		if errors.Is(err, ledgerrepo.ErrDuplicate) {
-			return nil, fmt.Errorf("%w: %s", ErrDuplicateTransaction, transaction.TransactionID)
+			return nil, fmt.Errorf("%v: %s", ErrDuplicateTransaction, transaction.TransactionID)
 		}
 		return nil, stackerr.Error(err)
 	}
@@ -107,7 +107,7 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 
 	transaction, err := repo.GetTransaction(ctx, transaction.TransactionID)
 	if errors.Is(err, ledgerrepo.ErrNotFound) {
-		return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID)
+		return nil, fmt.Errorf("%v: %s", ErrTransactionNotFound, transactionID)
 	}
 	if err != nil {
 		return nil, stackerr.Error(err)
@@ -123,25 +123,25 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 
 func validateLedgerInputs(transactionID string, entries []entity.LedgerEntryInput) error {
 	if strings.TrimSpace(transactionID) == "" {
-		return fmt.Errorf("%w: transaction_id is required", ErrValidation)
+		return fmt.Errorf("%v: transaction_id is required", ErrValidation)
 	}
 	if len(entries) < 2 {
-		return fmt.Errorf("%w: at least 2 entries are required", ErrValidation)
+		return fmt.Errorf("%v: at least 2 entries are required", ErrValidation)
 	}
 
 	var sum int64
 	for idx, entry := range entries {
 		if strings.TrimSpace(entry.AccountID) == "" {
-			return fmt.Errorf("%w: entries[%d].account_id is required", ErrValidation, idx)
+			return fmt.Errorf("%v: entries[%d].account_id is required", ErrValidation, idx)
 		}
 		if entry.Amount == 0 {
-			return fmt.Errorf("%w: entries[%d].amount must be non-zero", ErrValidation, idx)
+			return fmt.Errorf("%v: entries[%d].amount must be non-zero", ErrValidation, idx)
 		}
 		sum += entry.Amount
 	}
 
 	if sum != 0 {
-		return fmt.Errorf("%w: entries must balance to zero", ErrValidation)
+		return fmt.Errorf("%v: entries must balance to zero", ErrValidation)
 	}
 	return nil
 }
@@ -180,5 +180,5 @@ func wrapValidation(err error) error {
 	if err == nil {
 		return nil
 	}
-	return fmt.Errorf("%w: %s", ErrValidation, err.Error())
+	return fmt.Errorf("%v: %s", ErrValidation, err.Error())
 }

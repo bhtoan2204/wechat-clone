@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"go-socket/core/modules/ledger/domain/entity"
-	"go-socket/core/modules/ledger/providers"
+	"go-socket/core/modules/payment/domain/entity"
+	"go-socket/core/modules/payment/providers"
 )
 
 const ProviderName = "mock"
