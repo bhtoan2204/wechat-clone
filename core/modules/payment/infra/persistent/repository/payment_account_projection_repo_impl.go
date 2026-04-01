@@ -6,6 +6,7 @@ import (
 	"go-socket/core/modules/payment/domain/entity"
 	paymentrepos "go-socket/core/modules/payment/domain/repos"
 	"go-socket/core/modules/payment/infra/persistent/model"
+	stackerr "go-socket/core/shared/pkg/stackErr"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -22,7 +23,7 @@ func NewPaymentAccountProjectionRepoImpl(db *gorm.DB) paymentrepos.PaymentAccoun
 func (p *paymentAccountProjectionRepoImpl) GetAccountProjectionByAccountID(ctx context.Context, accountID string) (*entity.PaymentAccount, error) {
 	var accountProjection model.PaymentAccountProjectionModel
 	if err := p.db.WithContext(ctx).Where("account_id = ?", accountID).First(&accountProjection).Error; err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 	return &entity.PaymentAccount{
 		ID:        accountProjection.ID,

@@ -14,6 +14,7 @@ import (
 	ledgerrepo "go-socket/core/modules/ledger/infra/persistent/repository"
 	"go-socket/core/modules/ledger/providers"
 	"go-socket/core/shared/pkg/logging"
+	stackerr "go-socket/core/shared/pkg/stackErr"
 )
 
 type PaymentService struct {
@@ -33,12 +34,12 @@ func NewPaymentService(baseRepo ledgerrepos.Repos, ledgerService *LedgerService,
 func (s *PaymentService) CreatePayment(ctx context.Context, req *ledgerin.CreatePaymentRequest) (*ledgerout.CreatePaymentResponse, error) {
 	req.Normalize()
 	if err := wrapValidation(req.Validate()); err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	provider, err := s.providerRegistry.Get(req.Provider)
 	if err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	now := time.Now().UTC()
@@ -63,7 +64,7 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *ledgerin.Create
 		}
 		return nil
 	}); err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	response, err := provider.CreatePayment(ctx, providers.CreatePaymentRequest{
@@ -81,7 +82,7 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *ledgerin.Create
 			"error", err,
 		)
 		_ = s.updateIntentStatus(ctx, req.TransactionID, entity.PaymentStatusFailed)
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	targetStatus := normalizePaymentStatus(response.Status)
@@ -117,7 +118,7 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *ledgerin.Create
 
 		return nil
 	}); err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	logging.FromContext(ctx).Infow("payment created",
@@ -139,17 +140,17 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *ledgerin.Create
 func (s *PaymentService) HandleWebhook(ctx context.Context, providerName string, payload []byte, signature string) (*ledgerout.ProcessWebhookResponse, error) {
 	provider, err := s.providerRegistry.Get(providerName)
 	if err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	event, err := provider.VerifyWebhook(ctx, payload, signature)
 	if err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	result, err := provider.ParseEvent(ctx, event)
 	if err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 	result.Status = normalizePaymentStatus(result.Status)
 
@@ -199,7 +200,7 @@ func (s *PaymentService) HandleWebhook(ctx context.Context, providerName string,
 
 		return nil
 	}); err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	return response, nil
@@ -255,7 +256,7 @@ func (s *PaymentService) findIntent(ctx context.Context, repo ledgerrepos.Paymen
 			return intent, nil
 		}
 		if !errors.Is(err, ledgerrepo.ErrNotFound) {
-			return nil, err
+			return nil, stackerr.Error(err)
 		}
 	}
 
@@ -265,7 +266,7 @@ func (s *PaymentService) findIntent(ctx context.Context, repo ledgerrepos.Paymen
 			return intent, nil
 		}
 		if !errors.Is(err, ledgerrepo.ErrNotFound) {
-			return nil, err
+			return nil, stackerr.Error(err)
 		}
 	}
 

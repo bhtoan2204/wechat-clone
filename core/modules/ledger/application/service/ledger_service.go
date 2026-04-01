@@ -13,6 +13,7 @@ import (
 	ledgerrepos "go-socket/core/modules/ledger/domain/repos"
 	ledgerrepo "go-socket/core/modules/ledger/infra/persistent/repository"
 	"go-socket/core/shared/pkg/logging"
+	stackerr "go-socket/core/shared/pkg/stackErr"
 )
 
 type LedgerService struct {
@@ -25,7 +26,7 @@ func NewLedgerService(baseRepo ledgerrepos.Repos) *LedgerService {
 
 func (s *LedgerService) CreateTransaction(ctx context.Context, req *ledgerin.CreateTransactionRequest) (*ledgerout.TransactionResponse, error) {
 	if err := wrapValidation(req.Validate()); err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	var transaction *entity.LedgerTransaction
@@ -34,7 +35,7 @@ func (s *LedgerService) CreateTransaction(ctx context.Context, req *ledgerin.Cre
 		transaction, err = s.createTransaction(ctx, txRepos.LedgerRepository(), req.TransactionID, toLedgerEntryInputs(req.Entries))
 		return err
 	}); err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	return toTransactionResponse(transaction), nil
@@ -48,7 +49,7 @@ func (s *LedgerService) GetAccountBalance(ctx context.Context, accountID string)
 
 	balance, err := s.baseRepo.LedgerRepository().GetBalance(ctx, accountID)
 	if err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	return &ledgerout.AccountBalanceResponse{
@@ -68,7 +69,7 @@ func (s *LedgerService) GetTransaction(ctx context.Context, transactionID string
 		return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID)
 	}
 	if err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	return toTransactionResponse(transaction), nil
@@ -76,7 +77,7 @@ func (s *LedgerService) GetTransaction(ctx context.Context, transactionID string
 
 func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.LedgerRepository, transactionID string, entries []entity.LedgerEntryInput) (*entity.LedgerTransaction, error) {
 	if err := validateLedgerInputs(transactionID, entries); err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	now := time.Now().UTC()
@@ -88,7 +89,7 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 		if errors.Is(err, ledgerrepo.ErrDuplicate) {
 			return nil, fmt.Errorf("%w: %s", ErrDuplicateTransaction, transaction.TransactionID)
 		}
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	ledgerEntries := make([]*entity.LedgerEntry, 0, len(entries))
@@ -101,7 +102,7 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 		})
 	}
 	if err := repo.InsertEntries(ctx, ledgerEntries); err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	transaction, err := repo.GetTransaction(ctx, transaction.TransactionID)
@@ -109,7 +110,7 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 		return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID)
 	}
 	if err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	logging.FromContext(ctx).Infow("ledger transaction created",

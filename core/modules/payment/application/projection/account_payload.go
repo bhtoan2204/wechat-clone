@@ -25,7 +25,7 @@ func newProjectionSerializer() (eventpkg.Serializer, error) {
 
 	for _, agg := range aggregates {
 		if err := serializer.RegisterAggregate(agg); err != nil {
-			return nil, err
+			return nil, stackerr.Error(err)
 		}
 	}
 

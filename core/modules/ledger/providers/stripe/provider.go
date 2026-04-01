@@ -18,6 +18,7 @@ import (
 	"go-socket/core/modules/ledger/domain/entity"
 	"go-socket/core/modules/ledger/providers"
 	"go-socket/core/shared/config"
+	stackerr "go-socket/core/shared/pkg/stackErr"
 )
 
 const (
@@ -96,7 +97,7 @@ func (p *Provider) CreatePayment(ctx context.Context, req providers.CreatePaymen
 
 	respBody, statusCode, err := p.doFormRequest(ctx, http.MethodPost, apiBaseURL+"/v1/checkout/sessions", form)
 	if err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	var session checkoutSession

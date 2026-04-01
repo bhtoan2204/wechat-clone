@@ -51,12 +51,12 @@ func (r aggregateRepo) CreateSnapshot(ctx context.Context, aggregate event.Aggre
 func (r aggregateRepo) GetSnapshot(ctx context.Context, aggregateID string, version int, agg event.Aggregate) (event.Aggregate, error) {
 	events := []model.PaymentEventModel{}
 	if err := r.db.Raw(readSnapshotSQL, aggregateID, version).Scan(&events).Error; err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 	root := agg.Root()
 	for _, snapshot := range events {
 		if err := r.serializer.Unmarshal([]byte(snapshot.EventData), root); err != nil {
-			return nil, err
+			return nil, stackerr.Error(err)
 		}
 	}
 	return agg, nil

@@ -12,6 +12,7 @@ import (
 	"go-socket/core/modules/payment/domain/types"
 	"go-socket/core/modules/payment/infra/persistent/model"
 	eventpkg "go-socket/core/shared/pkg/event"
+	stackerr "go-socket/core/shared/pkg/stackErr"
 
 	"gorm.io/gorm"
 )
@@ -54,17 +55,17 @@ func (p *paymentProjectionRepoImpl) RebuildProjection(ctx context.Context, accou
 func (p *paymentProjectionRepoImpl) rebuildFullProjection(ctx context.Context, accountID string) (*repos.ProjectionRebuildResult, error) {
 	aggregateIDs, err := p.listAggregateIDs(ctx, accountID)
 	if err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 	if err := p.clearProjection(ctx, accountID, true); err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	result := &repos.ProjectionRebuildResult{}
 	for _, aggregateID := range aggregateIDs {
 		eventModels, err := p.loadEventModels(ctx, aggregateID, 0)
 		if err != nil {
-			return nil, err
+			return nil, stackerr.Error(err)
 		}
 		if len(eventModels) == 0 {
 			continue
@@ -75,7 +76,7 @@ func (p *paymentProjectionRepoImpl) rebuildFullProjection(ctx context.Context, a
 		for _, eventModel := range eventModels {
 			applied, err := p.replayPaymentEvent(ctx, eventModel, true)
 			if err != nil {
-				return nil, err
+				return nil, stackerr.Error(err)
 			}
 			if !applied {
 				continue
@@ -95,24 +96,24 @@ func (p *paymentProjectionRepoImpl) rebuildFullProjection(ctx context.Context, a
 func (p *paymentProjectionRepoImpl) rebuildProjectionFromSnapshot(ctx context.Context, accountID string) (*repos.ProjectionRebuildResult, error) {
 	aggregateIDs, err := p.listAggregateIDs(ctx, accountID)
 	if err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 	if err := p.clearProjection(ctx, accountID, false); err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	result := &repos.ProjectionRebuildResult{}
 	for _, aggregateID := range aggregateIDs {
 		snapshot, err := p.loadLatestSnapshot(ctx, aggregateID)
 		if err != nil {
-			return nil, err
+			return nil, stackerr.Error(err)
 		}
 
 		startVersion := 0
 		balanceTouched := false
 		if snapshot != nil {
 			if err := p.restoreBalanceProjectionFromSnapshot(ctx, *snapshot); err != nil {
-				return nil, err
+				return nil, stackerr.Error(err)
 			}
 			startVersion = snapshot.Version
 			balanceTouched = true
@@ -120,7 +121,7 @@ func (p *paymentProjectionRepoImpl) rebuildProjectionFromSnapshot(ctx context.Co
 
 		eventModels, err := p.loadEventModels(ctx, aggregateID, startVersion)
 		if err != nil {
-			return nil, err
+			return nil, stackerr.Error(err)
 		}
 		if len(eventModels) == 0 && !balanceTouched {
 			continue
@@ -130,7 +131,7 @@ func (p *paymentProjectionRepoImpl) rebuildProjectionFromSnapshot(ctx context.Co
 		for _, eventModel := range eventModels {
 			applied, err := p.replayPaymentEvent(ctx, eventModel, false)
 			if err != nil {
-				return nil, err
+				return nil, stackerr.Error(err)
 			}
 			if !applied {
 				continue
@@ -320,7 +321,7 @@ func (p *paymentProjectionRepoImpl) listAggregateIDs(ctx context.Context, accoun
 
 	var aggregateIDs []string
 	if err := query.Pluck("aggregate_id", &aggregateIDs).Error; err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	return aggregateIDs, nil
@@ -335,7 +336,7 @@ func (p *paymentProjectionRepoImpl) loadEventModels(ctx context.Context, account
 
 	var eventModels []model.PaymentEventModel
 	if err := query.Order("version ASC").Find(&eventModels).Error; err != nil {
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	return eventModels, nil
@@ -351,7 +352,7 @@ func (p *paymentProjectionRepoImpl) loadLatestSnapshot(ctx context.Context, acco
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, stackerr.Error(err)
 	}
 
 	return &snapshot, nil
