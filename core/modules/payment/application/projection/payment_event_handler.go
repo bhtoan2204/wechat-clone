@@ -33,6 +33,10 @@ func (p *processor) handlePaymentEvent(ctx context.Context, value []byte) error 
 		return p.projectDepositedEvent(ctx, &event)
 	case "EventPaymentTransactionWithdrawn":
 		return p.projectWithdrawnEvent(ctx, &event)
+	case "EventPaymentTransactionTransferred":
+		return p.projectTransferredEvent(ctx, &event)
+	case "EventPaymentTransactionReceived":
+		return p.projectReceivedEvent(ctx, &event)
 	default:
 		return nil
 	}
@@ -64,6 +68,34 @@ func (p *processor) projectWithdrawnEvent(ctx context.Context, event *paymentEve
 	}
 
 	return p.projectTransaction(ctx, event.ID, payload.PaymentTransactionID, event.AggregateID, payload.PaymentTransactionAmount, -payload.PaymentTransactionAmount, types.TransactionTypeWithdrawn, payload.PaymentTransactionCreatedAt)
+}
+
+func (p *processor) projectTransferredEvent(ctx context.Context, event *paymentEventMessage) error {
+	payloadAny, err := decodeEventPayload(ctx, p.eventSerializer, event.AggregateType, event.EventName, event.EventData)
+	if err != nil {
+		return stackerr.Error(fmt.Errorf("decode transfer payload failed: %w", err))
+	}
+
+	payload, ok := payloadAny.(*aggregate.EventPaymentTransactionTransferred)
+	if !ok || payload == nil {
+		return stackerr.Error(fmt.Errorf("invalid transfer payload"))
+	}
+
+	return p.projectTransaction(ctx, event.ID, payload.PaymentTransactionID, event.AggregateID, payload.PaymentTransactionAmount, -payload.PaymentTransactionAmount, types.TransactionTypeTransferred, payload.PaymentTransactionCreatedAt)
+}
+
+func (p *processor) projectReceivedEvent(ctx context.Context, event *paymentEventMessage) error {
+	payloadAny, err := decodeEventPayload(ctx, p.eventSerializer, event.AggregateType, event.EventName, event.EventData)
+	if err != nil {
+		return stackerr.Error(fmt.Errorf("decode receive payload failed: %w", err))
+	}
+
+	payload, ok := payloadAny.(*aggregate.EventPaymentTransactionReceived)
+	if !ok || payload == nil {
+		return stackerr.Error(fmt.Errorf("invalid receive payload"))
+	}
+
+	return p.projectTransaction(ctx, event.ID, payload.PaymentTransactionID, event.AggregateID, payload.PaymentTransactionAmount, payload.PaymentTransactionAmount, types.TransactionTypeReceived, payload.PaymentTransactionCreatedAt)
 }
 
 func (p *processor) projectTransaction(ctx context.Context, eventID, transactionID, accountID string, amount, balanceDelta int64, transactionType types.TransactionType, createdAt time.Time) error {

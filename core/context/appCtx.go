@@ -2,6 +2,7 @@ package appCtx
 
 import (
 	"context"
+	"go-socket/core/shared/config"
 	"go-socket/core/shared/infra/cache"
 	"go-socket/core/shared/infra/discovery"
 	"go-socket/core/shared/infra/smtp"
@@ -15,6 +16,7 @@ import (
 type Option func(*AppContext)
 
 type AppContext struct {
+	cfg          *config.Config
 	redisClient  *redis.Client
 	db           *gorm.DB
 	cache        cache.Cache
@@ -35,6 +37,12 @@ func NewAppContext(ctx context.Context, opts ...Option) (*AppContext, error) {
 func WithRedisClient(redisClient *redis.Client) Option {
 	return func(appCtx *AppContext) {
 		appCtx.redisClient = redisClient
+	}
+}
+
+func WithConfig(cfg *config.Config) Option {
+	return func(appCtx *AppContext) {
+		appCtx.cfg = cfg
 	}
 }
 
@@ -76,6 +84,10 @@ func WithConsulClient(consulClient discovery.ConsulClient) Option {
 
 func (appCtx *AppContext) GetRedisClient() *redis.Client {
 	return appCtx.redisClient
+}
+
+func (appCtx *AppContext) GetConfig() *config.Config {
+	return appCtx.cfg
 }
 
 func (appCtx *AppContext) GetDB() *gorm.DB {

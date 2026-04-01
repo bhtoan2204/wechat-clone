@@ -53,7 +53,9 @@ func (s *Server) Routes(ctx context.Context, appCtx *appCtx.AppContext) *gin.Eng
 		constant.DEFAULT_IDEMPOTENCY_LOCK_TTL,
 		constant.DEFAULT_IDEMPOTENCY_DONE_TTL,
 	)
-	r.Use(middleware.IdempotencyMiddleware(idemManager))
+	if s.cfg.ServerConfig.Environment == "prod" {
+		r.Use(middleware.IdempotencyMiddleware(idemManager))
+	}
 	r.Use(middleware.RateLimitMiddleware(cache))
 	r.Use(gin.CustomRecovery(func(c *gin.Context, err interface{}) {
 		c.JSON(http.StatusInternalServerError, gin.H{"errors": gin.H{"error": "something went wrong"}})

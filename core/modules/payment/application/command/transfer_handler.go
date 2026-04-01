@@ -69,7 +69,7 @@ func (h *transferHandler) Handle(ctx context.Context, req *in.TransferRequest) (
 		if err != nil {
 			return stackerr.Error(err)
 		}
-		if err := receiverAgg.Receive(transactionID, req.Amount, receiverID, now); err != nil {
+		if err := receiverAgg.Receive(transactionID, req.Amount, accountID, now); err != nil {
 			return stackerr.Error(err)
 		}
 		if err := txRepos.PaymentBalanceAggregateRepository().Save(ctx, receiverAgg); err != nil {

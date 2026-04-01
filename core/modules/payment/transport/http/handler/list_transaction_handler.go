@@ -25,7 +25,7 @@ func (h *listTransactionHandler) Handle(c *gin.Context) (interface{}, error) {
 	logger := logging.FromContext(ctx)
 
 	var request in.ListTransactionRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
+	if err := c.ShouldBindQuery(&request); err != nil {
 		logger.Errorw("Unmarshal request failed", zap.Error(err))
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return nil, nil

@@ -6,6 +6,7 @@ const (
 	TransactionTypeDeposited   TransactionType = "deposited"
 	TransactionTypeWithdrawn   TransactionType = "withdrawn"
 	TransactionTypeTransferred TransactionType = "transferred"
+	TransactionTypeReceived    TransactionType = "received"
 	TransactionTypeRefunded    TransactionType = "refunded"
 )
 

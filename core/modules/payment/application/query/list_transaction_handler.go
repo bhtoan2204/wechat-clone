@@ -35,16 +35,39 @@ func (l *listTransactionHandler) Handle(ctx context.Context, req *in.ListTransac
 	options := utils.QueryOptions{
 		Conditions: []utils.Condition{
 			{
-				Field:    "sender_id",
-				Value:    payload.AccountID,
-				Operator: utils.Equal,
+				Field:    "(sender_id = ? OR receiver_id = ?)",
+				Value:    []interface{}{payload.AccountID, payload.AccountID},
+				Operator: utils.Raw,
 			},
 		},
+		OrderBy:        "created_at",
+		OrderDirection: "DESC",
 	}
-	_, err := l.paymentHistoryRepository.ListPaymentHistory(ctx, options)
+	histories, err := l.paymentHistoryRepository.ListPaymentHistory(ctx, options)
 	if err != nil {
 		return nil, stackerr.Error(err)
 	}
 
-	return &out.ListTransactionResponse{}, nil
+	records := make([]out.TransactionRecord, 0, len(histories))
+	for _, history := range histories {
+		if history == nil {
+			continue
+		}
+		records = append(records, out.TransactionRecord{
+			Type:       history.Type,
+			Amount:     history.Amount,
+			Balance:    history.Balance,
+			Date:       history.CreatedAt,
+			Sender:     history.SenderName,
+			SenderID:   history.SenderID,
+			Receiver:   history.ReceiverName,
+			ReceiverID: history.ReceiverID,
+		})
+	}
+
+	return &out.ListTransactionResponse{
+		Page:   req.Page,
+		Limit:  req.Limit,
+		Record: records,
+	}, nil
 }

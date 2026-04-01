@@ -6,6 +6,7 @@ import (
 	"fmt"
 	appCtx "go-socket/core/context"
 	accountassembly "go-socket/core/modules/account/assembly"
+	ledgerassembly "go-socket/core/modules/ledger/assembly"
 	notificationassembly "go-socket/core/modules/notification/assembly"
 	paymentassembly "go-socket/core/modules/payment/assembly"
 	roomassembly "go-socket/core/modules/room/assembly"
@@ -53,6 +54,7 @@ func main() {
 
 	appServer := apptransport.NewServer(cfg, apptransport.WithHTTPModuleBuilders(
 		accountassembly.BuildHTTPServer,
+		ledgerassembly.BuildHTTPServer,
 		notificationassembly.BuildHTTPServer,
 		roomassembly.BuildHTTPServer,
 		paymentassembly.BuildHTTPServer,

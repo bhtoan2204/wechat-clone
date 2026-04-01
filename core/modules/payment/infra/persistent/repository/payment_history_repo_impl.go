@@ -22,7 +22,7 @@ func NewPaymentHistoryRepoImpl(db *gorm.DB) repos.PaymentHistoryRepository {
 }
 
 func (r *paymentHistoryRepoImpl) ListPaymentHistory(ctx context.Context, options utils.QueryOptions) ([]*entity.PaymentHistory, error) {
-	var notifications []*model.PaymentHistoryModel
+	var rows []*model.PaymentHistoryModel
 
 	tx := r.db.WithContext(ctx).Model(&model.PaymentHistoryModel{})
 
@@ -57,9 +57,37 @@ func (r *paymentHistoryRepoImpl) ListPaymentHistory(ctx context.Context, options
 		tx = tx.Offset(*options.Offset)
 	}
 
-	if err := tx.Find(&notifications).Error; err != nil {
+	if err := tx.Find(&rows).Error; err != nil {
 		return nil, stackerr.Error(err)
 	}
 
-	return []*entity.PaymentHistory{}, nil
+	result := make([]*entity.PaymentHistory, 0, len(rows))
+	for _, row := range rows {
+		if row == nil {
+			continue
+		}
+
+		history := &entity.PaymentHistory{
+			ID:        row.ID,
+			Type:      row.Type,
+			Amount:    row.Amount,
+			Balance:   row.Balance,
+			CreatedAt: row.CreatedAt,
+		}
+		if row.SenderID != nil {
+			history.SenderID = *row.SenderID
+		}
+		if row.ReceiverID != nil {
+			history.ReceiverID = *row.ReceiverID
+		}
+		if row.SenderName != nil {
+			history.SenderName = *row.SenderName
+		}
+		if row.ReceiverName != nil {
+			history.ReceiverName = *row.ReceiverName
+		}
+		result = append(result, history)
+	}
+
+	return result, nil
 }

@@ -17,6 +17,7 @@ import (
 
 func LoadAppCtx(ctx context.Context, cfg *config.Config) (*AppContext, error) {
 	var opts []Option
+	opts = append(opts, WithConfig(cfg))
 
 	db, err := dbinfra.NewConnection(ctx, cfg)
 	if err != nil {

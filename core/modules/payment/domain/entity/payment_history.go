@@ -7,6 +7,8 @@ type PaymentHistory struct {
 	Type         string
 	Amount       int64
 	Balance      int64
+	SenderID     string
+	ReceiverID   string
 	Sender       PaymentAccount
 	Receiver     PaymentAccount
 	SenderName   string

@@ -243,6 +243,16 @@ func (p *paymentProjectionRepoImpl) replayPaymentEvent(ctx context.Context, even
 			return true, p.ProjectTransaction(ctx, eventModel.ID, eventData.PaymentTransactionID, eventModel.AggregateID, eventData.PaymentTransactionAmount, -eventData.PaymentTransactionAmount, types.TransactionTypeWithdrawn, eventData.PaymentTransactionCreatedAt)
 		}
 		return true, p.applyBalanceDelta(ctx, eventModel.AggregateID, -eventData.PaymentTransactionAmount, eventData.PaymentTransactionCreatedAt)
+	case *aggregate.EventPaymentTransactionTransferred:
+		if projectTransactions {
+			return true, p.ProjectTransaction(ctx, eventModel.ID, eventData.PaymentTransactionID, eventModel.AggregateID, eventData.PaymentTransactionAmount, -eventData.PaymentTransactionAmount, types.TransactionTypeTransferred, eventData.PaymentTransactionCreatedAt)
+		}
+		return true, p.applyBalanceDelta(ctx, eventModel.AggregateID, -eventData.PaymentTransactionAmount, eventData.PaymentTransactionCreatedAt)
+	case *aggregate.EventPaymentTransactionReceived:
+		if projectTransactions {
+			return true, p.ProjectTransaction(ctx, eventModel.ID, eventData.PaymentTransactionID, eventModel.AggregateID, eventData.PaymentTransactionAmount, eventData.PaymentTransactionAmount, types.TransactionTypeReceived, eventData.PaymentTransactionCreatedAt)
+		}
+		return true, p.applyBalanceDelta(ctx, eventModel.AggregateID, eventData.PaymentTransactionAmount, eventData.PaymentTransactionCreatedAt)
 	default:
 		return false, fmt.Errorf("unsupported payment event for projection rebuild: %s", eventModel.EventName)
 	}

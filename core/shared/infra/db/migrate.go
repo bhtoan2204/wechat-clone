@@ -203,25 +203,68 @@ func applyMigrationFile(db *sql.DB, path string, version int) error {
 
 func splitSQLStatements(input string) []string {
 	lines := strings.Split(input, "\n")
-	var cleaned strings.Builder
+	var out []string
+	var current strings.Builder
+	inPLSQLBlock := false
+
+	flush := func(trimSemicolon bool) {
+		stmt := strings.TrimSpace(current.String())
+		if trimSemicolon {
+			stmt = strings.TrimSpace(strings.TrimSuffix(stmt, ";"))
+		}
+		if stmt != "" {
+			out = append(out, stmt)
+		}
+		current.Reset()
+	}
+
 	for _, line := range lines {
 		trim := strings.TrimSpace(line)
-		if strings.HasPrefix(trim, "--") || trim == "" {
+		if trim == "" || strings.HasPrefix(trim, "--") {
 			continue
 		}
-		cleaned.WriteString(line)
-		cleaned.WriteString("\n")
+
+		upper := strings.ToUpper(trim)
+		if !inPLSQLBlock && isOraclePLSQLBlockStart(upper) {
+			inPLSQLBlock = true
+		}
+
+		if inPLSQLBlock {
+			if trim == "/" {
+				flush(false)
+				inPLSQLBlock = false
+				continue
+			}
+			current.WriteString(line)
+			current.WriteString("\n")
+			continue
+		}
+
+		current.WriteString(line)
+		current.WriteString("\n")
+
+		if strings.HasSuffix(trim, ";") {
+			flush(true)
+		}
 	}
-	raw := strings.Split(cleaned.String(), ";")
-	var out []string
-	for _, stmt := range raw {
-		stmt = strings.TrimSpace(stmt)
-		if stmt == "" {
-			continue
-		}
-		out = append(out, stmt)
+
+	if strings.TrimSpace(current.String()) != "" {
+		flush(true)
 	}
 	return out
+}
+
+func isOraclePLSQLBlockStart(statement string) bool {
+	switch {
+	case strings.HasPrefix(statement, "CREATE OR REPLACE TRIGGER"):
+		return true
+	case strings.HasPrefix(statement, "CREATE OR REPLACE FUNCTION"):
+		return true
+	case strings.HasPrefix(statement, "CREATE OR REPLACE PROCEDURE"):
+		return true
+	default:
+		return false
+	}
 }
 
 func isObjectExistsError(err error) bool {
