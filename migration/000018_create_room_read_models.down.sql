@@ -1,0 +1,23 @@
+DROP INDEX idx_message_deletion_read_models_account_id;
+DROP TABLE message_deletion_read_models CASCADE CONSTRAINTS;
+
+DROP INDEX idx_message_receipt_read_models_status;
+DROP INDEX idx_message_receipt_read_models_account_id;
+DROP TABLE message_receipt_read_models CASCADE CONSTRAINTS;
+
+DROP INDEX idx_message_read_models_forwarded_from_message_id;
+DROP INDEX idx_message_read_models_reply_to_message_id;
+DROP INDEX idx_message_read_models_created_at;
+DROP INDEX idx_message_read_models_sender_id;
+DROP INDEX idx_message_read_models_room_id;
+DROP TABLE message_read_models CASCADE CONSTRAINTS;
+
+DROP INDEX idx_room_member_read_models_account_id;
+DROP INDEX idx_room_member_read_models_room_id;
+DROP TABLE room_member_read_models CASCADE CONSTRAINTS;
+
+DROP INDEX idx_room_read_models_last_message_id;
+DROP INDEX idx_room_read_models_updated_at;
+DROP INDEX idx_room_read_models_owner_id;
+DROP INDEX uq_room_read_models_direct_key;
+DROP TABLE room_read_models CASCADE CONSTRAINTS;

@@ -1,0 +1,102 @@
+version: 1
+basePath: /api/v1
+
+endpoints:
+  - name: LedgerCreateTransaction
+    method: POST
+    path: /ledger/transactions
+    handler: CreateTransactionHandler
+    auth: true
+    usecase:
+      name: LedgerUsecase
+      method: CreateTransaction
+    request:
+      struct: CreateTransactionRequest
+      fields:
+        - name: transaction_id
+          type: string
+          required: true
+        - name: entries
+          type: array
+          required: true
+    response:
+      struct: TransactionResponse
+      fields:
+        - name: transaction_id
+          type: string
+        - name: created_at
+          type: string
+        - name: entries
+          type: array
+          items:
+            struct: LedgerEntryResponse
+            fields:
+              - name: id
+                type: int64
+              - name: transaction_id
+                type: string
+              - name: account_id
+                type: string
+              - name: amount
+                type: int64
+              - name: created_at
+                type: string
+
+  - name: LedgerGetAccountBalance
+    method: GET
+    path: /ledger/accounts/:account_id/balance
+    handler: GetAccountBalanceHandler
+    auth: true
+    usecase:
+      name: LedgerUsecase
+      method: GetAccountBalance
+    request:
+      struct: GetAccountBalanceRequest
+      fields:
+        - name: account_id
+          type: string
+          required: true
+    response:
+      struct: AccountBalanceResponse
+      fields:
+        - name: account_id
+          type: string
+        - name: balance
+          type: int64
+
+  - name: LedgerGetTransaction
+    method: GET
+    path: /ledger/transactions/:transaction_id
+    handler: GetTransactionHandler
+    auth: true
+    usecase:
+      name: LedgerUsecase
+      method: GetTransaction
+    request:
+      struct: GetTransactionRequest
+      fields:
+        - name: transaction_id
+          type: string
+          required: true
+    response:
+      struct: TransactionResponse
+      fields:
+        - name: transaction_id
+          type: string
+        - name: created_at
+          type: string
+        - name: entries
+          type: array
+          items:
+            struct: LedgerEntryResponse
+            fields:
+              - name: id
+                type: int64
+              - name: transaction_id
+                type: string
+              - name: account_id
+                type: string
+              - name: amount
+                type: int64
+              - name: created_at
+                type: string

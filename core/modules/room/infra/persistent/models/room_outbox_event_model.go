@@ -9,6 +9,7 @@ type RoomOutboxEventModel struct {
 	Version       int       `gorm:"not null"`
 	EventName     string    `gorm:"not null;index"`
 	EventData     string    `gorm:"type:CLOB;not null"`
+	Metadata      string    `gorm:"type:CLOB;not null;default:'{}'"`
 	CreatedAt     time.Time `gorm:"autoCreateTime"`
 }
 

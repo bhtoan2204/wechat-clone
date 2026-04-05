@@ -18,6 +18,67 @@ services:
     volumes:
       - redis_data:/data
 
+  cassandra:
+    image: cassandra:5.0
+    container_name: chat-cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: chat-cluster
+      CASSANDRA_DC: dc1
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 128M
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    restart: unless-stopped
+
+  cassandra-init:
+    image: cassandra:5.0
+    depends_on:
+      - cassandra
+    entrypoint: >
+      /bin/sh -c "
+      until cqlsh cassandra 9042 -e 'DESCRIBE KEYSPACES'; do
+        echo 'waiting for cassandra';
+        sleep 5;
+      done;
+      cqlsh cassandra 9042 -e \"
+      CREATE KEYSPACE IF NOT EXISTS chat_app
+      WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+      \";
+      "
+    restart: "no"
+
+  minio:
+    image: minio/minio:latest
+    container_name: chat-minio
+    ports:
+      - "9001:9000"
+      - "9002:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until /usr/bin/mc alias set local http://minio:9000 minioadmin minioadmin; do
+        echo 'waiting for minio';
+        sleep 2;
+      done;
+      /usr/bin/mc mb -p local/chat-media || true;
+      /usr/bin/mc anonymous set public local/chat-media || true;
+      "
+    restart: "no"
+
   oracle-db:
     image: gvenzl/oracle-free:23.4-slim
     container_name: oracle23c-free
@@ -122,6 +183,8 @@ volumes:
   go_pkg_mod:
   go_build_cache:
   redis_data:
+  cassandra_data:
+  minio_data:
   oracle_data:
   kafka_data:
   zookeeper_data:

@@ -10,6 +10,8 @@ type RoomType string
 const (
 	RoomTypePublic  RoomType = "public"
 	RoomTypePrivate RoomType = "private"
+	RoomTypeDirect  RoomType = "direct"
+	RoomTypeGroup   RoomType = "group"
 )
 
 func (r RoomType) Normalize() RoomType {
@@ -18,7 +20,7 @@ func (r RoomType) Normalize() RoomType {
 
 func (r RoomType) IsValid() bool {
 	switch r.Normalize() {
-	case RoomTypePublic, RoomTypePrivate:
+	case RoomTypePublic, RoomTypePrivate, RoomTypeDirect, RoomTypeGroup:
 		return true
 	default:
 		return false

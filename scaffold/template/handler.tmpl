@@ -2,9 +2,11 @@
 package {{.PackageName}}
 
 import (
-	"errors"
-	"{{.BusImport}}"
+	"net/http"
+
 	"{{.RequestDtoImport}}"
+	"{{.ResponseDtoImport}}"
+	"{{.DispatcherImport}}"
 	"go-socket/core/shared/pkg/logging"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 
@@ -13,35 +15,46 @@ import (
 )
 
 type {{.StructName}} struct {
-	{{.BusField}} {{.BusPackage}}.Bus
+	{{.DispatcherField}} {{.DispatcherPackage}}.Dispatcher[*in.{{.RequestStruct}}, *out.{{.ResponseStruct}}]
 }
 
-func New{{.HandlerName}}({{.BusField}} {{.BusPackage}}.Bus) *{{.StructName}} {
+func New{{.HandlerName}}(
+	{{.DispatcherField}} {{.DispatcherPackage}}.Dispatcher[*in.{{.RequestStruct}}, *out.{{.ResponseStruct}}],
+) *{{.StructName}} {
 	return &{{.StructName}}{
-		{{.BusField}}: {{.BusField}},
+		{{.DispatcherField}}: {{.DispatcherField}},
 	}
 }
 
 func (h *{{.StructName}}) Handle(c *gin.Context) (interface{}, error) {
 	ctx := c.Request.Context()
 	logger := logging.FromContext(ctx)
+{{- if .RequestInit}}
+	{{.RequestInit}}
+{{- else}}
 	var request in.{{.RequestStruct}}
+{{- end}}
 {{- if eq .Method "GET"}}
 	if err := c.ShouldBindQuery(&request); err != nil {
 {{- else}}
 	if err := c.ShouldBindJSON(&request); err != nil {
 {{- end}}
 		logger.Errorw("Unmarshal request failed", zap.Error(err))
-		return nil, stackerr.Error(err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
+
 	if err := request.Validate(); err != nil {
 		logger.Errorw("Validate request failed", zap.Error(err))
-		return nil, stackerr.Error(errors.New("validate request failed"))
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
-	result, err := h.{{.BusField}}.{{.UsecaseMethod}}.Dispatch(ctx, &request)
+
+	result, err := h.{{.DispatcherField}}.Dispatch(ctx, &request)
 	if err != nil {
-		logger.Errorw("{{.UsecaseMethod}} failed", zap.Error(err))
-		return nil, stackerr.Error(errors.New("{{.UsecaseMethod}} failed"))
+		logger.Errorw("{{.ActionName}} failed", zap.Error(err))
+		return nil, stackerr.Error(err)
 	}
+
 	return result, nil
 }

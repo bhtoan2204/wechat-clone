@@ -3,20 +3,29 @@ package server
 import (
 	"context"
 
+	"go-socket/core/modules/ledger/application/dto/in"
+	"go-socket/core/modules/ledger/application/dto/out"
 	"go-socket/core/modules/ledger/transport/http"
-	"go-socket/core/modules/ledger/transport/http/handler"
+	"go-socket/core/shared/pkg/cqrs"
 	infrahttp "go-socket/core/shared/transport/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 type ledgerHTTPServer struct {
-	ledgerHandler *handler.LedgerHandler
+	createTransactionHandler cqrs.Dispatcher[*in.CreateTransactionRequest, *out.TransactionResponse]
+	getAccountBalanceHandler cqrs.Dispatcher[*in.GetAccountBalanceRequest, *out.AccountBalanceResponse]
+	getTransactionHandler    cqrs.Dispatcher[*in.GetTransactionRequest, *out.TransactionResponse]
 }
 
-func NewHTTPServer(ledgerHandler *handler.LedgerHandler) (infrahttp.HTTPServer, error) {
+func NewHTTPServer(
+	createTransactionHandler cqrs.Dispatcher[*in.CreateTransactionRequest, *out.TransactionResponse],
+	getAccountBalanceHandler cqrs.Dispatcher[*in.GetAccountBalanceRequest, *out.AccountBalanceResponse],
+	getTransactionHandler cqrs.Dispatcher[*in.GetTransactionRequest, *out.TransactionResponse]) (infrahttp.HTTPServer, error) {
 	return &ledgerHTTPServer{
-		ledgerHandler: ledgerHandler,
+		createTransactionHandler: createTransactionHandler,
+		getAccountBalanceHandler: getAccountBalanceHandler,
+		getTransactionHandler:    getTransactionHandler,
 	}, nil
 }
 
@@ -25,7 +34,7 @@ func (s *ledgerHTTPServer) RegisterPublicRoutes(routes *gin.RouterGroup) {
 }
 
 func (s *ledgerHTTPServer) RegisterPrivateRoutes(routes *gin.RouterGroup) {
-	http.RegisterPrivateRoutes(routes, s.ledgerHandler)
+	http.RegisterPrivateRoutes(routes, s.createTransactionHandler, s.getAccountBalanceHandler, s.getTransactionHandler)
 }
 
 func (s *ledgerHTTPServer) Stop(_ context.Context) error {

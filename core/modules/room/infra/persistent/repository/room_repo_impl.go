@@ -80,6 +80,18 @@ func (r *roomRepoImpl) GetRoomByID(ctx context.Context, id string) (*entity.Room
 	return r.toEntity(&m), nil
 }
 
+func (r *roomRepoImpl) GetRoomByDirectKey(ctx context.Context, directKey string) (*entity.Room, error) {
+	var m models.RoomModel
+	err := r.db.WithContext(ctx).
+		Where("direct_key = ?", directKey).
+		First(&m).Error
+	if err != nil {
+		return nil, stackerr.Error(err)
+	}
+	_ = r.roomCache.Set(ctx, r.toEntity(&m))
+	return r.toEntity(&m), nil
+}
+
 func (r *roomRepoImpl) UpdateRoom(ctx context.Context, room *entity.Room) error {
 	m := r.toModel(room)
 	if err := r.db.WithContext(ctx).Save(m).Error; err != nil {
@@ -98,24 +110,42 @@ func (r *roomRepoImpl) DeleteRoom(ctx context.Context, id string) error {
 
 func (r *roomRepoImpl) toEntity(m *models.RoomModel) *entity.Room {
 	return &entity.Room{
-		ID:          m.ID,
-		Name:        m.Name,
-		Description: m.Description,
-		RoomType:    m.RoomType,
-		OwnerID:     m.OwnerID,
-		CreatedAt:   m.CreatedAt,
-		UpdatedAt:   m.UpdatedAt,
+		ID:              m.ID,
+		Name:            m.Name,
+		Description:     m.Description,
+		RoomType:        m.RoomType,
+		OwnerID:         m.OwnerID,
+		DirectKey:       roomDerefString(m.DirectKey),
+		PinnedMessageID: roomDerefString(m.PinnedMessageID),
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
 	}
 }
 
 func (r *roomRepoImpl) toModel(e *entity.Room) *models.RoomModel {
 	return &models.RoomModel{
-		ID:          e.ID,
-		Name:        e.Name,
-		Description: e.Description,
-		RoomType:    e.RoomType,
-		OwnerID:     e.OwnerID,
-		CreatedAt:   e.CreatedAt,
-		UpdatedAt:   e.UpdatedAt,
+		ID:              e.ID,
+		Name:            e.Name,
+		Description:     e.Description,
+		RoomType:        e.RoomType,
+		OwnerID:         e.OwnerID,
+		DirectKey:       roomNullableString(e.DirectKey),
+		PinnedMessageID: roomNullableString(e.PinnedMessageID),
+		CreatedAt:       e.CreatedAt,
+		UpdatedAt:       e.UpdatedAt,
 	}
+}
+
+func roomNullableString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func roomDerefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }

@@ -1,15 +1,23 @@
 package http
 
 import (
+	"go-socket/core/modules/ledger/application/dto/in"
+	"go-socket/core/modules/ledger/application/dto/out"
 	"go-socket/core/modules/ledger/transport/http/handler"
+	"go-socket/core/shared/pkg/cqrs"
+	"go-socket/core/shared/transport/httpx"
 
 	"github.com/gin-gonic/gin"
 )
 
 func RegisterPublicRoutes(_ *gin.RouterGroup) {}
 
-func RegisterPrivateRoutes(routes *gin.RouterGroup, ledgerHandler *handler.LedgerHandler) {
-	routes.POST("/ledger/transactions", ledgerHandler.CreateTransaction)
-	routes.GET("/ledger/accounts/:account_id/balance", ledgerHandler.GetAccountBalance)
-	routes.GET("/ledger/transactions/:transaction_id", ledgerHandler.GetTransaction)
+func RegisterPrivateRoutes(routes *gin.RouterGroup,
+	createTransactionHandler cqrs.Dispatcher[*in.CreateTransactionRequest, *out.TransactionResponse],
+	getAccountBalanceHandler cqrs.Dispatcher[*in.GetAccountBalanceRequest, *out.AccountBalanceResponse],
+	getTransactionHandler cqrs.Dispatcher[*in.GetTransactionRequest, *out.TransactionResponse],
+) {
+	routes.POST("/ledger/transactions", httpx.Wrap(handler.NewCreateTransactionHandler(createTransactionHandler)))
+	routes.GET("/ledger/accounts/:account_id/balance", httpx.Wrap(handler.NewGetAccountBalanceHandler(getAccountBalanceHandler)))
+	routes.GET("/ledger/transactions/:transaction_id", httpx.Wrap(handler.NewGetTransactionHandler(getTransactionHandler)))
 }

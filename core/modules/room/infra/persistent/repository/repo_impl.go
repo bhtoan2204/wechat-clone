@@ -14,10 +14,13 @@ type repoImpl struct {
 	db     *gorm.DB
 	appCtx *appCtx.AppContext
 
-	roomRepo       repos.RoomRepository
-	messageRepo    repos.MessageRepository
-	roomMemberRepo repos.RoomMemberRepository
-	roomOutboxRepo repos.RoomOutboxEventsRepository
+	roomRepo        repos.RoomRepository
+	messageRepo     repos.MessageRepository
+	roomMemberRepo  repos.RoomMemberRepository
+	roomOutboxRepo  repos.RoomOutboxEventsRepository
+	roomReadRepo    repos.RoomReadRepository
+	messageReadRepo repos.MessageReadRepository
+	memberReadRepo  repos.RoomMemberReadRepository
 }
 
 func NewRepoImpl(appCtx *appCtx.AppContext) repos.Repos {
@@ -29,14 +32,20 @@ func newRepoImplWithDB(appCtx *appCtx.AppContext, db *gorm.DB) repos.Repos {
 	messageRepo := NewMessageRepoImpl(db)
 	roomMemberRepo := NewRoomMemberImpl(db)
 	roomOutboxRepo := NewRoomOutboxEventsRepoImpl(db)
+	roomReadRepo := NewRoomReadRepoImpl(db)
+	messageReadRepo := NewMessageReadRepoImpl(db)
+	memberReadRepo := NewRoomMemberReadRepoImpl(db)
 
 	return &repoImpl{
-		db:             db,
-		appCtx:         appCtx,
-		roomRepo:       roomRepo,
-		messageRepo:    messageRepo,
-		roomMemberRepo: roomMemberRepo,
-		roomOutboxRepo: roomOutboxRepo,
+		db:              db,
+		appCtx:          appCtx,
+		roomRepo:        roomRepo,
+		messageRepo:     messageRepo,
+		roomMemberRepo:  roomMemberRepo,
+		roomOutboxRepo:  roomOutboxRepo,
+		roomReadRepo:    roomReadRepo,
+		messageReadRepo: messageReadRepo,
+		memberReadRepo:  memberReadRepo,
 	}
 }
 
@@ -54,6 +63,18 @@ func (r *repoImpl) RoomMemberRepository() repos.RoomMemberRepository {
 
 func (r *repoImpl) RoomOutboxEventsRepository() repos.RoomOutboxEventsRepository {
 	return r.roomOutboxRepo
+}
+
+func (r *repoImpl) RoomReadRepository() repos.RoomReadRepository {
+	return r.roomReadRepo
+}
+
+func (r *repoImpl) MessageReadRepository() repos.MessageReadRepository {
+	return r.messageReadRepo
+}
+
+func (r *repoImpl) RoomMemberReadRepository() repos.RoomMemberReadRepository {
+	return r.memberReadRepo
 }
 
 func (r *repoImpl) WithTransaction(ctx context.Context, fn func(repos.Repos) error) (err error) {

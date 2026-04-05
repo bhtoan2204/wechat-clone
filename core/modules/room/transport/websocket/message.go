@@ -6,6 +6,9 @@ const (
 	ActionJoinRoom    = "JOIN_ROOM"
 	ActionLeaveRoom   = "LEAVE_ROOM"
 	ActionChatMessage = "CHAT_MESSAGE"
+	ActionTyping      = "TYPING"
+	ActionPresence    = "PRESENCE"
+	ActionSeen        = "SEEN"
 )
 
 type Message struct {

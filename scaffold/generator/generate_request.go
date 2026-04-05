@@ -49,6 +49,10 @@ func GenerateRequest(endpoints []models.Endpoint) (string, error) {
 
 		fileName := utils.Snake(ep.Request.Struct) + "_request.go"
 		dst := filepath.Join(module.FsRoot, "application/dto/in", fileName)
+		if structExistsInDir(filepath.Dir(dst), ep.Request.Struct) {
+			skipped++
+			continue
+		}
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return "", err
 		}

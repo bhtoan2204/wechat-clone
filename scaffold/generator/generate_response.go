@@ -48,6 +48,10 @@ func GenerateResponse(endpoints []models.Endpoint) (string, error) {
 
 		fileName := utils.Snake(ep.Response.Struct) + "_response.go"
 		dst := filepath.Join(module.FsRoot, "application/dto/out", fileName)
+		if structExistsInDir(filepath.Dir(dst), ep.Response.Struct) {
+			skipped++
+			continue
+		}
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return "", err
 		}

@@ -7,4 +7,6 @@ import (
 
 type MessageRepository interface {
 	CreateMessage(ctx context.Context, message *entity.MessageEntity) error
+	UpdateMessage(ctx context.Context, message *entity.MessageEntity) error
+	GetMessageByID(ctx context.Context, id string) (*entity.MessageEntity, error)
 }

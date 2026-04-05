@@ -33,6 +33,11 @@ func moduleForUsecase(usecaseName string) (modulePaths, error) {
 			FsRoot:     "core/modules/payment",
 			ImportRoot: "go-socket/core/modules/payment",
 		}, nil
+	case "Ledger":
+		return modulePaths{
+			FsRoot:     "core/modules/ledger",
+			ImportRoot: "go-socket/core/modules/ledger",
+		}, nil
 	default:
 		return modulePaths{}, fmt.Errorf("unknown usecase: %s", usecaseName)
 	}

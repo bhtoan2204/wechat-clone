@@ -40,6 +40,7 @@ func (r *roomOutboxEventsRepoImpl) Append(ctx context.Context, evt eventpkg.Even
 		Version:       evt.Version,
 		EventName:     evt.EventName,
 		EventData:     string(data),
+		Metadata:      "{}",
 		CreatedAt:     createdAt,
 	}).Error
 }

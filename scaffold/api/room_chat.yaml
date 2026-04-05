@@ -1,0 +1,720 @@
+version: 1
+basePath: /api/v1
+
+endpoints:
+  - name: ChatCreateDirectConversation
+    method: POST
+    path: /chat/direct
+    handler: CreateDirectConversationHandler
+    auth: true
+    usecase:
+      name: RoomUsecase
+      method: CreateDirectConversation
+    request:
+      struct: CreateDirectConversationRequest
+      fields:
+        - name: peer_account_id
+          type: string
+          required: true
+    response:
+      struct: ChatConversationResponse
+      fields:
+        - name: room_id
+          type: string
+        - name: name
+          type: string
+        - name: description
+          type: string
+        - name: room_type
+          type: string
+        - name: owner_id
+          type: string
+        - name: pinned_message_id
+          type: string
+        - name: member_count
+          type: int
+        - name: unread_count
+          type: int64
+        - name: last_message
+          type: object
+        - name: members
+          type: array
+          items:
+            struct: ChatRoomMemberResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: role
+                type: string
+        - name: created_at
+          type: string
+        - name: updated_at
+          type: string
+
+  - name: ChatCreateGroup
+    method: POST
+    path: /chat/groups
+    handler: CreateGroupChatHandler
+    auth: true
+    usecase:
+      name: RoomUsecase
+      method: CreateGroupChat
+    request:
+      struct: CreateGroupChatRequest
+      fields:
+        - name: name
+          type: string
+          required: true
+        - name: description
+          type: string
+        - name: member_ids
+          type: array
+    response:
+      struct: ChatConversationResponse
+      fields:
+        - name: room_id
+          type: string
+        - name: name
+          type: string
+        - name: description
+          type: string
+        - name: room_type
+          type: string
+        - name: owner_id
+          type: string
+        - name: pinned_message_id
+          type: string
+        - name: member_count
+          type: int
+        - name: unread_count
+          type: int64
+        - name: last_message
+          type: object
+        - name: members
+          type: array
+          items:
+            struct: ChatRoomMemberResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: role
+                type: string
+        - name: created_at
+          type: string
+        - name: updated_at
+          type: string
+
+  - name: ChatUpdateGroup
+    method: PATCH
+    path: /chat/groups/:room_id
+    handler: UpdateGroupChatHandler
+    auth: true
+    usecase:
+      name: RoomUsecase
+      method: UpdateGroupChat
+    request:
+      struct: UpdateGroupChatRequest
+      fields:
+        - name: room_id
+          type: string
+          required: true
+        - name: name
+          type: string
+        - name: description
+          type: string
+    response:
+      struct: ChatConversationResponse
+      fields:
+        - name: room_id
+          type: string
+        - name: name
+          type: string
+        - name: description
+          type: string
+        - name: room_type
+          type: string
+        - name: owner_id
+          type: string
+        - name: pinned_message_id
+          type: string
+        - name: member_count
+          type: int
+        - name: unread_count
+          type: int64
+        - name: last_message
+          type: object
+        - name: members
+          type: array
+          items:
+            struct: ChatRoomMemberResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: role
+                type: string
+        - name: created_at
+          type: string
+        - name: updated_at
+          type: string
+
+  - name: ChatListConversations
+    method: GET
+    path: /chat/conversations
+    handler: ListChatConversationsHandler
+    auth: true
+    usecase:
+      name: RoomUsecase
+      method: ListChatConversations
+    request:
+      struct: ListChatConversationsRequest
+      fields:
+        - name: limit
+          type: int
+        - name: offset
+          type: int
+    response:
+      struct: ChatConversationResponse
+      fields:
+        - name: room_id
+          type: string
+        - name: name
+          type: string
+        - name: description
+          type: string
+        - name: room_type
+          type: string
+        - name: owner_id
+          type: string
+        - name: pinned_message_id
+          type: string
+        - name: member_count
+          type: int
+        - name: unread_count
+          type: int64
+        - name: last_message
+          type: object
+        - name: members
+          type: array
+          items:
+            struct: ChatRoomMemberResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: role
+                type: string
+        - name: created_at
+          type: string
+        - name: updated_at
+          type: string
+
+  - name: ChatGetConversation
+    method: GET
+    path: /chat/conversations/:room_id
+    handler: GetChatConversationHandler
+    auth: true
+    usecase:
+      name: RoomUsecase
+      method: GetChatConversation
+    request:
+      struct: GetChatConversationRequest
+      fields:
+        - name: room_id
+          type: string
+          required: true
+    response:
+      struct: ChatConversationResponse
+      fields:
+        - name: room_id
+          type: string
+        - name: name
+          type: string
+        - name: description
+          type: string
+        - name: room_type
+          type: string
+        - name: owner_id
+          type: string
+        - name: pinned_message_id
+          type: string
+        - name: member_count
+          type: int
+        - name: unread_count
+          type: int64
+        - name: last_message
+          type: object
+        - name: members
+          type: array
+          items:
+            struct: ChatRoomMemberResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: role
+                type: string
+        - name: created_at
+          type: string
+        - name: updated_at
+          type: string
+
+  - name: ChatListMessages
+    method: GET
+    path: /chat/conversations/:room_id/messages
+    handler: ListChatMessagesHandler
+    auth: true
+    usecase:
+      name: MessageUsecase
+      method: ListChatMessages
+    request:
+      struct: ListChatMessagesRequest
+      fields:
+        - name: room_id
+          type: string
+          required: true
+        - name: limit
+          type: int
+        - name: before_id
+          type: string
+        - name: before_at
+          type: string
+        - name: ascending
+          type: bool
+    response:
+      struct: ChatMessageResponse
+      fields:
+        - name: id
+          type: string
+        - name: room_id
+          type: string
+        - name: sender_id
+          type: string
+        - name: message
+          type: string
+        - name: message_type
+          type: string
+        - name: status
+          type: string
+        - name: reply_to_message_id
+          type: string
+        - name: forwarded_from_message_id
+          type: string
+        - name: file_name
+          type: string
+        - name: file_size
+          type: int64
+        - name: mime_type
+          type: string
+        - name: object_key
+          type: string
+        - name: edited_at
+          type: string
+        - name: deleted_for_everyone
+          type: bool
+        - name: created_at
+          type: string
+        - name: reply_to
+          type: object
+        - name: forwarded_from
+          type: object
+
+  - name: ChatSendMessage
+    method: POST
+    path: /chat/messages
+    handler: SendChatMessageHandler
+    auth: true
+    usecase:
+      name: MessageUsecase
+      method: SendChatMessage
+    request:
+      struct: SendChatMessageRequest
+      fields:
+        - name: room_id
+          type: string
+          required: true
+        - name: message
+          type: string
+        - name: message_type
+          type: string
+        - name: reply_to_message_id
+          type: string
+        - name: forwarded_from_message_id
+          type: string
+        - name: file_name
+          type: string
+        - name: file_size
+          type: int64
+        - name: mime_type
+          type: string
+        - name: object_key
+          type: string
+    response:
+      struct: ChatMessageResponse
+      fields:
+        - name: id
+          type: string
+        - name: room_id
+          type: string
+        - name: sender_id
+          type: string
+        - name: message
+          type: string
+        - name: message_type
+          type: string
+        - name: status
+          type: string
+        - name: reply_to_message_id
+          type: string
+        - name: forwarded_from_message_id
+          type: string
+        - name: file_name
+          type: string
+        - name: file_size
+          type: int64
+        - name: mime_type
+          type: string
+        - name: object_key
+          type: string
+        - name: edited_at
+          type: string
+        - name: deleted_for_everyone
+          type: bool
+        - name: created_at
+          type: string
+        - name: reply_to
+          type: object
+        - name: forwarded_from
+          type: object
+
+  - name: ChatEditMessage
+    method: PATCH
+    path: /chat/messages/:message_id
+    handler: EditChatMessageHandler
+    auth: true
+    usecase:
+      name: MessageUsecase
+      method: EditChatMessage
+    request:
+      struct: EditChatMessageRequest
+      fields:
+        - name: message_id
+          type: string
+          required: true
+        - name: message
+          type: string
+          required: true
+    response:
+      struct: ChatMessageResponse
+      fields:
+        - name: id
+          type: string
+        - name: room_id
+          type: string
+        - name: sender_id
+          type: string
+        - name: message
+          type: string
+        - name: message_type
+          type: string
+        - name: status
+          type: string
+        - name: reply_to_message_id
+          type: string
+        - name: forwarded_from_message_id
+          type: string
+        - name: file_name
+          type: string
+        - name: file_size
+          type: int64
+        - name: mime_type
+          type: string
+        - name: object_key
+          type: string
+        - name: edited_at
+          type: string
+        - name: deleted_for_everyone
+          type: bool
+        - name: created_at
+          type: string
+        - name: reply_to
+          type: object
+        - name: forwarded_from
+          type: object
+
+  - name: ChatDeleteMessage
+    method: DELETE
+    path: /chat/messages/:message_id
+    handler: DeleteChatMessageHandler
+    auth: true
+    usecase:
+      name: MessageUsecase
+      method: DeleteChatMessage
+    request:
+      struct: DeleteChatMessageRequest
+      fields:
+        - name: message_id
+          type: string
+          required: true
+        - name: scope
+          type: string
+    response:
+      struct: DeleteChatMessageResponse
+      fields:
+        - name: ok
+          type: bool
+
+  - name: ChatForwardMessage
+    method: POST
+    path: /chat/messages/:message_id/forward
+    handler: ForwardChatMessageHandler
+    auth: true
+    usecase:
+      name: MessageUsecase
+      method: ForwardChatMessage
+    request:
+      struct: ForwardChatMessageRequest
+      fields:
+        - name: message_id
+          type: string
+          required: true
+        - name: target_room_id
+          type: string
+          required: true
+    response:
+      struct: ChatMessageResponse
+      fields:
+        - name: id
+          type: string
+        - name: room_id
+          type: string
+        - name: sender_id
+          type: string
+        - name: message
+          type: string
+        - name: message_type
+          type: string
+        - name: status
+          type: string
+        - name: reply_to_message_id
+          type: string
+        - name: forwarded_from_message_id
+          type: string
+        - name: file_name
+          type: string
+        - name: file_size
+          type: int64
+        - name: mime_type
+          type: string
+        - name: object_key
+          type: string
+        - name: edited_at
+          type: string
+        - name: deleted_for_everyone
+          type: bool
+        - name: created_at
+          type: string
+        - name: reply_to
+          type: object
+        - name: forwarded_from
+          type: object
+
+  - name: ChatMarkMessageStatus
+    method: POST
+    path: /chat/messages/:message_id/status
+    handler: MarkChatMessageStatusHandler
+    auth: true
+    usecase:
+      name: MessageUsecase
+      method: MarkChatMessageStatus
+    request:
+      struct: MarkChatMessageStatusRequest
+      fields:
+        - name: message_id
+          type: string
+          required: true
+        - name: status
+          type: string
+          required: true
+    response:
+      struct: MarkChatMessageStatusResponse
+      fields:
+        - name: ok
+          type: bool
+
+  - name: ChatAddMember
+    method: POST
+    path: /chat/rooms/:room_id/members
+    handler: AddChatMemberHandler
+    auth: true
+    usecase:
+      name: RoomUsecase
+      method: AddChatMember
+    request:
+      struct: AddChatMemberRequest
+      fields:
+        - name: room_id
+          type: string
+          required: true
+        - name: account_id
+          type: string
+          required: true
+        - name: role
+          type: string
+    response:
+      struct: ChatConversationResponse
+      fields:
+        - name: room_id
+          type: string
+        - name: name
+          type: string
+        - name: description
+          type: string
+        - name: room_type
+          type: string
+        - name: owner_id
+          type: string
+        - name: pinned_message_id
+          type: string
+        - name: member_count
+          type: int
+        - name: unread_count
+          type: int64
+        - name: last_message
+          type: object
+        - name: members
+          type: array
+          items:
+            struct: ChatRoomMemberResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: role
+                type: string
+        - name: created_at
+          type: string
+        - name: updated_at
+          type: string
+
+  - name: ChatRemoveMember
+    method: DELETE
+    path: /chat/rooms/:room_id/members/:account_id
+    handler: RemoveChatMemberHandler
+    auth: true
+    usecase:
+      name: RoomUsecase
+      method: RemoveChatMember
+    request:
+      struct: RemoveChatMemberRequest
+      fields:
+        - name: room_id
+          type: string
+          required: true
+        - name: account_id
+          type: string
+          required: true
+    response:
+      struct: ChatConversationResponse
+      fields:
+        - name: room_id
+          type: string
+        - name: name
+          type: string
+        - name: description
+          type: string
+        - name: room_type
+          type: string
+        - name: owner_id
+          type: string
+        - name: pinned_message_id
+          type: string
+        - name: member_count
+          type: int
+        - name: unread_count
+          type: int64
+        - name: last_message
+          type: object
+        - name: members
+          type: array
+          items:
+            struct: ChatRoomMemberResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: role
+                type: string
+        - name: created_at
+          type: string
+        - name: updated_at
+          type: string
+
+  - name: ChatPinMessage
+    method: POST
+    path: /chat/rooms/:room_id/pin
+    handler: PinChatMessageHandler
+    auth: true
+    usecase:
+      name: RoomUsecase
+      method: PinChatMessage
+    request:
+      struct: PinChatMessageRequest
+      fields:
+        - name: room_id
+          type: string
+          required: true
+        - name: message_id
+          type: string
+          required: true
+    response:
+      struct: ChatConversationResponse
+      fields:
+        - name: room_id
+          type: string
+        - name: name
+          type: string
+        - name: description
+          type: string
+        - name: room_type
+          type: string
+        - name: owner_id
+          type: string
+        - name: pinned_message_id
+          type: string
+        - name: member_count
+          type: int
+        - name: unread_count
+          type: int64
+        - name: last_message
+          type: object
+        - name: members
+          type: array
+          items:
+            struct: ChatRoomMemberResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: role
+                type: string
+        - name: created_at
+          type: string
+        - name: updated_at
+          type: string
+
+  - name: ChatGetPresence
+    method: GET
+    path: /chat/presence/:account_id
+    handler: GetChatPresenceHandler
+    auth: true
+    usecase:
+      name: RoomUsecase
+      method: GetChatPresence
+    request:
+      struct: GetChatPresenceRequest
+      fields:
+        - name: account_id
+          type: string
+          required: true
+    response:
+      struct: ChatPresenceResponse
+      fields:
+        - name: account_id
+          type: string
+        - name: status
+          type: string

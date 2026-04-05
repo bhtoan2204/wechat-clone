@@ -9,11 +9,13 @@ import (
 	"go-socket/core/shared/pkg/logging"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
 const roomChannelPrefix = "room:"
+const presenceTTL = 2 * time.Minute
 
 var _ IHub = (*Hub)(nil)
 
@@ -72,6 +74,7 @@ func (h *Hub) Register(ctx context.Context, client IClient) {
 	if _, ok := h.clientRooms[client.GetID()]; !ok {
 		h.clientRooms[client.GetID()] = make(map[string]struct{})
 	}
+	h.publishPresence(ctx, client.GetUserID(), "online")
 
 	log.Infow("client registered", "client_id", client.GetID(), "user_id", client.GetUserID(), "clients", len(h.clients))
 }
@@ -108,6 +111,7 @@ func (h *Hub) Unregister(ctx context.Context, client IClient) {
 	remainingClients := len(h.clients)
 	h.mu.Unlock()
 
+	h.publishPresence(ctx, client.GetUserID(), "offline")
 	client.Close(ctx)
 	log.Infow("client unregistered", "client_id", clientID, "clients", remainingClients)
 }
@@ -208,10 +212,10 @@ func (h *Hub) HandleMessage(ctx context.Context, client IClient, msg Message) er
 	case ActionLeaveRoom:
 		return h.LeaveRoom(ctx, client, msg.RoomID)
 
-	case ActionChatMessage:
+	case ActionChatMessage, ActionTyping, ActionSeen:
 		roomID := strings.TrimSpace(msg.RoomID)
 		if roomID == "" {
-			return errors.New("room_id is required for chat message")
+			return errors.New("room_id is required")
 		}
 		if h.redisClient == nil {
 			return errors.New("redis client is nil")
@@ -230,6 +234,9 @@ func (h *Hub) HandleMessage(ctx context.Context, client IClient, msg Message) er
 		if err := h.redisClient.Publish(ctx, roomChannelName(roomID), payload).Err(); err != nil {
 			return fmt.Errorf("publish redis message: %w", err)
 		}
+		return nil
+	case ActionPresence:
+		h.publishPresence(ctx, client.GetUserID(), "online")
 		return nil
 	}
 
@@ -375,4 +382,41 @@ func (h *Hub) removeSubscription(ctx context.Context, roomID string, expected *r
 
 func roomChannelName(roomID string) string {
 	return roomChannelPrefix + roomID
+}
+
+func (h *Hub) publishPresence(ctx context.Context, userID, status string) {
+	if h.redisClient == nil || strings.TrimSpace(userID) == "" {
+		return
+	}
+	key := "chat:presence:" + strings.TrimSpace(userID)
+	if status == "online" {
+		_ = h.redisClient.Set(ctx, key, "online", presenceTTL).Err()
+	} else {
+		_ = h.redisClient.Del(ctx, key).Err()
+	}
+	payload, err := json.Marshal(Message{
+		Action:   ActionPresence,
+		SenderID: userID,
+		Data:     json.RawMessage(fmt.Sprintf(`{"status":%q}`, status)),
+	})
+	if err == nil {
+		for _, roomID := range h.roomsForUser(userID) {
+			_ = h.redisClient.Publish(ctx, roomChannelName(roomID), payload).Err()
+		}
+	}
+}
+
+func (h *Hub) roomsForUser(userID string) []string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	roomIDs := make([]string, 0)
+	for _, client := range h.clients {
+		if client.GetUserID() != userID {
+			continue
+		}
+		for roomID := range h.clientRooms[client.GetID()] {
+			roomIDs = append(roomIDs, roomID)
+		}
+	}
+	return roomIDs
 }

@@ -26,7 +26,7 @@ func (r *CreateRoomRequest) Validate() error {
 		r.RoomType = types.RoomTypePublic
 	}
 	if !r.RoomType.IsValid() {
-		return errors.New("room_type must be one of: public, private")
+		return errors.New("room_type must be one of: public, private, direct, group")
 	}
 
 	return nil

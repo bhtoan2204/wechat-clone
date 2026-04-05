@@ -2,24 +2,32 @@ package command
 
 import (
 	"context"
-	"fmt"
 	"go-socket/core/modules/room/application/dto/in"
 	"go-socket/core/modules/room/application/dto/out"
-	"go-socket/core/modules/room/domain/repos"
+	roomservice "go-socket/core/modules/room/application/service"
+	roomsupport "go-socket/core/modules/room/application/support"
+	apptypes "go-socket/core/modules/room/application/types"
 	"go-socket/core/shared/pkg/cqrs"
 	stackerr "go-socket/core/shared/pkg/stackErr"
 )
 
 type joinRoomHandler struct {
-	roomRepo repos.RoomRepository
+	roomService *roomservice.RoomCommandService
 }
 
-func NewJoinRoomHandler(roomRepo repos.RoomRepository) cqrs.Handler[*in.JoinRoomRequest, *out.JoinRoomResponse] {
+func NewJoinRoomHandler(roomService *roomservice.RoomCommandService) cqrs.Handler[*in.JoinRoomRequest, *out.JoinRoomResponse] {
 	return &joinRoomHandler{
-		roomRepo: roomRepo,
+		roomService: roomService,
 	}
 }
 
 func (h *joinRoomHandler) Handle(ctx context.Context, req *in.JoinRoomRequest) (*out.JoinRoomResponse, error) {
-	return nil, stackerr.Error(fmt.Errorf("not implemented"))
+	accountID, err := roomsupport.AccountIDFromCtx(ctx)
+	if err != nil {
+		return nil, stackerr.Error(err)
+	}
+	if err := h.roomService.JoinRoom(ctx, accountID, apptypes.JoinRoomCommand{RoomID: req.RoomID}); err != nil {
+		return nil, stackerr.Error(err)
+	}
+	return &out.JoinRoomResponse{Message: "join room is scaffolded"}, nil
 }

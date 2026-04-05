@@ -164,3 +164,81 @@ endpoints:
                 type: string
               - name: receiver_id
                 type: string
+
+  - name: PaymentCreatePayment
+    method: POST
+    path: /payment/intents
+    handler: CreatePaymentHandler
+    auth: true
+    usecase:
+      name: PaymentUsecase
+      method: CreatePayment
+    request:
+      struct: CreatePaymentRequest
+      fields:
+        - name: provider
+          type: string
+          required: true
+        - name: transaction_id
+          type: string
+          required: true
+        - name: amount
+          type: int64
+          required: true
+        - name: currency
+          type: string
+          required: true
+        - name: debit_account_id
+          type: string
+          required: true
+        - name: credit_account_id
+          type: string
+          required: true
+        - name: metadata
+          type: object
+    response:
+      struct: CreatePaymentResponse
+      fields:
+        - name: provider
+          type: string
+        - name: transaction_id
+          type: string
+        - name: external_ref
+          type: string
+        - name: status
+          type: string
+        - name: checkout_url
+          type: string
+
+  - name: PaymentProcessWebhook
+    method: POST
+    path: /payment/webhooks/:provider
+    handler: ProcessWebhookHandler
+    usecase:
+      name: PaymentUsecase
+      method: ProcessWebhook
+    request:
+      struct: ProcessWebhookRequest
+      fields:
+        - name: provider
+          type: string
+          required: true
+        - name: signature
+          type: string
+        - name: payload
+          type: string
+    response:
+      struct: ProcessWebhookResponse
+      fields:
+        - name: provider
+          type: string
+        - name: transaction_id
+          type: string
+        - name: external_ref
+          type: string
+        - name: status
+          type: string
+        - name: duplicate
+          type: bool
+        - name: ledger_posted
+          type: bool
