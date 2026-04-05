@@ -27,7 +27,7 @@ func NewPaymentOutboxEventsRepoImpl(db *gorm.DB) paymentrepos.PaymentOutboxEvent
 func (p *paymentOutboxEventsRepoImpl) Append(ctx context.Context, evt eventpkg.Event) error {
 	data, err := p.serializer.Marshal(evt.EventData)
 	if err != nil {
-		return fmt.Errorf("marshal event data failed: %w", err)
+		return fmt.Errorf("marshal event data failed: %v", err)
 	}
 
 	createdAt := time.Now().UTC()

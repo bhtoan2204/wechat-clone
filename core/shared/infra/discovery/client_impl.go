@@ -7,6 +7,7 @@ import (
 	"go-socket/core/shared/pkg/stackErr"
 
 	"github.com/hashicorp/consul/api"
+	"go.uber.org/zap"
 )
 
 func (c *consulClientImpl) RegisterService(ctx context.Context, serviceID string, serviceName string, serviceAddress string, servicePort int) error {
@@ -31,7 +32,7 @@ func (c *consulClientImpl) RegisterService(ctx context.Context, serviceID string
 
 	err := c.client.Agent().ServiceRegister(registration)
 	if err != nil {
-		log.Errorw("Failed to register service", "serviceID", serviceID, "error", err)
+		log.Errorw("Failed to register service", "serviceID", serviceID, zap.Error(err))
 		return stackErr.Error(err)
 	}
 
@@ -44,7 +45,7 @@ func (c *consulClientImpl) UnregisterService(ctx context.Context, serviceID stri
 
 	err := c.client.Agent().ServiceDeregister(serviceID)
 	if err != nil {
-		log.Errorw("Failed to unregister service", "serviceID", serviceID, "error", err)
+		log.Errorw("Failed to unregister service", "serviceID", serviceID, zap.Error(err))
 		return stackErr.Error(err)
 	}
 
@@ -83,7 +84,7 @@ func (c *consulClientImpl) GetServiceHealth(ctx context.Context, serviceID strin
 	log := logging.FromContext(ctx)
 	svc, err := c.GetService(ctx, serviceID)
 	if err != nil {
-		log.Errorw("Failed to get service", "serviceID", serviceID, "error", err)
+		log.Errorw("Failed to get service", "serviceID", serviceID, zap.Error(err))
 		return nil, stackErr.Error(err)
 	}
 
@@ -91,7 +92,7 @@ func (c *consulClientImpl) GetServiceHealth(ctx context.Context, serviceID strin
 		Filter: fmt.Sprintf("ServiceID == `%s`", serviceID),
 	})
 	if err != nil {
-		log.Errorw("Failed to get service health", "serviceID", serviceID, "error", err)
+		log.Errorw("Failed to get service health", "serviceID", serviceID, zap.Error(err))
 		return nil, stackErr.Error(err)
 	}
 

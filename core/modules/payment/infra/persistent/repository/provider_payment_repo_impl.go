@@ -129,7 +129,7 @@ func (r *providerPaymentRepoImpl) MarkProcessed(ctx context.Context, event *enti
 func (r *providerPaymentRepoImpl) AppendOutboxEvent(ctx context.Context, evt eventpkg.Event) error {
 	data, err := r.serializer.Marshal(evt.EventData)
 	if err != nil {
-		return fmt.Errorf("marshal event data failed: %w", err)
+		return fmt.Errorf("marshal event data failed: %v", err)
 	}
 
 	createdAt := time.Now().UTC()

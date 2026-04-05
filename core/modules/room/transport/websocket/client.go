@@ -97,16 +97,16 @@ func (c *Client) ReadPump(ctx context.Context, hub IHub) {
 		_, payload, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Warnw("unexpected websocket read error", "client_id", c.id, "error", err)
+				log.Warnw("unexpected websocket read error", "client_id", c.id, zap.Error(err))
 			} else {
-				log.Infow("websocket connection closed while reading", "client_id", c.id, "error", err)
+				log.Infow("websocket connection closed while reading", "client_id", c.id, zap.Error(err))
 			}
 			return
 		}
 
 		var msg Message
 		if err := json.Unmarshal(payload, &msg); err != nil {
-			log.Warnw("invalid websocket payload", "client_id", c.id, "error", err)
+			log.Warnw("invalid websocket payload", "client_id", c.id, zap.Error(err))
 			continue
 		}
 		if msg.SenderID == "" {
@@ -142,14 +142,14 @@ func (c *Client) WritePump(ctx context.Context) {
 			}
 
 			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
-				log.Errorw("failed to write websocket message", "client_id", c.id, "error", err)
+				log.Errorw("failed to write websocket message", "client_id", c.id, zap.Error(err))
 				return
 			}
 
 		case <-ticker.C:
 			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Infow("failed to write websocket ping", "client_id", c.id, "error", err)
+				log.Infow("failed to write websocket ping", "client_id", c.id, zap.Error(err))
 				return
 			}
 		}
@@ -165,7 +165,7 @@ func (c *Client) Close(ctx context.Context) {
 		c.sendMu.Unlock()
 
 		if err := c.conn.Close(); err != nil {
-			log.Debugw("error while closing websocket connection", "client_id", c.id, "error", err)
+			log.Debugw("error while closing websocket connection", "client_id", c.id, zap.Error(err))
 		}
 	})
 }

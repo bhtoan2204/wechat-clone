@@ -19,7 +19,7 @@ func (p *processor) handlePaymentEvent(ctx context.Context, value []byte) error 
 	log := logging.FromContext(ctx).Named("PaymentProjection")
 	var event paymentEventMessage
 	if err := json.Unmarshal(value, &event); err != nil {
-		return stackErr.Error(fmt.Errorf("unmarshal payment event failed: %w", err))
+		return stackErr.Error(fmt.Errorf("unmarshal payment event failed: %v", err))
 	}
 
 	log.Infow("handle payment event",
@@ -45,7 +45,7 @@ func (p *processor) handlePaymentEvent(ctx context.Context, value []byte) error 
 func (p *processor) projectDepositedEvent(ctx context.Context, event *paymentEventMessage) error {
 	payloadAny, err := decodeEventPayload(ctx, p.eventSerializer, event.AggregateType, event.EventName, event.EventData)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode deposit payload failed: %w", err))
+		return stackErr.Error(fmt.Errorf("decode deposit payload failed: %v", err))
 	}
 
 	payload, ok := payloadAny.(*aggregate.EventPaymentTransactionDeposited)
@@ -59,7 +59,7 @@ func (p *processor) projectDepositedEvent(ctx context.Context, event *paymentEve
 func (p *processor) projectWithdrawnEvent(ctx context.Context, event *paymentEventMessage) error {
 	payloadAny, err := decodeEventPayload(ctx, p.eventSerializer, event.AggregateType, event.EventName, event.EventData)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode withdrawal payload failed: %w", err))
+		return stackErr.Error(fmt.Errorf("decode withdrawal payload failed: %v", err))
 	}
 
 	payload, ok := payloadAny.(*aggregate.EventPaymentTransactionWithdrawn)
@@ -73,7 +73,7 @@ func (p *processor) projectWithdrawnEvent(ctx context.Context, event *paymentEve
 func (p *processor) projectTransferredEvent(ctx context.Context, event *paymentEventMessage) error {
 	payloadAny, err := decodeEventPayload(ctx, p.eventSerializer, event.AggregateType, event.EventName, event.EventData)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode transfer payload failed: %w", err))
+		return stackErr.Error(fmt.Errorf("decode transfer payload failed: %v", err))
 	}
 
 	payload, ok := payloadAny.(*aggregate.EventPaymentTransactionTransferred)
@@ -87,7 +87,7 @@ func (p *processor) projectTransferredEvent(ctx context.Context, event *paymentE
 func (p *processor) projectReceivedEvent(ctx context.Context, event *paymentEventMessage) error {
 	payloadAny, err := decodeEventPayload(ctx, p.eventSerializer, event.AggregateType, event.EventName, event.EventData)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode receive payload failed: %w", err))
+		return stackErr.Error(fmt.Errorf("decode receive payload failed: %v", err))
 	}
 
 	payload, ok := payloadAny.(*aggregate.EventPaymentTransactionReceived)

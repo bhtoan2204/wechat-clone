@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 )
 
 type wsHandler struct {
@@ -46,7 +47,7 @@ func (h *wsHandler) Handle(c *gin.Context) {
 
 	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		log.Errorw("failed to upgrade websocket connection", "error", err)
+		log.Errorw("failed to upgrade websocket connection", zap.Error(err))
 		return
 	}
 

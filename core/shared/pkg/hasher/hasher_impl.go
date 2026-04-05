@@ -54,12 +54,12 @@ func (h *hasherImpl) Verify(ctx context.Context, val string, hash string) (bool,
 
 	salt, err := base64.RawStdEncoding.DecodeString(encodedSalt)
 	if err != nil {
-		return false, fmt.Errorf("failed to decode salt: %w", err)
+		return false, fmt.Errorf("failed to decode salt: %v", err)
 	}
 
 	expectedHash, err := base64.RawStdEncoding.DecodeString(encodedHash)
 	if err != nil {
-		return false, fmt.Errorf("failed to decode hash: %w", err)
+		return false, fmt.Errorf("failed to decode hash: %v", err)
 	}
 
 	computedHash := argon2.IDKey([]byte(val), salt, h.Time, h.Memory, h.Threads, h.KeyLen)

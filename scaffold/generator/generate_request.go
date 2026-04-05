@@ -66,7 +66,7 @@ func GenerateRequest(endpoints []models.Endpoint) (string, error) {
 		}
 		formatted, err := format.Source(buf.Bytes())
 		if err != nil {
-			return "", fmt.Errorf("format request DTO failed: %w", err)
+			return "", fmt.Errorf("format request DTO failed: %v", err)
 		}
 		if err := os.WriteFile(dst, formatted, 0o644); err != nil {
 			return "", err

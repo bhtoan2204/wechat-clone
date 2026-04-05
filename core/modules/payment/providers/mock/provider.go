@@ -49,7 +49,7 @@ func (p *Provider) VerifyWebhook(_ context.Context, payload []byte, signature st
 
 	var body webhookPayload
 	if err := json.Unmarshal(payload, &body); err != nil {
-		return nil, fmt.Errorf("decode mock webhook payload: %w", err)
+		return nil, fmt.Errorf("decode mock webhook payload: %v", err)
 	}
 
 	return &providers.WebhookEvent{
@@ -70,7 +70,7 @@ func (p *Provider) ParseEvent(_ context.Context, event *providers.WebhookEvent) 
 	amount := int64(0)
 	if rawAmount := strings.TrimSpace(event.Attributes["amount"]); rawAmount != "" {
 		if _, err := fmt.Sscanf(rawAmount, "%d", &amount); err != nil {
-			return nil, fmt.Errorf("parse mock webhook amount: %w", err)
+			return nil, fmt.Errorf("parse mock webhook amount: %v", err)
 		}
 	}
 

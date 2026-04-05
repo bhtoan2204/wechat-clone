@@ -50,7 +50,7 @@ func (a *accountCache) Get(ctx context.Context, id string) (*entity.Account, boo
 	}
 	var m entity.Account
 	if err := json.Unmarshal(data, &m); err != nil {
-		return nil, false, fmt.Errorf("unmarshal account cache failed: %w", err)
+		return nil, false, fmt.Errorf("unmarshal account cache failed: %v", err)
 	}
 	return &m, true, nil
 }
@@ -61,7 +61,7 @@ func (a *accountCache) Set(ctx context.Context, m *entity.Account) error {
 	}
 	data, err := json.Marshal(m)
 	if err != nil {
-		return fmt.Errorf("marshal account cache failed: %w", err)
+		return fmt.Errorf("marshal account cache failed: %v", err)
 	}
 	return a.cache.Set(ctx, accountCacheKey(m.ID), data)
 }
@@ -86,7 +86,7 @@ func (a *accountCache) GetByEmail(ctx context.Context, email string) (*entity.Ac
 	}
 	var m entity.Account
 	if err := json.Unmarshal(data, &m); err != nil {
-		return nil, false, fmt.Errorf("unmarshal account cache failed: %w", err)
+		return nil, false, fmt.Errorf("unmarshal account cache failed: %v", err)
 	}
 	return &m, true, nil
 }
@@ -97,7 +97,7 @@ func (a *accountCache) SetByEmail(ctx context.Context, m *entity.Account) error 
 	}
 	data, err := json.Marshal(m)
 	if err != nil {
-		return fmt.Errorf("marshal account cache failed: %w", err)
+		return fmt.Errorf("marshal account cache failed: %v", err)
 	}
 	return a.cache.Set(ctx, accountEmailCacheKey(m.Email.Value()), data)
 }

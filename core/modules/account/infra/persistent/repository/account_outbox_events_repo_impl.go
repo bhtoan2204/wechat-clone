@@ -26,7 +26,7 @@ func NewAccountOutboxEventsRepoImpl(db *gorm.DB) repos.AccountOutboxEventsReposi
 func (a *accountOutboxEventsRepoImpl) Append(ctx context.Context, evt eventpkg.Event) error {
 	data, err := a.serializer.Marshal(evt.EventData)
 	if err != nil {
-		return fmt.Errorf("marshal event data failed: %w", err)
+		return fmt.Errorf("marshal event data failed: %v", err)
 	}
 
 	createdAt := time.Now().UTC()

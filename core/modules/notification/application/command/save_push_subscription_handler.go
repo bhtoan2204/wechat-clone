@@ -44,7 +44,7 @@ func (h *savePushSubscriptionHandler) Handle(ctx context.Context, req *in.SavePu
 	keysBytes, err := json.Marshal(req.Keys)
 	if err != nil {
 		log.Errorw("marshal keys failed", zap.Error(err))
-		return nil, stackErr.Error(fmt.Errorf("marshal subscription keys failed: %w", err))
+		return nil, stackErr.Error(fmt.Errorf("marshal subscription keys failed: %v", err))
 	}
 
 	subscription := &entity.PushSubscription{

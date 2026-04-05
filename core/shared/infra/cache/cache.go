@@ -67,7 +67,7 @@ func New(rc *redis.Client, cacheTime time.Duration) Cache {
 func (c *cache) Get(ctx context.Context, key string) ([]byte, error) {
 	value, err := c.rc.Get(ctx, key).Bytes()
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("get key=%s failed err=%w", key, err))
+		return nil, stackErr.Error(fmt.Errorf("get key=%s failed err=%v", key, err))
 	}
 	return value, nil
 }
@@ -75,7 +75,7 @@ func (c *cache) Get(ctx context.Context, key string) ([]byte, error) {
 func (c *cache) Set(ctx context.Context, key string, value []byte) error {
 	err := c.rc.Set(ctx, key, value, c.cacheTime).Err()
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("set value=%v with key=%s to redis failed err=%w", value, key, err))
+		return stackErr.Error(fmt.Errorf("set value=%v with key=%s to redis failed err=%v", value, key, err))
 	}
 	return nil
 }
@@ -91,7 +91,7 @@ func (c *cache) SetObject(ctx context.Context, key string, val interface{}, dura
 func (c *cache) Delete(ctx context.Context, key string) error {
 	err := c.rc.Del(ctx, key).Err()
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("delete with key=%s to redis failed err=%w", key, err))
+		return stackErr.Error(fmt.Errorf("delete with key=%s to redis failed err=%v", key, err))
 	}
 	return nil
 }
@@ -99,7 +99,7 @@ func (c *cache) Delete(ctx context.Context, key string) error {
 func (c *cache) SetWithDuration(ctx context.Context, key string, value []byte, duration time.Duration) error {
 	err := c.rc.Set(ctx, key, value, duration).Err()
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("set value=%v with key=%s and duration=%d to redis failed err=%w", value, key, duration, err))
+		return stackErr.Error(fmt.Errorf("set value=%v with key=%s and duration=%d to redis failed err=%v", value, key, duration, err))
 	}
 	return nil
 }
@@ -107,7 +107,7 @@ func (c *cache) SetWithDuration(ctx context.Context, key string, value []byte, d
 func (c *cache) LGet(ctx context.Context, key string) ([]byte, error) {
 	value, err := c.rc.LPop(ctx, key).Bytes()
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("get cache key=%s from redis failed err=%w", key, err))
+		return nil, stackErr.Error(fmt.Errorf("get cache key=%s from redis failed err=%v", key, err))
 	}
 	return value, nil
 }
@@ -119,7 +119,7 @@ func (c *cache) LSet(ctx context.Context, key string, val []byte) error {
 func (c *cache) LLen(ctx context.Context, key string) (int64, error) {
 	val, err := c.rc.LLen(ctx, key).Result()
 	if err != nil {
-		return -1, stackErr.Error(fmt.Errorf("get len of key=%s from redis failed err=%w", key, err))
+		return -1, stackErr.Error(fmt.Errorf("get len of key=%s from redis failed err=%v", key, err))
 	}
 	return val, nil
 }
@@ -127,7 +127,7 @@ func (c *cache) LLen(ctx context.Context, key string) (int64, error) {
 func (c *cache) LList(ctx context.Context, key string) ([]string, error) {
 	vals, err := c.rc.LRange(ctx, key, 0, -1).Result()
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("get datas of key=%s from redis failed err=%w", key, err))
+		return nil, stackErr.Error(fmt.Errorf("get datas of key=%s from redis failed err=%v", key, err))
 	}
 	return vals, nil
 }
@@ -135,7 +135,7 @@ func (c *cache) LList(ctx context.Context, key string) ([]string, error) {
 func (c *cache) Decr(ctx context.Context, key string) (int64, error) {
 	val, err := c.rc.Decr(ctx, key).Result()
 	if err != nil {
-		return -1, stackErr.Error(fmt.Errorf("decrby key=%s from redis failed err=%w", key, err))
+		return -1, stackErr.Error(fmt.Errorf("decrby key=%s from redis failed err=%v", key, err))
 	}
 	return val, err
 }
@@ -143,7 +143,7 @@ func (c *cache) Decr(ctx context.Context, key string) (int64, error) {
 func (c *cache) Incr(ctx context.Context, key string) (int64, error) {
 	val, err := c.rc.Incr(ctx, key).Result()
 	if err != nil {
-		return -1, stackErr.Error(fmt.Errorf("incrBy key=%s from redis failed err=%w", key, err))
+		return -1, stackErr.Error(fmt.Errorf("incrBy key=%s from redis failed err=%v", key, err))
 	}
 	return val, err
 }
@@ -151,7 +151,7 @@ func (c *cache) Incr(ctx context.Context, key string) (int64, error) {
 func (c *cache) DecrBy(ctx context.Context, key string, value int64) (int64, error) {
 	val, err := c.rc.DecrBy(ctx, key, value).Result()
 	if err != nil {
-		return -1, stackErr.Error(fmt.Errorf("decrby key=%s from redis failed err=%w", key, err))
+		return -1, stackErr.Error(fmt.Errorf("decrby key=%s from redis failed err=%v", key, err))
 	}
 	return val, err
 }
@@ -159,7 +159,7 @@ func (c *cache) DecrBy(ctx context.Context, key string, value int64) (int64, err
 func (c *cache) IncrBy(ctx context.Context, key string, value int64) (int64, error) {
 	val, err := c.rc.IncrBy(ctx, key, value).Result()
 	if err != nil {
-		return -1, stackErr.Error(fmt.Errorf("incrBy key=%s from redis failed err=%w", key, err))
+		return -1, stackErr.Error(fmt.Errorf("incrBy key=%s from redis failed err=%v", key, err))
 	}
 	return val, err
 }
@@ -167,7 +167,7 @@ func (c *cache) IncrBy(ctx context.Context, key string, value int64) (int64, err
 func (c *cache) LRange(ctx context.Context, key string, from int, to int) ([]string, error) {
 	result, err := c.rc.LRange(ctx, key, int64(from), int64(to)).Result()
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("lrange cache key=%s from redis failed err=%w", key, err))
+		return nil, stackErr.Error(fmt.Errorf("lrange cache key=%s from redis failed err=%v", key, err))
 	}
 	return result, nil
 }
@@ -177,7 +177,7 @@ func (c *cache) ZIncrBy(ctx context.Context, key string, increment float64, memb
 		ZIncrBy(ctx, key, increment, member).
 		Err()
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("zincrby member=%v with key=%s and increment=%v to redis failed. Error: %w", member, key, increment, err))
+		return stackErr.Error(fmt.Errorf("zincrby member=%v with key=%s and increment=%v to redis failed. Error: %v", member, key, increment, err))
 	}
 
 	return nil
@@ -189,7 +189,7 @@ func (c *cache) ZAdd(ctx context.Context, key string, score float64, member stri
 		Member: member,
 	}).Err()
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("zadd member=%v with key=%s and score=%v to redis failed, err=%w", member, key, score, err))
+		return stackErr.Error(fmt.Errorf("zadd member=%v with key=%s and score=%v to redis failed, err=%v", member, key, score, err))
 	}
 
 	return nil
@@ -199,7 +199,7 @@ func (c *cache) ZRange(ctx context.Context, key string, start int64, stop int64)
 	result, err := c.rc.ZRange(ctx, key, start, stop).Result()
 
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("zrange with key=%s, start=%v and stop=%v to redis failed, err=%w", key, start, stop, err))
+		return nil, stackErr.Error(fmt.Errorf("zrange with key=%s, start=%v and stop=%v to redis failed, err=%v", key, start, stop, err))
 	}
 
 	return result, nil
@@ -209,7 +209,7 @@ func (c *cache) ZRevRangeWithScores(ctx context.Context, key string, start, stop
 	result, err := c.rc.ZRevRangeWithScores(ctx, key, start, stop).Result()
 
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("ZRevRangeWithScores with key=%s, start=%v and stop=%v to redis failed. Error: %w", key, start, stop, err))
+		return nil, stackErr.Error(fmt.Errorf("ZRevRangeWithScores with key=%s, start=%v and stop=%v to redis failed. Error: %v", key, start, stop, err))
 	}
 
 	return result, nil
@@ -218,7 +218,7 @@ func (c *cache) ZRevRangeWithScores(ctx context.Context, key string, start, stop
 func (c *cache) ZRevRank(ctx context.Context, key string, member string) (int64, error) {
 	result, err := c.rc.ZRevRank(ctx, key, member).Result()
 	if err != nil {
-		return -1, stackErr.Error(fmt.Errorf("ZRevRank with key=%s, member=%v. Error: %w", key, member, err))
+		return -1, stackErr.Error(fmt.Errorf("ZRevRank with key=%s, member=%v. Error: %v", key, member, err))
 	}
 
 	return result, nil
@@ -231,7 +231,7 @@ func (c *cache) ZScore(ctx context.Context, key string, member string) (float64,
 	}
 
 	if err != nil {
-		return -1, stackErr.Error(fmt.Errorf("ZRevRank with key=%s, member=%v. Error: %w", key, member, err))
+		return -1, stackErr.Error(fmt.Errorf("ZRevRank with key=%s, member=%v. Error: %v", key, member, err))
 	}
 
 	return result, nil
@@ -241,7 +241,7 @@ func (c *cache) ZRemRangeByRank(ctx context.Context, key string, start int64, st
 	err := c.rc.ZRemRangeByRank(ctx, key, start, stop).Err()
 
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("zremrangebyrank with key=%s, start=%v and stop=%v to redis failed, err=%w", key, start, stop, err))
+		return stackErr.Error(fmt.Errorf("zremrangebyrank with key=%s, start=%v and stop=%v to redis failed, err=%v", key, start, stop, err))
 	}
 
 	return nil
@@ -252,7 +252,7 @@ func (c *cache) ZRemRangeByScore(ctx context.Context, key string, min float64, m
 	maxStr := strconv.FormatFloat(max, 'f', -1, 64)
 	err := c.rc.ZRemRangeByScore(ctx, key, minStr, maxStr).Err()
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("zremrangebyscore with key=%s, min=%v and max=%v to redis failed, err=%w", key, min, max, err))
+		return stackErr.Error(fmt.Errorf("zremrangebyscore with key=%s, min=%v and max=%v to redis failed, err=%v", key, min, max, err))
 	}
 	return nil
 }
@@ -260,7 +260,7 @@ func (c *cache) ZRemRangeByScore(ctx context.Context, key string, min float64, m
 func (c *cache) ZCard(ctx context.Context, key string) (int64, error) {
 	val, err := c.rc.ZCard(ctx, key).Result()
 	if err != nil {
-		return -1, stackErr.Error(fmt.Errorf("zcard with key=%s to redis failed, err=%w", key, err))
+		return -1, stackErr.Error(fmt.Errorf("zcard with key=%s to redis failed, err=%v", key, err))
 	}
 	return val, nil
 }
@@ -268,7 +268,7 @@ func (c *cache) ZCard(ctx context.Context, key string) (int64, error) {
 func (c *cache) SetVal(ctx context.Context, key string, value string) error {
 	err := c.rc.Set(ctx, key, value, c.cacheTime).Err()
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("set value=%v with key=%s to redis failed, err=%w", value, key, err))
+		return stackErr.Error(fmt.Errorf("set value=%v with key=%s to redis failed, err=%v", value, key, err))
 	}
 	return nil
 }
@@ -276,7 +276,7 @@ func (c *cache) SetVal(ctx context.Context, key string, value string) error {
 func (c *cache) SetValWithExp(ctx context.Context, key string, value string, seconds int64) error {
 	err := c.rc.Set(ctx, key, value, time.Duration(seconds)*time.Second).Err()
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("set value=%v with key=%s to redis failed, err=%w", value, key, err))
+		return stackErr.Error(fmt.Errorf("set value=%v with key=%s to redis failed, err=%v", value, key, err))
 	}
 	return nil
 }
@@ -296,7 +296,7 @@ func (c *cache) Exists(ctx context.Context, keys ...string) int64 {
 func (c *cache) GetSMembers(ctx context.Context, key string) ([]string, error) {
 	data, err := c.rc.SMembers(ctx, key).Result()
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("get smembers with key=%s to redis failed, err=%w", key, err))
+		return nil, stackErr.Error(fmt.Errorf("get smembers with key=%s to redis failed, err=%v", key, err))
 	}
 	return data, nil
 }

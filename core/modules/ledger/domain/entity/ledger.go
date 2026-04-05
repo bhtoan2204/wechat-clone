@@ -54,10 +54,10 @@ func NewLedgerTransaction(transactionID string, entries []LedgerEntryInput, now 
 	for idx, entry := range entries {
 		accountID := strings.TrimSpace(entry.AccountID)
 		if accountID == "" {
-			return nil, fmt.Errorf("entries[%d].%w", idx, ErrLedgerEntryAccountRequired)
+			return nil, fmt.Errorf("entries[%d].%v", idx, ErrLedgerEntryAccountRequired)
 		}
 		if entry.Amount == 0 {
-			return nil, fmt.Errorf("entries[%d].%w", idx, ErrLedgerEntryAmountZero)
+			return nil, fmt.Errorf("entries[%d].%v", idx, ErrLedgerEntryAmountZero)
 		}
 
 		sum += entry.Amount

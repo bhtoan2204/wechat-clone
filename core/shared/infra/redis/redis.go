@@ -12,7 +12,7 @@ import (
 func NewStandaloneRedisClient(cfg *config.Config) (*redis.Client, error) {
 	opts, err := redis.ParseURL(cfg.RedisConfig.ConnectionURL)
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("parse url failed err=%w", err))
+		return nil, stackErr.Error(fmt.Errorf("parse url failed err=%v", err))
 	}
 	opts.PoolSize = cfg.RedisConfig.PoolSize
 	opts.DialTimeout = time.Duration(cfg.RedisConfig.DialTimeoutSeconds) * time.Second

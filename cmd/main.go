@@ -19,6 +19,8 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -34,12 +36,12 @@ func main() {
 
 	cfg, err := config.LoadConfig(ctx)
 	if err != nil {
-		logger.Errorw("Failed to load config", "error", err)
+		logger.Errorw("Failed to load config", zap.Error(err))
 		return
 	}
 	appContext, err := appCtx.LoadAppCtx(ctx, cfg)
 	if err != nil {
-		logger.Errorw("Failed to create app context", "error", err)
+		logger.Errorw("Failed to create app context", zap.Error(err))
 		return
 	}
 	defer appContext.Close()
@@ -48,7 +50,7 @@ func main() {
 	pathMigration := flag.String("path", "migration/", "path to migrations folder")
 	flag.Parse()
 	if err := migrateTool.Migrate(fmt.Sprintf("file://%s", *pathMigration), cfg.DBConfig.ConnectionURL); err != nil {
-		logger.Errorw("Failed to migrate database", "error", err)
+		logger.Errorw("Failed to migrate database", zap.Error(err))
 		return
 	}
 
@@ -63,7 +65,7 @@ func main() {
 	serviceName := "go-socket"
 	serviceAddress, err := utils.GetInternalIP()
 	if err != nil {
-		logger.Errorw("Failed to detect internal IP, fallback to localhost", "error", err)
+		logger.Errorw("Failed to detect internal IP, fallback to localhost", zap.Error(err))
 		serviceAddress = "127.0.0.1"
 	}
 
@@ -73,21 +75,23 @@ func main() {
 		serviceID = fmt.Sprintf("%s-%s-%d", serviceName, hostName, servicePort)
 	}
 
-	if err := appContext.GetConsulClient().RegisterService(ctx, serviceID, serviceName, serviceAddress, servicePort); err != nil {
-		logger.Errorw("Failed to register service with consul",
-			"serviceID", serviceID,
-			"serviceName", serviceName,
-			"serviceAddress", serviceAddress,
-			"servicePort", servicePort,
-			"error", err,
-		)
-		return
-	}
-	defer func() {
-		if err := appContext.GetConsulClient().UnregisterService(ctx, serviceID); err != nil {
-			logger.Errorw("Failed to unregister service from consul", "serviceID", serviceID, "error", err)
+	if cfg.ServerConfig.Environment == "production" {
+		if err := appContext.GetConsulClient().RegisterService(ctx, serviceID, serviceName, serviceAddress, servicePort); err != nil {
+			logger.Errorw("Failed to register service with consul",
+				zap.String("serviceID", serviceID),
+				zap.String("serviceName", serviceName),
+				zap.String("serviceAddress", serviceAddress),
+				zap.Int("servicePort", servicePort),
+				zap.Error(err),
+			)
+			return
 		}
-	}()
+		defer func() {
+			if err := appContext.GetConsulClient().UnregisterService(ctx, serviceID); err != nil {
+				logger.Errorw("Failed to unregister service from consul", "serviceID", serviceID, zap.Error(err))
+			}
+		}()
+	}
 
 	logger.Infow("Registered service with consul",
 		"serviceID", serviceID,
@@ -97,7 +101,7 @@ func main() {
 	)
 
 	if err := appServer.Start(ctx, appContext); err != nil {
-		logger.Errorw("Failed to start app server", "error", err)
+		logger.Errorw("Failed to start app server", zap.Error(err))
 		return
 	}
 }

@@ -125,7 +125,7 @@ func (p *Provider) CreatePayment(ctx context.Context, req providers.CreatePaymen
 	if applicationFee := strings.TrimSpace(req.Metadata["application_fee_amount"]); applicationFee != "" {
 		feeAmount, err := strconv.ParseInt(applicationFee, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("invalid application_fee_amount: %w", err)
+			return nil, fmt.Errorf("invalid application_fee_amount: %v", err)
 		}
 		params.PaymentIntentData.ApplicationFeeAmount = stripe.Int64(feeAmount)
 	}
@@ -194,7 +194,7 @@ func (p *Provider) ParseEvent(_ context.Context, event *providers.WebhookEvent) 
 		stripe.EventTypeCheckoutSessionExpired:
 		var session stripe.CheckoutSession
 		if err := json.Unmarshal([]byte(event.Attributes["object"]), &session); err != nil {
-			return nil, fmt.Errorf("decode stripe checkout session event: %w", err)
+			return nil, fmt.Errorf("decode stripe checkout session event: %v", err)
 		}
 
 		return &providers.PaymentResult{
@@ -210,7 +210,7 @@ func (p *Provider) ParseEvent(_ context.Context, event *providers.WebhookEvent) 
 		stripe.EventTypePaymentIntentPaymentFailed:
 		var intent stripe.PaymentIntent
 		if err := json.Unmarshal([]byte(event.Attributes["object"]), &intent); err != nil {
-			return nil, fmt.Errorf("decode stripe payment intent event: %w", err)
+			return nil, fmt.Errorf("decode stripe payment intent event: %v", err)
 		}
 
 		return &providers.PaymentResult{
@@ -225,7 +225,7 @@ func (p *Provider) ParseEvent(_ context.Context, event *providers.WebhookEvent) 
 	case stripe.EventTypeChargeSucceeded, stripe.EventTypeChargeFailed:
 		var charge stripe.Charge
 		if err := json.Unmarshal([]byte(event.Attributes["object"]), &charge); err != nil {
-			return nil, fmt.Errorf("decode stripe charge event: %w", err)
+			return nil, fmt.Errorf("decode stripe charge event: %v", err)
 		}
 
 		return &providers.PaymentResult{

@@ -54,7 +54,7 @@ func (u *loginHandler) Handle(ctx context.Context, req *in.LoginRequest) (*out.L
 			return nil, stackErr.Error(ErrAccountNotFound)
 		}
 		log.Errorw("Failed to get account", zap.Error(err))
-		return nil, stackErr.Error(fmt.Errorf("get account failed: %w", err))
+		return nil, stackErr.Error(fmt.Errorf("get account failed: %v", err))
 	}
 
 	valid, err := u.hasher.Verify(ctx, password.Value(), account.Password.Value())

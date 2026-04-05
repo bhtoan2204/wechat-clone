@@ -33,7 +33,7 @@ func (r *RoomCache) Get(ctx context.Context, id string) (*entity.Room, bool, err
 	}
 	var m entity.Room
 	if err := json.Unmarshal(data, &m); err != nil {
-		return nil, false, fmt.Errorf("unmarshal room cache failed: %w", err)
+		return nil, false, fmt.Errorf("unmarshal room cache failed: %v", err)
 	}
 	return &m, true, nil
 }
@@ -44,7 +44,7 @@ func (r *RoomCache) Set(ctx context.Context, m *entity.Room) error {
 	}
 	data, err := json.Marshal(m)
 	if err != nil {
-		return fmt.Errorf("marshal room cache failed: %w", err)
+		return fmt.Errorf("marshal room cache failed: %v", err)
 	}
 	return r.cache.Set(ctx, roomCacheKey(m.ID), data)
 }

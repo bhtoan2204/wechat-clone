@@ -84,7 +84,7 @@ func (s *PaymentService) CreatePayment(ctx context.Context, req *paymentin.Creat
 		logging.FromContext(ctx).Errorw("provider create payment failed",
 			"provider", provider.Name(),
 			"transaction_id", req.TransactionID,
-			"error", err,
+			zap.Error(err),
 		)
 		if stateErr := intent.SetProviderState("", entity.PaymentStatusFailed, time.Now().UTC()); stateErr == nil {
 			_ = s.updateIntentStatus(ctx, intent.TransactionID, intent.Status)

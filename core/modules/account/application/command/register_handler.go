@@ -83,14 +83,14 @@ func (u *registerHandler) Handle(ctx context.Context, req *in.RegisterRequest) (
 	if txErr := u.baseRepo.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		if err := txRepos.AccountRepository().CreateAccount(ctx, newAccountEntity); err != nil {
 			log.Errorw("Failed to create account", zap.Error(err))
-			return stackErr.Error(fmt.Errorf("create account failed: %w", err))
+			return stackErr.Error(fmt.Errorf("create account failed: %v", err))
 		}
 
 		accountAggregate := &aggregate.AccountAggregate{}
 		accountAggregateType := reflect.TypeOf(accountAggregate).Elem().Name()
 		accountAggregate.SetAggregateType(accountAggregateType)
 		if err := accountAggregate.SetID(newAccountEntity.ID); err != nil {
-			return fmt.Errorf("set account aggregate id failed: %w", err)
+			return fmt.Errorf("set account aggregate id failed: %v", err)
 		}
 
 		if err := accountAggregate.ApplyChange(accountAggregate, &aggregate.EventAccountCreated{
@@ -98,12 +98,12 @@ func (u *registerHandler) Handle(ctx context.Context, req *in.RegisterRequest) (
 			Email:     newAccountEntity.Email.Value(),
 			CreatedAt: time.Now(),
 		}); err != nil {
-			return fmt.Errorf("apply account created event failed: %w", err)
+			return fmt.Errorf("apply account created event failed: %v", err)
 		}
 
 		publisher := eventpkg.NewPublisher(txRepos.AccountOutboxEventsRepository())
 		if err := publisher.PublishAggregate(ctx, accountAggregate); err != nil {
-			return fmt.Errorf("publish account created event failed: %w", err)
+			return fmt.Errorf("publish account created event failed: %v", err)
 		}
 		return nil
 	}); txErr != nil {
@@ -114,7 +114,7 @@ func (u *registerHandler) Handle(ctx context.Context, req *in.RegisterRequest) (
 	token, expiresAt, err := u.paseto.GenerateToken(ctx, newAccountEntity)
 	if err != nil {
 		log.Errorw("Failed to generate token", zap.Error(err))
-		return nil, stackErr.Error(fmt.Errorf("generate token failed: %w", err))
+		return nil, stackErr.Error(fmt.Errorf("generate token failed: %v", err))
 	}
 
 	return &out.RegisterResponse{

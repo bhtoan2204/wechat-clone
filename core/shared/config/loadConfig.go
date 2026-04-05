@@ -14,7 +14,7 @@ func LoadConfig(ctx context.Context) (*Config, error) {
 		Target:   cfg,
 		Lookuper: envconfig.OsLookuper(),
 	}); err != nil {
-		return nil, stackErr.Error(fmt.Errorf("envconfig.ProcessWith has err=%w", err))
+		return nil, stackErr.Error(fmt.Errorf("envconfig.ProcessWith has err=%v", err))
 	}
 	return cfg, nil
 }

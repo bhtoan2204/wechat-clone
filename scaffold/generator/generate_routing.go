@@ -51,7 +51,7 @@ func GenerateRouting(spec *models.APISpec) (string, error) {
 
 		formatted, err := format.Source(buf.Bytes())
 		if err != nil {
-			return "", fmt.Errorf("format routing failed: %w", err)
+			return "", fmt.Errorf("format routing failed: %v", err)
 		}
 
 		if err := os.WriteFile(dst, formatted, 0o644); err != nil {

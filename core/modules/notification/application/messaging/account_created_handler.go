@@ -18,7 +18,7 @@ func (h *messageHandler) handleAccountCreatedEvent(ctx context.Context, raw json
 	log := logging.FromContext(ctx).Named("handleAccountCreatedEvent")
 	payloadAny, err := decodeEventPayload(ctx, "EventAccountCreated", raw)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode event payload failed: %w", err))
+		return stackErr.Error(fmt.Errorf("decode event payload failed: %v", err))
 	}
 
 	payload, ok := payloadAny.(*aggregate.EventAccountCreated)
@@ -39,7 +39,7 @@ func (h *messageHandler) handleAccountCreatedEvent(ctx context.Context, raw json
 	}
 	if err := h.notificationRepo.CreateNotification(ctx, notification); err != nil {
 		log.Errorw("create notification failed", zap.Error(err))
-		return stackErr.Error(fmt.Errorf("create notification failed: %w", err))
+		return stackErr.Error(fmt.Errorf("create notification failed: %v", err))
 	}
 
 	return h.emailSender.Send(ctx, payload.Email, subject, body)

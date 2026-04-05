@@ -26,7 +26,7 @@ func NewRoomOutboxEventsRepoImpl(db *gorm.DB) repos.RoomOutboxEventsRepository {
 func (r *roomOutboxEventsRepoImpl) Append(ctx context.Context, evt eventpkg.Event) error {
 	data, err := r.serializer.Marshal(evt.EventData)
 	if err != nil {
-		return fmt.Errorf("marshal event data failed: %w", err)
+		return fmt.Errorf("marshal event data failed: %v", err)
 	}
 
 	createdAt := time.Now().UTC()

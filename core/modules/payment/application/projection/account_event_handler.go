@@ -18,7 +18,7 @@ func (p *processor) handleAccountEvent(ctx context.Context, value []byte) error 
 	log := logging.FromContext(ctx).Named("PaymentAccountProjection")
 	var event accountOutboxMessage
 	if err := json.Unmarshal(value, &event); err != nil {
-		return stackErr.Error(fmt.Errorf("unmarshal account outbox event failed: %w", err))
+		return stackErr.Error(fmt.Errorf("unmarshal account outbox event failed: %v", err))
 	}
 
 	log.Infow("handle account event", zap.String("event_name", event.EventName))
@@ -38,7 +38,7 @@ func (p *processor) handleAccountCreatedEvent(ctx context.Context, event *accoun
 	log := logging.FromContext(ctx).Named("handleAccountCreatedEvent")
 	payloadAny, err := decodeEventPayload(ctx, p.eventSerializer, event.AggregateType, event.EventName, event.EventData)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode event payload failed: %w", err))
+		return stackErr.Error(fmt.Errorf("decode event payload failed: %v", err))
 	}
 	payload, ok := payloadAny.(*aggregate.EventAccountCreated)
 	if !ok || payload == nil {
@@ -55,7 +55,7 @@ func (p *processor) handleAccountCreatedEvent(ctx context.Context, event *accoun
 
 	if err := p.accountProjectionRepo.UpsertAccountProjection(ctx, projection); err != nil {
 		log.Errorw("upsert account projection failed", zap.Error(err))
-		return stackErr.Error(fmt.Errorf("upsert account projection failed: %w", err))
+		return stackErr.Error(fmt.Errorf("upsert account projection failed: %v", err))
 	}
 	return nil
 }
@@ -64,7 +64,7 @@ func (p *processor) handleAccountUpdatedEvent(ctx context.Context, event *accoun
 	log := logging.FromContext(ctx).Named("handleAccountUpdatedEvent")
 	payloadAny, err := decodeEventPayload(ctx, p.eventSerializer, event.AggregateType, event.EventName, event.EventData)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode event payload failed: %w", err))
+		return stackErr.Error(fmt.Errorf("decode event payload failed: %v", err))
 	}
 	payload, ok := payloadAny.(*aggregate.EventAccountUpdated)
 	if !ok || payload == nil {
@@ -74,7 +74,7 @@ func (p *processor) handleAccountUpdatedEvent(ctx context.Context, event *accoun
 	existing, err := p.accountProjectionRepo.GetAccountProjectionByAccountID(ctx, payload.AccountID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Errorw("get account projection failed", zap.Error(err))
-		return stackErr.Error(fmt.Errorf("get account projection failed: %w", err))
+		return stackErr.Error(fmt.Errorf("get account projection failed: %v", err))
 	}
 
 	if existing == nil {
@@ -87,7 +87,7 @@ func (p *processor) handleAccountUpdatedEvent(ctx context.Context, event *accoun
 		}
 		if err := p.accountProjectionRepo.CreateAccountProjection(ctx, projection); err != nil {
 			log.Errorw("create account projection failed", zap.Error(err))
-			return stackErr.Error(fmt.Errorf("create account projection failed: %w", err))
+			return stackErr.Error(fmt.Errorf("create account projection failed: %v", err))
 		}
 		return nil
 	}
@@ -97,7 +97,7 @@ func (p *processor) handleAccountUpdatedEvent(ctx context.Context, event *accoun
 	existing.UpdatedAt = payload.UpdatedAt
 	if err := p.accountProjectionRepo.UpdateAccountProjection(ctx, existing); err != nil {
 		log.Errorw("update account projection failed", zap.Error(err))
-		return stackErr.Error(fmt.Errorf("update account projection failed: %w", err))
+		return stackErr.Error(fmt.Errorf("update account projection failed: %v", err))
 	}
 	return nil
 }
@@ -106,7 +106,7 @@ func (p *processor) handleAccountBannedEvent(ctx context.Context, event *account
 	log := logging.FromContext(ctx).Named("handleAccountBannedEvent")
 	payloadAny, err := decodeEventPayload(ctx, p.eventSerializer, event.AggregateType, event.EventName, event.EventData)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode event payload failed: %w", err))
+		return stackErr.Error(fmt.Errorf("decode event payload failed: %v", err))
 	}
 	payload, ok := payloadAny.(*aggregate.EventAccountBanned)
 	if !ok || payload == nil {
@@ -115,7 +115,7 @@ func (p *processor) handleAccountBannedEvent(ctx context.Context, event *account
 
 	if err := p.accountProjectionRepo.DeleteAccountProjection(ctx, payload.AccountID); err != nil {
 		log.Errorw("delete account projection failed", zap.Error(err))
-		return stackErr.Error(fmt.Errorf("delete account projection failed: %w", err))
+		return stackErr.Error(fmt.Errorf("delete account projection failed: %v", err))
 	}
 	return nil
 }

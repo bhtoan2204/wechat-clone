@@ -7,6 +7,7 @@ import (
 	"go-socket/core/shared/pkg/stackErr"
 
 	"github.com/hashicorp/consul/api"
+	"go.uber.org/zap"
 )
 
 type ConsulClient interface {
@@ -32,7 +33,7 @@ func NewConsulClient(ctx context.Context, cfg *config.Config) (ConsulClient, err
 
 	consulAPIClient, err := api.NewClient(consulConfig)
 	if err != nil {
-		log.Errorw("Failed to connect to Consul", "error", err)
+		log.Errorw("Failed to connect to Consul", zap.Error(err))
 		return nil, stackErr.Error(err)
 	}
 

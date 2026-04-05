@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 var _ App = (*Server)(nil)
@@ -163,7 +164,7 @@ func (s *Server) registerPrivateAPI() {
 func (s *Server) stopModuleServers(ctx context.Context) {
 	for i := len(s.moduleServers) - 1; i >= 0; i-- {
 		if err := s.moduleServers[i].Stop(ctx); err != nil {
-			logging.FromContext(ctx).Errorw("failed to stop http module server", "error", err)
+			logging.FromContext(ctx).Errorw("failed to stop http module server", zap.Error(err))
 		}
 	}
 }

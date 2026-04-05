@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 const roomChannelPrefix = "room:"
@@ -102,7 +103,7 @@ func (h *Hub) Unregister(ctx context.Context, client IClient) {
 
 	for _, roomID := range roomIDs {
 		if err := h.LeaveRoom(ctx, client, roomID); err != nil {
-			log.Warnw("failed to leave room while unregistering client", "client_id", clientID, "room_id", roomID, "error", err)
+			log.Warnw("failed to leave room while unregistering client", "client_id", clientID, "room_id", roomID, zap.Error(err))
 		}
 	}
 
@@ -229,10 +230,10 @@ func (h *Hub) HandleMessage(ctx context.Context, client IClient, msg Message) er
 
 		payload, err := json.Marshal(msg)
 		if err != nil {
-			return fmt.Errorf("marshal websocket message: %w", err)
+			return fmt.Errorf("marshal websocket message: %v", err)
 		}
 		if err := h.redisClient.Publish(ctx, roomChannelName(roomID), payload).Err(); err != nil {
-			return fmt.Errorf("publish redis message: %w", err)
+			return fmt.Errorf("publish redis message: %v", err)
 		}
 		return nil
 	case ActionPresence:
@@ -265,7 +266,7 @@ func (h *Hub) Close(ctx context.Context) {
 
 		for _, sub := range subscriptions {
 			if err := sub.Close(); err != nil {
-				log.Warnw("failed to close redis pubsub", "error", err)
+				log.Warnw("failed to close redis pubsub", zap.Error(err))
 			}
 		}
 		for _, client := range clients {
@@ -303,7 +304,7 @@ func (h *Hub) subscribeRoom(ctx context.Context, roomID string) error {
 	if _, err := pubsub.Receive(subCtx); err != nil {
 		h.removeSubscription(subCtx, roomID, sub)
 		_ = sub.Close()
-		return fmt.Errorf("subscribe to redis room channel: %w", err)
+		return fmt.Errorf("subscribe to redis room channel: %v", err)
 	}
 
 	go h.consumeRoomMessages(subCtx, roomID, sub)
@@ -318,7 +319,7 @@ func (h *Hub) unsubscribeRoom(ctx context.Context, roomID string) {
 		return
 	}
 	if err := sub.Close(); err != nil {
-		log.Warnw("failed to unsubscribe redis room channel", "room_id", roomID, "error", err)
+		log.Warnw("failed to unsubscribe redis room channel", "room_id", roomID, zap.Error(err))
 		return
 	}
 	log.Infow("unsubscribed redis room channel", "room_id", roomID, "channel", roomChannelName(roomID))
@@ -329,7 +330,7 @@ func (h *Hub) consumeRoomMessages(ctx context.Context, roomID string, sub *roomS
 	defer func() {
 		h.removeSubscription(ctx, roomID, sub)
 		if err := sub.Close(); err != nil {
-			log.Debugw("error while closing redis pubsub from consumer", "room_id", roomID, "error", err)
+			log.Debugw("error while closing redis pubsub from consumer", "room_id", roomID, zap.Error(err))
 		}
 	}()
 

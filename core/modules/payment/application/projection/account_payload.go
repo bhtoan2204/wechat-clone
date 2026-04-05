@@ -54,7 +54,7 @@ func decodeEventPayload(ctx context.Context, serializer eventpkg.Serializer, agg
 
 	if err := unmarshalEventData(raw, payload); err != nil {
 		logger.Errorw("unmarshal event_data failed", zap.Error(err), zap.String("raw", string(raw)))
-		return nil, stackErr.Error(fmt.Errorf("unmarshal event_data failed: %w", err))
+		return nil, stackErr.Error(fmt.Errorf("unmarshal event_data failed: %v", err))
 	}
 
 	return payload, nil
@@ -82,7 +82,7 @@ func unmarshalEventData(raw []byte, target interface{}) error {
 
 	var encoded string
 	if err := json.Unmarshal(raw, &encoded); err != nil {
-		return stackErr.Error(fmt.Errorf("unmarshal event_data as string failed: %w", err))
+		return stackErr.Error(fmt.Errorf("unmarshal event_data as string failed: %v", err))
 	}
 
 	encoded = strings.TrimSpace(encoded)
@@ -91,7 +91,7 @@ func unmarshalEventData(raw []byte, target interface{}) error {
 	}
 
 	if err := json.Unmarshal([]byte(encoded), target); err != nil {
-		return stackErr.Error(fmt.Errorf("unmarshal encoded event_data failed: %w", err))
+		return stackErr.Error(fmt.Errorf("unmarshal encoded event_data failed: %v", err))
 	}
 
 	return nil

@@ -104,7 +104,7 @@ func writeHandlerFile(tmpl *template.Template, module modulePaths, ep models.End
 
 	formatted, err := format.Source(buf.Bytes())
 	if err != nil {
-		return false, fmt.Errorf("format handler failed: %w", err)
+		return false, fmt.Errorf("format handler failed: %v", err)
 	}
 
 	if err := os.WriteFile(dst, formatted, 0o644); err != nil {

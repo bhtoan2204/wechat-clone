@@ -9,7 +9,7 @@ import (
 func genSalt(keyLen uint32) ([]byte, error) {
 	salt := make([]byte, keyLen)
 	if _, err := rand.Read(salt); err != nil {
-		return nil, stackErr.Error(fmt.Errorf("failed to generate salt: %w", err))
+		return nil, stackErr.Error(fmt.Errorf("failed to generate salt: %v", err))
 	}
 	return salt, nil
 }

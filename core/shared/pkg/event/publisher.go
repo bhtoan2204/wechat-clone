@@ -47,7 +47,7 @@ func (p *publisher) Publish(ctx context.Context, events ...Event) error {
 			ev.CreatedAt = time.Now().Unix()
 		}
 		if err := p.store.Append(ctx, ev); err != nil {
-			return fmt.Errorf("append event=%s failed: %w", ev.EventName, err)
+			return fmt.Errorf("append event=%s failed: %v", ev.EventName, err)
 		}
 	}
 	return nil

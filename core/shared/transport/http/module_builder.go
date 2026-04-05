@@ -18,7 +18,7 @@ func BuildModuleServers(ctx context.Context, appCtx *appCtx.AppContext, builders
 		}
 		server, err := builder(ctx, appCtx)
 		if err != nil {
-			return nil, fmt.Errorf("build module server %d failed: %w", idx, err)
+			return nil, fmt.Errorf("build module server %d failed: %v", idx, err)
 		}
 		if server == nil {
 			continue

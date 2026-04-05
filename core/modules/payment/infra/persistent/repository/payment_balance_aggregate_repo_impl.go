@@ -119,7 +119,7 @@ func (p *paymentBalanceAggregateRepoImpl) Save(ctx context.Context, agg *aggrega
 		}
 
 		if err := p.db.WithContext(ctx).Create(&eventModel).Error; err != nil {
-			return stackErr.Error(fmt.Errorf("create payment event failed: %w", err))
+			return stackErr.Error(fmt.Errorf("create payment event failed: %v", err))
 		}
 	}
 
@@ -146,7 +146,7 @@ func (p *paymentBalanceAggregateRepoImpl) persistAggregateVersion(ctx context.Co
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		}).Error; err != nil {
-			return stackErr.Error(fmt.Errorf("create payment aggregate failed: %w", err))
+			return stackErr.Error(fmt.Errorf("create payment aggregate failed: %v", err))
 		}
 		return nil
 	}
@@ -159,7 +159,7 @@ func (p *paymentBalanceAggregateRepoImpl) persistAggregateVersion(ctx context.Co
 			"updated_at": now,
 		})
 	if result.Error != nil {
-		return stackErr.Error(fmt.Errorf("update payment aggregate version failed: %w", result.Error))
+		return stackErr.Error(fmt.Errorf("update payment aggregate version failed: %v", result.Error))
 	}
 	if result.RowsAffected == 0 {
 		return stackErr.Error(repos.ErrPaymentVersionConflict)
@@ -171,7 +171,7 @@ func (p *paymentBalanceAggregateRepoImpl) persistAggregateVersion(ctx context.Co
 func (p *paymentBalanceAggregateRepoImpl) buildEventModel(evt eventpkg.Event) (model.PaymentEventModel, error) {
 	data, err := p.serializer.Marshal(evt.EventData)
 	if err != nil {
-		return model.PaymentEventModel{}, fmt.Errorf("marshal event data failed: %w", err)
+		return model.PaymentEventModel{}, fmt.Errorf("marshal event data failed: %v", err)
 	}
 
 	createdAt := time.Now().UTC()
@@ -203,7 +203,7 @@ func (p *paymentBalanceAggregateRepoImpl) loadSnapshot(ctx context.Context, agg 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, nil
 		}
-		return 0, fmt.Errorf("load payment snapshot failed: %w", err)
+		return 0, fmt.Errorf("load payment snapshot failed: %v", err)
 	}
 
 	if err := p.restoreSnapshot(agg, snapshot); err != nil {
@@ -215,7 +215,7 @@ func (p *paymentBalanceAggregateRepoImpl) loadSnapshot(ctx context.Context, agg 
 
 func (p *paymentBalanceAggregateRepoImpl) restoreSnapshot(agg *aggregate.PaymentBalanceAggregate, snapshot model.PaymentBalanceSnapshotModel) error {
 	if err := p.serializer.Unmarshal([]byte(snapshot.State), agg); err != nil {
-		return fmt.Errorf("unmarshal payment snapshot failed: %w", err)
+		return fmt.Errorf("unmarshal payment snapshot failed: %v", err)
 	}
 
 	if agg.AccountID == "" {
@@ -228,7 +228,7 @@ func (p *paymentBalanceAggregateRepoImpl) restoreSnapshot(agg *aggregate.Payment
 func (p *paymentBalanceAggregateRepoImpl) createSnapshot(ctx context.Context, agg *aggregate.PaymentBalanceAggregate) error {
 	state, err := p.serializer.Marshal(agg)
 	if err != nil {
-		return fmt.Errorf("marshal payment snapshot failed: %w", err)
+		return fmt.Errorf("marshal payment snapshot failed: %v", err)
 	}
 
 	snapshot := model.PaymentBalanceSnapshotModel{
@@ -239,7 +239,7 @@ func (p *paymentBalanceAggregateRepoImpl) createSnapshot(ctx context.Context, ag
 		CreatedAt:   time.Now().UTC(),
 	}
 	if err := p.db.WithContext(ctx).Create(&snapshot).Error; err != nil {
-		return fmt.Errorf("create payment snapshot failed: %w", err)
+		return fmt.Errorf("create payment snapshot failed: %v", err)
 	}
 
 	return nil

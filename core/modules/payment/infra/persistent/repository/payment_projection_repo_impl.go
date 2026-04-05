@@ -270,7 +270,7 @@ func (p *paymentProjectionRepoImpl) decodePaymentEvent(eventModel model.PaymentE
 		return nil, fmt.Errorf("payment event payload prototype is nil")
 	}
 	if err := p.serializer.Unmarshal([]byte(eventModel.EventData), payload); err != nil {
-		return nil, fmt.Errorf("unmarshal payment event payload failed: %w", err)
+		return nil, fmt.Errorf("unmarshal payment event payload failed: %v", err)
 	}
 
 	return payload, nil
@@ -279,7 +279,7 @@ func (p *paymentProjectionRepoImpl) decodePaymentEvent(eventModel model.PaymentE
 func (p *paymentProjectionRepoImpl) restoreBalanceProjectionFromSnapshot(ctx context.Context, snapshot model.PaymentBalanceSnapshotModel) error {
 	var agg aggregate.PaymentBalanceAggregate
 	if err := p.serializer.Unmarshal([]byte(snapshot.State), &agg); err != nil {
-		return fmt.Errorf("unmarshal payment snapshot state failed: %w", err)
+		return fmt.Errorf("unmarshal payment snapshot state failed: %v", err)
 	}
 
 	createdAt := agg.CreatedAt
