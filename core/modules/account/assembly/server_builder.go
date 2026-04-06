@@ -23,21 +23,23 @@ func BuildHTTPServer(_ context.Context, appContext *appCtx.AppContext) (http.HTT
 	logout := cqrs.NewDispatcher(command.NewLogoutHandler())
 	getProfile := cqrs.NewDispatcher(query.NewGetProfileHandler(accountRepos))
 	getAvatar := cqrs.NewDispatcher(query.NewGetAvatarHandler(accountRepos, appContext.GetStorage()))
+	getPresignedUrl := cqrs.NewDispatcher(command.NewCreatePresignedUrlHandler(appContext))
 	updateProfile := cqrs.NewDispatcher(command.NewUpdateProfileHandler(accountRepos, accountAggregateService))
 	verifyEmail := cqrs.NewDispatcher(command.NewVerifyEmailHandler(accountRepos, accountAggregateService, emailVerificationService))
 	confirmVerifyEmail := cqrs.NewDispatcher(command.NewConfirmVerifyEmailHandler(accountRepos, accountAggregateService, emailVerificationService))
 	changePassword := cqrs.NewDispatcher(command.NewChangePasswordHandler(appContext, accountRepos, accountAggregateService))
 
-	server, err := accountserver.NewServer(
+	server, err := accountserver.NewHTTPServer(
 		login,
 		register,
 		logout,
 		getProfile,
-		getAvatar,
 		updateProfile,
 		verifyEmail,
 		confirmVerifyEmail,
 		changePassword,
+		getAvatar,
+		getPresignedUrl,
 	)
 	if err != nil {
 		return nil, stackErr.Error(err)

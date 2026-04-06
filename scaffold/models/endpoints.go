@@ -42,10 +42,12 @@ type Payload struct {
 type FieldSpec struct {
 	Name     string   `json:"name" yaml:"name"`
 	Type     string   `json:"type" yaml:"type"`
+	Struct   string   `json:"struct,omitempty" yaml:"struct,omitempty"`
 	Source   string   `json:"source,omitempty" yaml:"source,omitempty"`
 	Header   string   `json:"header,omitempty" yaml:"header,omitempty"`
 	Items    *Payload `json:"items,omitempty" yaml:"items,omitempty"`
 	Required bool     `json:"required,omitempty" yaml:"required,omitempty"`
+	Pointer  bool     `json:"pointer,omitempty" yaml:"pointer,omitempty"`
 }
 
 func LoadAPISpec(path string) (*APISpec, error) {

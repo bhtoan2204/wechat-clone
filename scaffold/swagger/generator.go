@@ -314,7 +314,7 @@ func fieldSchemaForPrefix(prefix string, field models.FieldSpec) *Schema {
 	case "float64", "double":
 		return &Schema{Type: "number", Format: "double"}
 	case "array":
-		items := &Schema{}
+		items := &Schema{Type: "string"}
 		if field.Items != nil {
 			if field.Items.Struct != "" {
 				items = schemaRef(componentName(prefix, field.Items.Struct))

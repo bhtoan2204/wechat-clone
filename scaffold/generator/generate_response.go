@@ -9,6 +9,7 @@ import (
 	"go/format"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 )
 
@@ -39,26 +40,32 @@ func GenerateResponse(endpoints []models.Endpoint) (string, error) {
 		}
 		seen[key] = true
 
-		data := responseTemplateData{
-			PackageName:       "out",
-			StructName:        ep.Response.Struct,
-			Fields:            mapResponseFields(ep.Response.Fields),
-			AdditionalStructs: mapNestedStructs(ep.Response.Fields),
-		}
-
 		fileName := utils.Snake(ep.Response.Struct) + "_response.go"
 		dst := filepath.Join(module.FsRoot, "application/dto/out", fileName)
-		if structExistsInDir(filepath.Dir(dst), ep.Response.Struct) {
+		if structExistsInDirExcept(filepath.Dir(dst), ep.Response.Struct, dst) {
+			if fileExists(dst) && isGeneratedFile(dst, "response") {
+				if err := os.Remove(dst); err != nil {
+					return "", err
+				}
+			}
 			skipped++
 			continue
 		}
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return "", err
 		}
-		if fileExists(dst) {
+		if fileExists(dst) && !isGeneratedFile(dst, "response") {
 			skipped++
 			continue
 		}
+
+		data := responseTemplateData{
+			PackageName:       "out",
+			StructName:        ep.Response.Struct,
+			Fields:            mapResponseFields(ep.Response.Fields),
+			AdditionalStructs: filterNestedStructs(filepath.Dir(dst), dst, mapNestedStructs(ep.Response.Fields)),
+		}
+
 		var buf bytes.Buffer
 		if err := tmpl.Execute(&buf, data); err != nil {
 			return "", err
@@ -97,10 +104,7 @@ type nestedStruct struct {
 func mapResponseFields(fields []models.FieldSpec) []responseField {
 	result := make([]responseField, 0, len(fields))
 	for _, f := range fields {
-		fieldType := utils.GoType(f.Type)
-		if f.Type == "array" && f.Items != nil && f.Items.Struct != "" {
-			fieldType = "[]" + f.Items.Struct
-		}
+		fieldType := responseFieldType(f)
 		result = append(result, responseField{
 			GoName:   utils.Pascal(f.Name),
 			Type:     fieldType,
@@ -127,4 +131,36 @@ func mapNestedStructs(fields []models.FieldSpec) []nestedStruct {
 		})
 	}
 	return result
+}
+
+func responseFieldType(field models.FieldSpec) string {
+	switch strings.ToLower(strings.TrimSpace(field.Type)) {
+	case "array":
+		if field.Items != nil && field.Items.Struct != "" {
+			return "[]" + field.Items.Struct
+		}
+		return "[]string"
+	case "object":
+		if strings.TrimSpace(field.Struct) != "" {
+			return "*" + field.Struct
+		}
+		return "map[string]interface{}"
+	default:
+		goType := utils.GoType(field.Type)
+		if field.Pointer {
+			goType = "*" + goType
+		}
+		return goType
+	}
+}
+
+func filterNestedStructs(dir, dst string, structs []nestedStruct) []nestedStruct {
+	filtered := make([]nestedStruct, 0, len(structs))
+	for _, nested := range structs {
+		if structExistsInDirExcept(dir, nested.StructName, dst) {
+			continue
+		}
+		filtered = append(filtered, nested)
+	}
+	return filtered
 }

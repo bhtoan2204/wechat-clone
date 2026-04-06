@@ -1,3 +1,4 @@
+// CODE_GENERATOR: routing
 package http
 
 import (
@@ -11,13 +12,13 @@ import (
 )
 
 func RegisterPublicRoutes(_ *gin.RouterGroup) {}
-
-func RegisterPrivateRoutes(routes *gin.RouterGroup,
-	createTransactionHandler cqrs.Dispatcher[*in.CreateTransactionRequest, *out.TransactionResponse],
-	getAccountBalanceHandler cqrs.Dispatcher[*in.GetAccountBalanceRequest, *out.AccountBalanceResponse],
-	getTransactionHandler cqrs.Dispatcher[*in.GetTransactionRequest, *out.TransactionResponse],
+func RegisterPrivateRoutes(
+	routes *gin.RouterGroup,
+	createTransaction cqrs.Dispatcher[*in.CreateTransactionRequest, *out.TransactionResponse],
+	getAccountBalance cqrs.Dispatcher[*in.GetAccountBalanceRequest, *out.AccountBalanceResponse],
+	getTransaction cqrs.Dispatcher[*in.GetTransactionRequest, *out.TransactionResponse],
 ) {
-	routes.POST("/ledger/transactions", httpx.Wrap(handler.NewCreateTransactionHandler(createTransactionHandler)))
-	routes.GET("/ledger/accounts/:account_id/balance", httpx.Wrap(handler.NewGetAccountBalanceHandler(getAccountBalanceHandler)))
-	routes.GET("/ledger/transactions/:transaction_id", httpx.Wrap(handler.NewGetTransactionHandler(getTransactionHandler)))
+	routes.POST("/ledger/transactions", httpx.Wrap(handler.NewCreateTransactionHandler(createTransaction)))
+	routes.GET("/ledger/accounts/:account_id/balance", httpx.Wrap(handler.NewGetAccountBalanceHandler(getAccountBalance)))
+	routes.GET("/ledger/transactions/:transaction_id", httpx.Wrap(handler.NewGetTransactionHandler(getTransaction)))
 }

@@ -2,14 +2,22 @@
 
 package in
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 type GetAccountBalanceRequest struct {
-	AccountId string `json:"account_id" form:"account_id" binding:"required"`
+	AccountID string `json:"account_id" form:"account_id" binding:"required"`
+}
+
+func (r *GetAccountBalanceRequest) Normalize() {
+	r.AccountID = strings.TrimSpace(r.AccountID)
 }
 
 func (r *GetAccountBalanceRequest) Validate() error {
-	if r.AccountId == "" {
+	r.Normalize()
+	if r.AccountID == "" {
 		return errors.New("account_id is required")
 	}
 	return nil

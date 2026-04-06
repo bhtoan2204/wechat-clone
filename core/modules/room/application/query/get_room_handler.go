@@ -26,7 +26,7 @@ func NewGetRoomHandler(roomQueryService *roomservice.RoomQueryService) cqrs.Hand
 
 func (h *getRoomHandler) Handle(ctx context.Context, req *in.GetRoomRequest) (*out.GetRoomResponse, error) {
 	log := logging.FromContext(ctx).Named("GetRoom")
-	room, err := h.roomQueryService.GetRoom(ctx, apptypes.GetRoomQuery{ID: req.Id})
+	room, err := h.roomQueryService.GetRoom(ctx, apptypes.GetRoomQuery{ID: req.ID})
 	if err != nil {
 		log.Errorw("Failed to get room", zap.Error(err))
 		return nil, stackErr.Error(err)

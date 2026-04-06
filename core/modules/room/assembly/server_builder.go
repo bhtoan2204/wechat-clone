@@ -8,7 +8,6 @@ import (
 	roomservice "go-socket/core/modules/room/application/service"
 	roomrepo "go-socket/core/modules/room/infra/persistent/repository"
 	roomserver "go-socket/core/modules/room/transport/server"
-	roomsocket "go-socket/core/modules/room/transport/websocket"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/transport/http"
@@ -26,7 +25,6 @@ func BuildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 	deleteRoom := cqrs.NewDispatcher(roomcommand.NewDeleteRoomHandler(roomCommandService))
 	getRoom := cqrs.NewDispatcher(roomquery.NewGetRoomHandler(roomQueryService))
 	listRoom := cqrs.NewDispatcher(roomquery.NewListRoomHandler(roomQueryService))
-	roomHub := roomsocket.NewHub(ctx, appContext)
 	createDirectConversation := cqrs.NewDispatcher(roomcommand.NewCreateDirectConversationHandler(roomCommandService))
 	createGroupChat := cqrs.NewDispatcher(roomcommand.NewCreateGroupChatHandler(roomCommandService))
 	updateGroupChat := cqrs.NewDispatcher(roomcommand.NewUpdateGroupChatHandler(roomCommandService))
@@ -44,16 +42,13 @@ func BuildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 	getChatPresence := cqrs.NewDispatcher(roomquery.NewGetChatPresenceHandler(chatQueryService))
 	server, err := roomserver.NewHTTPServer(
 		createRoom,
+		listRoom,
+		getRoom,
 		updateRoom,
 		deleteRoom,
-		getRoom,
-		listRoom,
 		createDirectConversation,
 		createGroupChat,
 		updateGroupChat,
-		addChatMember,
-		removeChatMember,
-		pinChatMessage,
 		listChatConversations,
 		getChatConversation,
 		listChatMessages,
@@ -62,8 +57,10 @@ func BuildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 		deleteChatMessage,
 		forwardChatMessage,
 		markChatMessageStatus,
+		addChatMember,
+		removeChatMember,
+		pinChatMessage,
 		getChatPresence,
-		roomHub,
 	)
 	if err != nil {
 		return nil, stackErr.Error(err)

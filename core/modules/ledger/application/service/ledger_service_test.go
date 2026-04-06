@@ -19,7 +19,7 @@ func TestLedgerServiceCreateTransaction(t *testing.T) {
 
 		response, err := service.CreateTransaction(context.Background(), &ledgerin.CreateTransactionRequest{
 			TransactionID: "ledger-tx-valid",
-			Entries: []ledgerin.LedgerEntryInput{
+			Entries: []ledgerin.LedgerEntryRequest{
 				{AccountID: "acc-a", Amount: -100},
 				{AccountID: "acc-b", Amount: 100},
 			},
@@ -41,7 +41,7 @@ func TestLedgerServiceCreateTransaction(t *testing.T) {
 
 		_, err := service.CreateTransaction(context.Background(), &ledgerin.CreateTransactionRequest{
 			TransactionID: "ledger-tx-invalid",
-			Entries: []ledgerin.LedgerEntryInput{
+			Entries: []ledgerin.LedgerEntryRequest{
 				{AccountID: "acc-a", Amount: -100},
 				{AccountID: "acc-b", Amount: 50},
 			},
@@ -61,7 +61,7 @@ func TestLedgerServiceCreateTransaction(t *testing.T) {
 
 		_, err := service.CreateTransaction(context.Background(), &ledgerin.CreateTransactionRequest{
 			TransactionID: "ledger-tx-dup",
-			Entries: []ledgerin.LedgerEntryInput{
+			Entries: []ledgerin.LedgerEntryRequest{
 				{AccountID: "acc-a", Amount: -100},
 				{AccountID: "acc-b", Amount: 100},
 			},

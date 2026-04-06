@@ -29,7 +29,7 @@ func GenerateHandler(endpoints []models.Endpoint) (string, error) {
 	skipped := 0
 	for _, ep := range endpoints {
 		if !shouldGenerateHandler(ep) {
-			continue
+			// continue
 		}
 		module, err := moduleForUsecase(ep.Usecase.Name)
 		if err != nil {
@@ -37,7 +37,7 @@ func GenerateHandler(endpoints []models.Endpoint) (string, error) {
 		}
 		key := module.FsRoot + ":handler:" + ep.Handler
 		if seen[key] {
-			continue
+			// continue
 		}
 		seen[key] = true
 
@@ -93,7 +93,7 @@ func writeHandlerFile(tmpl *template.Template, module modulePaths, ep models.End
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return false, err
 	}
-	if fileExists(dst) {
+	if fileExists(dst) && !isGeneratedFile(dst, "handler") {
 		return false, nil
 	}
 

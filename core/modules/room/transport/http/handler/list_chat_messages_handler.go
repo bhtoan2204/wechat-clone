@@ -2,9 +2,10 @@
 package handler
 
 import (
-	"errors"
-	roomin "go-socket/core/modules/room/application/dto/in"
-	roomout "go-socket/core/modules/room/application/dto/out"
+	"net/http"
+
+	"go-socket/core/modules/room/application/dto/in"
+	"go-socket/core/modules/room/application/dto/out"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -14,10 +15,12 @@ import (
 )
 
 type listChatMessagesHandler struct {
-	listChatMessages cqrs.Dispatcher[*roomin.ListChatMessagesRequest, []*roomout.ChatMessageResponse]
+	listChatMessages cqrs.Dispatcher[*in.ListChatMessagesRequest, []*out.ChatMessageResponse]
 }
 
-func NewListChatMessagesHandler(listChatMessages cqrs.Dispatcher[*roomin.ListChatMessagesRequest, []*roomout.ChatMessageResponse]) *listChatMessagesHandler {
+func NewListChatMessagesHandler(
+	listChatMessages cqrs.Dispatcher[*in.ListChatMessagesRequest, []*out.ChatMessageResponse],
+) *listChatMessagesHandler {
 	return &listChatMessagesHandler{
 		listChatMessages: listChatMessages,
 	}
@@ -26,19 +29,24 @@ func NewListChatMessagesHandler(listChatMessages cqrs.Dispatcher[*roomin.ListCha
 func (h *listChatMessagesHandler) Handle(c *gin.Context) (interface{}, error) {
 	ctx := c.Request.Context()
 	logger := logging.FromContext(ctx)
-	request := roomin.ListChatMessagesRequest{RoomID: c.Param("room_id")}
+	var request in.ListChatMessagesRequest
+	request.RoomID = c.Param("room_id")
 	if err := c.ShouldBindQuery(&request); err != nil {
 		logger.Errorw("Unmarshal request failed", zap.Error(err))
-		return nil, stackErr.Error(err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
+
 	if err := request.Validate(); err != nil {
 		logger.Errorw("Validate request failed", zap.Error(err))
-		return nil, stackErr.Error(errors.New("validate request failed"))
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
+
 	result, err := h.listChatMessages.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("ListChatMessages failed", zap.Error(err))
-		return nil, stackErr.Error(errors.New("ListChatMessages failed"))
+		return nil, stackErr.Error(err)
 	}
 	return result, nil
 }

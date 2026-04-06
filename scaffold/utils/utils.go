@@ -6,15 +6,26 @@ import (
 	"strings"
 )
 
+var initialisms = map[string]string{
+	"id":  "ID",
+	"ids": "IDs",
+	"url": "URL",
+}
+
 func ZeroCheck(typ string, field string) string {
 	switch typ {
 	case "string":
 		return fmt.Sprintf("r.%s == \"\"", field)
+	case "*string":
+		return fmt.Sprintf("r.%s == nil || *r.%s == \"\"", field, field)
 	case "int", "int64":
 		return fmt.Sprintf("r.%s == 0", field)
 	case "bool":
 		return fmt.Sprintf("r.%s == false", field)
 	default:
+		if strings.HasPrefix(typ, "[]") || strings.HasPrefix(typ, "map[") {
+			return fmt.Sprintf("len(r.%s) == 0", field)
+		}
 		return ""
 	}
 }
@@ -34,6 +45,10 @@ func Pascal(name string) string {
 	parts := strings.Split(name, "_")
 	for i, p := range parts {
 		if p == "" {
+			continue
+		}
+		if initialism, ok := initialisms[strings.ToLower(p)]; ok {
+			parts[i] = initialism
 			continue
 		}
 		parts[i] = strings.ToUpper(p[:1]) + p[1:]

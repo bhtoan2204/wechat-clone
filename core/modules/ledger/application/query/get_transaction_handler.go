@@ -18,5 +18,5 @@ func NewGetTransactionHandler(service *ledgerservice.LedgerService) cqrs.Handler
 }
 
 func (h *getTransactionHandler) Handle(ctx context.Context, req *ledgerin.GetTransactionRequest) (*ledgerout.TransactionResponse, error) {
-	return h.service.GetTransaction(ctx, req.TransactionId)
+	return h.service.GetTransaction(ctx, req.TransactionID)
 }

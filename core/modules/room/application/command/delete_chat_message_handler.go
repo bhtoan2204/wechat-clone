@@ -32,5 +32,5 @@ func (h *deleteChatMessageHandler) Handle(ctx context.Context, req *in.DeleteCha
 		return nil, stackErr.Error(err)
 	}
 
-	return &out.DeleteChatMessageResponse{OK: true}, nil
+	return &out.DeleteChatMessageResponse{Ok: true}, nil
 }

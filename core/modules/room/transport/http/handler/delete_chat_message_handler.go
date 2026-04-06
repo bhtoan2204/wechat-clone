@@ -2,9 +2,10 @@
 package handler
 
 import (
-	"errors"
-	roomin "go-socket/core/modules/room/application/dto/in"
-	roomout "go-socket/core/modules/room/application/dto/out"
+	"net/http"
+
+	"go-socket/core/modules/room/application/dto/in"
+	"go-socket/core/modules/room/application/dto/out"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -14,10 +15,12 @@ import (
 )
 
 type deleteChatMessageHandler struct {
-	deleteChatMessage cqrs.Dispatcher[*roomin.DeleteChatMessageRequest, *roomout.DeleteChatMessageResponse]
+	deleteChatMessage cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse]
 }
 
-func NewDeleteChatMessageHandler(deleteChatMessage cqrs.Dispatcher[*roomin.DeleteChatMessageRequest, *roomout.DeleteChatMessageResponse]) *deleteChatMessageHandler {
+func NewDeleteChatMessageHandler(
+	deleteChatMessage cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse],
+) *deleteChatMessageHandler {
 	return &deleteChatMessageHandler{
 		deleteChatMessage: deleteChatMessage,
 	}
@@ -26,18 +29,24 @@ func NewDeleteChatMessageHandler(deleteChatMessage cqrs.Dispatcher[*roomin.Delet
 func (h *deleteChatMessageHandler) Handle(c *gin.Context) (interface{}, error) {
 	ctx := c.Request.Context()
 	logger := logging.FromContext(ctx)
-	request := roomin.DeleteChatMessageRequest{
-		MessageID: c.Param("message_id"),
-		Scope:     c.Query("scope"),
+	var request in.DeleteChatMessageRequest
+	request.MessageID = c.Param("message_id")
+	if err := c.ShouldBindJSON(&request); err != nil {
+		logger.Errorw("Unmarshal request failed", zap.Error(err))
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
+
 	if err := request.Validate(); err != nil {
 		logger.Errorw("Validate request failed", zap.Error(err))
-		return nil, stackErr.Error(errors.New("validate request failed"))
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
+
 	result, err := h.deleteChatMessage.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("DeleteChatMessage failed", zap.Error(err))
-		return nil, stackErr.Error(errors.New("DeleteChatMessage failed"))
+		return nil, stackErr.Error(err)
 	}
 	return result, nil
 }

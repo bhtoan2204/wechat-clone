@@ -2,9 +2,10 @@
 package handler
 
 import (
-	"errors"
-	roomin "go-socket/core/modules/room/application/dto/in"
-	roomout "go-socket/core/modules/room/application/dto/out"
+	"net/http"
+
+	"go-socket/core/modules/room/application/dto/in"
+	"go-socket/core/modules/room/application/dto/out"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -14,10 +15,12 @@ import (
 )
 
 type pinChatMessageHandler struct {
-	pinChatMessage cqrs.Dispatcher[*roomin.PinChatMessageRequest, *roomout.ChatConversationResponse]
+	pinChatMessage cqrs.Dispatcher[*in.PinChatMessageRequest, *out.ChatConversationResponse]
 }
 
-func NewPinChatMessageHandler(pinChatMessage cqrs.Dispatcher[*roomin.PinChatMessageRequest, *roomout.ChatConversationResponse]) *pinChatMessageHandler {
+func NewPinChatMessageHandler(
+	pinChatMessage cqrs.Dispatcher[*in.PinChatMessageRequest, *out.ChatConversationResponse],
+) *pinChatMessageHandler {
 	return &pinChatMessageHandler{
 		pinChatMessage: pinChatMessage,
 	}
@@ -26,19 +29,24 @@ func NewPinChatMessageHandler(pinChatMessage cqrs.Dispatcher[*roomin.PinChatMess
 func (h *pinChatMessageHandler) Handle(c *gin.Context) (interface{}, error) {
 	ctx := c.Request.Context()
 	logger := logging.FromContext(ctx)
-	request := roomin.PinChatMessageRequest{RoomID: c.Param("room_id")}
+	var request in.PinChatMessageRequest
+	request.RoomID = c.Param("room_id")
 	if err := c.ShouldBindJSON(&request); err != nil {
 		logger.Errorw("Unmarshal request failed", zap.Error(err))
-		return nil, stackErr.Error(err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
+
 	if err := request.Validate(); err != nil {
 		logger.Errorw("Validate request failed", zap.Error(err))
-		return nil, stackErr.Error(errors.New("validate request failed"))
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
+
 	result, err := h.pinChatMessage.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("PinChatMessage failed", zap.Error(err))
-		return nil, stackErr.Error(errors.New("PinChatMessage failed"))
+		return nil, stackErr.Error(err)
 	}
 	return result, nil
 }

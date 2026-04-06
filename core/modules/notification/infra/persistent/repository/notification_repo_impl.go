@@ -8,6 +8,7 @@ import (
 	"go-socket/core/modules/notification/infra/persistent/models"
 	"go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/utils"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -77,8 +78,8 @@ func (r *notificationRepoImpl) ListNotifications(ctx context.Context, options ut
 			Subject:   notification.Subject,
 			Body:      notification.Body,
 			IsRead:    notification.IsRead,
-			ReadAt:    notification.ReadAt,
-			CreatedAt: notification.CreatedAt,
+			ReadAt:    notification.ReadAt.Format(time.DateTime),
+			CreatedAt: notification.CreatedAt.Format(time.DateTime),
 		})
 	}
 

@@ -1,3 +1,5 @@
+// CODE_GENERATOR: request
+
 package in
 
 import (
@@ -6,13 +8,17 @@ import (
 )
 
 type ForwardChatMessageRequest struct {
-	MessageID    string `json:"message_id" uri:"message_id"`
-	TargetRoomID string `json:"target_room_id"`
+	MessageID    string `json:"message_id" form:"message_id" binding:"required"`
+	TargetRoomID string `json:"target_room_id" form:"target_room_id" binding:"required"`
+}
+
+func (r *ForwardChatMessageRequest) Normalize() {
+	r.MessageID = strings.TrimSpace(r.MessageID)
+	r.TargetRoomID = strings.TrimSpace(r.TargetRoomID)
 }
 
 func (r *ForwardChatMessageRequest) Validate() error {
-	r.MessageID = strings.TrimSpace(r.MessageID)
-	r.TargetRoomID = strings.TrimSpace(r.TargetRoomID)
+	r.Normalize()
 	if r.MessageID == "" {
 		return errors.New("message_id is required")
 	}

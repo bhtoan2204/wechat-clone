@@ -4,7 +4,7 @@ basePath: /api/v1
 endpoints:
   - name: RoomCreate
     method: POST
-    path: /room/create
+    path: /chat/room/create
     handler: CreateRoomHandler
     auth: true
     usecase:
@@ -30,7 +30,7 @@ endpoints:
 
   - name: RoomList
     method: GET
-    path: /room/list
+    path: /chat/room/list
     handler: ListRoomsHandler
     auth: true
     usecase:
@@ -72,7 +72,7 @@ endpoints:
 
   - name: RoomGet
     method: GET
-    path: /room/get
+    path: /chat/room/get
     handler: GetRoomHandler
     auth: true
     usecase:
@@ -104,7 +104,7 @@ endpoints:
 
   - name: RoomUpdate
     method: PUT
-    path: /room/update
+    path: /chat/room/update
     handler: UpdateRoomHandler
     auth: true
     usecase:
@@ -133,7 +133,7 @@ endpoints:
 
   - name: RoomDelete
     method: DELETE
-    path: /room/delete
+    path: /chat/room/delete
     handler: DeleteRoomHandler
     auth: true
     usecase:

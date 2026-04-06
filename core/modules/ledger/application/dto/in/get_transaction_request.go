@@ -2,14 +2,22 @@
 
 package in
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 type GetTransactionRequest struct {
-	TransactionId string `json:"transaction_id" form:"transaction_id" binding:"required"`
+	TransactionID string `json:"transaction_id" form:"transaction_id" binding:"required"`
+}
+
+func (r *GetTransactionRequest) Normalize() {
+	r.TransactionID = strings.TrimSpace(r.TransactionID)
 }
 
 func (r *GetTransactionRequest) Validate() error {
-	if r.TransactionId == "" {
+	r.Normalize()
+	if r.TransactionID == "" {
 		return errors.New("transaction_id is required")
 	}
 	return nil

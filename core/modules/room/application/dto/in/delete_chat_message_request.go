@@ -1,3 +1,5 @@
+// CODE_GENERATOR: request
+
 package in
 
 import (
@@ -6,13 +8,17 @@ import (
 )
 
 type DeleteChatMessageRequest struct {
-	MessageID string `json:"message_id" uri:"message_id"`
+	MessageID string `json:"message_id" form:"message_id" binding:"required"`
 	Scope     string `json:"scope" form:"scope"`
 }
 
-func (r *DeleteChatMessageRequest) Validate() error {
+func (r *DeleteChatMessageRequest) Normalize() {
 	r.MessageID = strings.TrimSpace(r.MessageID)
 	r.Scope = strings.TrimSpace(r.Scope)
+}
+
+func (r *DeleteChatMessageRequest) Validate() error {
+	r.Normalize()
 	if r.MessageID == "" {
 		return errors.New("message_id is required")
 	}

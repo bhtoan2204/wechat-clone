@@ -2,7 +2,10 @@
 
 package in
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 type RegisterRequest struct {
 	DisplayName string `json:"display_name" form:"display_name" binding:"required"`
@@ -10,7 +13,14 @@ type RegisterRequest struct {
 	Password    string `json:"password" form:"password" binding:"required"`
 }
 
+func (r *RegisterRequest) Normalize() {
+	r.DisplayName = strings.TrimSpace(r.DisplayName)
+	r.Email = strings.TrimSpace(r.Email)
+	r.Password = strings.TrimSpace(r.Password)
+}
+
 func (r *RegisterRequest) Validate() error {
+	r.Normalize()
 	if r.DisplayName == "" {
 		return errors.New("display_name is required")
 	}

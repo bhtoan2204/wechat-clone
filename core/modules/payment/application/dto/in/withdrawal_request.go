@@ -1,14 +1,18 @@
+// CODE_GENERATOR: request
+
 package in
 
-import "errors"
+import (
+	"errors"
+)
 
 type WithdrawalRequest struct {
-	Amount int64 `json:"amount" form:"amount"`
+	Amount int64 `json:"amount" form:"amount" binding:"required"`
 }
 
 func (r *WithdrawalRequest) Validate() error {
-	if r.Amount <= 0 {
-		return errors.New("amount must be greater than 0")
+	if r.Amount == 0 {
+		return errors.New("amount is required")
 	}
 	return nil
 }

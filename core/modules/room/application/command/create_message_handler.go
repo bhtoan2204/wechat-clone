@@ -41,9 +41,9 @@ func (h *createMessageHandler) Handle(ctx context.Context, req *in.CreateMessage
 	}
 
 	return &out.CreateMessageResponse{
-		Id:        res.ID,
-		RoomId:    res.RoomID,
-		SenderId:  res.SenderID,
+		ID:        res.ID,
+		RoomID:    res.RoomID,
+		SenderID:  res.SenderID,
 		Message:   res.Message,
 		CreatedAt: res.CreatedAt,
 	}, nil

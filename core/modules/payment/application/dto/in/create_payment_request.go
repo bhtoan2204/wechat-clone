@@ -1,3 +1,5 @@
+// CODE_GENERATOR: request
+
 package in
 
 import (
@@ -6,21 +8,24 @@ import (
 )
 
 type CreatePaymentRequest struct {
-	Provider        string            `json:"provider"`
-	TransactionID   string            `json:"transaction_id"`
-	Amount          int64             `json:"amount"`
-	Currency        string            `json:"currency"`
-	DebitAccountID  string            `json:"debit_account_id,omitempty"`
-	CreditAccountID string            `json:"credit_account_id"`
-	Metadata        map[string]string `json:"metadata,omitempty"`
+	Provider        string            `json:"provider" form:"provider" binding:"required"`
+	TransactionID   string            `json:"transaction_id" form:"transaction_id" binding:"required"`
+	Amount          int64             `json:"amount" form:"amount" binding:"required"`
+	Currency        string            `json:"currency" form:"currency" binding:"required"`
+	DebitAccountID  string            `json:"debit_account_id" form:"debit_account_id" binding:"required"`
+	CreditAccountID string            `json:"credit_account_id" form:"credit_account_id" binding:"required"`
+	Metadata        map[string]string `json:"metadata" form:"metadata"`
 }
 
 func (r *CreatePaymentRequest) Normalize() {
-	r.Provider = strings.ToLower(strings.TrimSpace(r.Provider))
+	r.Provider = strings.TrimSpace(r.Provider)
 	r.TransactionID = strings.TrimSpace(r.TransactionID)
-	r.Currency = strings.ToUpper(strings.TrimSpace(r.Currency))
+	r.Currency = strings.TrimSpace(r.Currency)
 	r.DebitAccountID = strings.TrimSpace(r.DebitAccountID)
 	r.CreditAccountID = strings.TrimSpace(r.CreditAccountID)
+	for key, value := range r.Metadata {
+		r.Metadata[key] = strings.TrimSpace(value)
+	}
 }
 
 func (r *CreatePaymentRequest) Validate() error {
@@ -31,8 +36,8 @@ func (r *CreatePaymentRequest) Validate() error {
 	if r.TransactionID == "" {
 		return errors.New("transaction_id is required")
 	}
-	if r.Amount <= 0 {
-		return errors.New("amount must be greater than 0")
+	if r.Amount == 0 {
+		return errors.New("amount is required")
 	}
 	if r.Currency == "" {
 		return errors.New("currency is required")
@@ -42,9 +47,6 @@ func (r *CreatePaymentRequest) Validate() error {
 	}
 	if r.CreditAccountID == "" {
 		return errors.New("credit_account_id is required")
-	}
-	if r.DebitAccountID == r.CreditAccountID {
-		return errors.New("debit_account_id and credit_account_id must be different")
 	}
 	return nil
 }

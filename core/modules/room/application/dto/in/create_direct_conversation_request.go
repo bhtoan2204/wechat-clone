@@ -1,3 +1,5 @@
+// CODE_GENERATOR: request
+
 package in
 
 import (
@@ -6,11 +8,15 @@ import (
 )
 
 type CreateDirectConversationRequest struct {
-	PeerAccountID string `json:"peer_account_id"`
+	PeerAccountID string `json:"peer_account_id" form:"peer_account_id" binding:"required"`
+}
+
+func (r *CreateDirectConversationRequest) Normalize() {
+	r.PeerAccountID = strings.TrimSpace(r.PeerAccountID)
 }
 
 func (r *CreateDirectConversationRequest) Validate() error {
-	r.PeerAccountID = strings.TrimSpace(r.PeerAccountID)
+	r.Normalize()
 	if r.PeerAccountID == "" {
 		return errors.New("peer_account_id is required")
 	}

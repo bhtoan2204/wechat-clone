@@ -25,7 +25,7 @@ func NewUpdateRoomHandler(roomService *roomservice.RoomCommandService) cqrs.Hand
 
 func (h *updateRoomHandler) Handle(ctx context.Context, req *in.UpdateRoomRequest) (*out.UpdateRoomResponse, error) {
 	log := logging.FromContext(ctx).Named("UpdateRoom")
-	room, err := h.roomService.UpdateRoom(ctx, "", req.Id, roomtypes.UpdateRoomCommand{
+	room, err := h.roomService.UpdateRoom(ctx, "", req.ID, roomtypes.UpdateRoomCommand{
 		Name: req.Name,
 	})
 	if err != nil {
@@ -33,7 +33,7 @@ func (h *updateRoomHandler) Handle(ctx context.Context, req *in.UpdateRoomReques
 		return nil, stackErr.Error(err)
 	}
 	return &out.UpdateRoomResponse{
-		Id:        room.ID,
+		ID:        room.ID,
 		Name:      room.Name,
 		CreatedAt: room.CreatedAt,
 		UpdatedAt: room.UpdatedAt,

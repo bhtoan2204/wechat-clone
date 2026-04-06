@@ -1,6 +1,5 @@
+// CODE_GENERATOR: response
 package out
-
-import "time"
 
 type ListNotificationResponse struct {
 	Notifications []NotificationResponse `json:"notifications"`
@@ -11,12 +10,12 @@ type ListNotificationResponse struct {
 }
 
 type NotificationResponse struct {
-	ID        string     `json:"id"`
-	AccountID string     `json:"account_id"`
-	Type      string     `json:"type"`
-	Subject   string     `json:"subject"`
-	Body      string     `json:"body"`
-	IsRead    bool       `json:"is_read"`
-	ReadAt    *time.Time `json:"read_at"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID        string `json:"id"`
+	AccountID string `json:"account_id"`
+	Type      string `json:"type"`
+	Subject   string `json:"subject"`
+	Body      string `json:"body"`
+	IsRead    bool   `json:"is_read"`
+	ReadAt    string `json:"read_at"`
+	CreatedAt string `json:"created_at"`
 }

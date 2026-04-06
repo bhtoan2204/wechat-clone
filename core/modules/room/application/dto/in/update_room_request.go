@@ -2,15 +2,24 @@
 
 package in
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 type UpdateRoomRequest struct {
-	Id   string `json:"id" form:"id"`
-	Name string `json:"name" form:"name"`
+	ID   string `json:"id" form:"id" binding:"required"`
+	Name string `json:"name" form:"name" binding:"required"`
+}
+
+func (r *UpdateRoomRequest) Normalize() {
+	r.ID = strings.TrimSpace(r.ID)
+	r.Name = strings.TrimSpace(r.Name)
 }
 
 func (r *UpdateRoomRequest) Validate() error {
-	if r.Id == "" {
+	r.Normalize()
+	if r.ID == "" {
 		return errors.New("id is required")
 	}
 	if r.Name == "" {

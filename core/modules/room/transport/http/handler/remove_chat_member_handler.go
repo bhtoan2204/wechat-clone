@@ -2,9 +2,10 @@
 package handler
 
 import (
-	"errors"
-	roomin "go-socket/core/modules/room/application/dto/in"
-	roomout "go-socket/core/modules/room/application/dto/out"
+	"net/http"
+
+	"go-socket/core/modules/room/application/dto/in"
+	"go-socket/core/modules/room/application/dto/out"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -14,10 +15,12 @@ import (
 )
 
 type removeChatMemberHandler struct {
-	removeChatMember cqrs.Dispatcher[*roomin.RemoveChatMemberRequest, *roomout.ChatConversationResponse]
+	removeChatMember cqrs.Dispatcher[*in.RemoveChatMemberRequest, *out.ChatConversationResponse]
 }
 
-func NewRemoveChatMemberHandler(removeChatMember cqrs.Dispatcher[*roomin.RemoveChatMemberRequest, *roomout.ChatConversationResponse]) *removeChatMemberHandler {
+func NewRemoveChatMemberHandler(
+	removeChatMember cqrs.Dispatcher[*in.RemoveChatMemberRequest, *out.ChatConversationResponse],
+) *removeChatMemberHandler {
 	return &removeChatMemberHandler{
 		removeChatMember: removeChatMember,
 	}
@@ -26,18 +29,20 @@ func NewRemoveChatMemberHandler(removeChatMember cqrs.Dispatcher[*roomin.RemoveC
 func (h *removeChatMemberHandler) Handle(c *gin.Context) (interface{}, error) {
 	ctx := c.Request.Context()
 	logger := logging.FromContext(ctx)
-	request := roomin.RemoveChatMemberRequest{
-		RoomID:    c.Param("room_id"),
-		AccountID: c.Param("account_id"),
-	}
+	var request in.RemoveChatMemberRequest
+	request.RoomID = c.Param("room_id")
+	request.AccountID = c.Param("account_id")
+
 	if err := request.Validate(); err != nil {
 		logger.Errorw("Validate request failed", zap.Error(err))
-		return nil, stackErr.Error(errors.New("validate request failed"))
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
+
 	result, err := h.removeChatMember.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("RemoveChatMember failed", zap.Error(err))
-		return nil, stackErr.Error(errors.New("RemoveChatMember failed"))
+		return nil, stackErr.Error(err)
 	}
 	return result, nil
 }

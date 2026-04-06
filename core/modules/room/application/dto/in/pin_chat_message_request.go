@@ -1,3 +1,5 @@
+// CODE_GENERATOR: request
+
 package in
 
 import (
@@ -6,13 +8,17 @@ import (
 )
 
 type PinChatMessageRequest struct {
-	RoomID    string `json:"room_id" uri:"room_id"`
-	MessageID string `json:"message_id"`
+	RoomID    string `json:"room_id" form:"room_id" binding:"required"`
+	MessageID string `json:"message_id" form:"message_id" binding:"required"`
+}
+
+func (r *PinChatMessageRequest) Normalize() {
+	r.RoomID = strings.TrimSpace(r.RoomID)
+	r.MessageID = strings.TrimSpace(r.MessageID)
 }
 
 func (r *PinChatMessageRequest) Validate() error {
-	r.RoomID = strings.TrimSpace(r.RoomID)
-	r.MessageID = strings.TrimSpace(r.MessageID)
+	r.Normalize()
 	if r.RoomID == "" {
 		return errors.New("room_id is required")
 	}

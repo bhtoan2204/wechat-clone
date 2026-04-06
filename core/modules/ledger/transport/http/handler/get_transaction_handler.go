@@ -29,12 +29,8 @@ func NewGetTransactionHandler(
 func (h *getTransactionHandler) Handle(c *gin.Context) (interface{}, error) {
 	ctx := c.Request.Context()
 	logger := logging.FromContext(ctx)
-	request := in.GetTransactionRequest{TransactionId: c.Param("transaction_id")}
-	if err := c.ShouldBindQuery(&request); err != nil {
-		logger.Errorw("Unmarshal request failed", zap.Error(err))
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return nil, nil
-	}
+	var request in.GetTransactionRequest
+	request.TransactionID = c.Param("transaction_id")
 
 	if err := request.Validate(); err != nil {
 		logger.Errorw("Validate request failed", zap.Error(err))
@@ -47,6 +43,5 @@ func (h *getTransactionHandler) Handle(c *gin.Context) (interface{}, error) {
 		logger.Errorw("GetTransaction failed", zap.Error(err))
 		return nil, stackErr.Error(err)
 	}
-
 	return result, nil
 }

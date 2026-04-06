@@ -1,16 +1,12 @@
+// CODE_GENERATOR: request
+
 package in
 
 type ListChatConversationsRequest struct {
-	Limit  int `form:"limit"`
-	Offset int `form:"offset"`
+	Limit  int `json:"limit" form:"limit"`
+	Offset int `json:"offset" form:"offset"`
 }
 
 func (r *ListChatConversationsRequest) Validate() error {
-	if r.Limit < 0 {
-		r.Limit = 0
-	}
-	if r.Offset < 0 {
-		r.Offset = 0
-	}
 	return nil
 }

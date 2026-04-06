@@ -47,7 +47,7 @@ func (s *LedgerService) CreateTransaction(ctx context.Context, req *ledgerin.Cre
 func (s *LedgerService) GetAccountBalance(ctx context.Context, accountID string) (*ledgerout.AccountBalanceResponse, error) {
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
-		return nil, fmt.Errorf("%v: account_id is required", ErrValidation)
+		return nil, fmt.Errorf("%w: account_id is required", ErrValidation)
 	}
 
 	balance, err := s.baseRepo.LedgerRepository().GetBalance(ctx, accountID)
@@ -64,12 +64,12 @@ func (s *LedgerService) GetAccountBalance(ctx context.Context, accountID string)
 func (s *LedgerService) GetTransaction(ctx context.Context, transactionID string) (*ledgerout.TransactionResponse, error) {
 	transactionID = strings.TrimSpace(transactionID)
 	if transactionID == "" {
-		return nil, fmt.Errorf("%v: transaction_id is required", ErrValidation)
+		return nil, fmt.Errorf("%w: transaction_id is required", ErrValidation)
 	}
 
 	transaction, err := s.baseRepo.LedgerRepository().GetTransaction(ctx, transactionID)
 	if errors.Is(err, ledgerrepo.ErrNotFound) {
-		return nil, fmt.Errorf("%v: %s", ErrTransactionNotFound, transactionID)
+		return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID)
 	}
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -82,7 +82,7 @@ func (s *LedgerService) RecordPaymentSucceeded(ctx context.Context, evt *sharede
 	log := logging.FromContext(ctx).Named("RecordPaymentSucceeded")
 	booking, err := entity.NewPaymentSucceededBooking(evt)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("%v: %s", ErrValidation, err.Error()))
+		return stackErr.Error(fmt.Errorf("%w: %s", ErrValidation, err.Error()))
 	}
 
 	return s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
@@ -105,7 +105,7 @@ func (s *LedgerService) RecordPaymentSucceeded(ctx context.Context, evt *sharede
 
 		processedEvent, err := booking.ProcessedEvent("payment-service", time.Now().UTC())
 		if err != nil {
-			return stackErr.Error(fmt.Errorf("%v: %s", ErrValidation, err.Error()))
+			return stackErr.Error(fmt.Errorf("%w: %s", ErrValidation, err.Error()))
 		}
 		if err := txRepos.PaymentRepository().MarkProcessed(ctx, processedEvent); err != nil {
 			if errors.Is(err, ledgerrepo.ErrDuplicate) {
@@ -127,12 +127,12 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 	log := logging.FromContext(ctx).Named("createTransaction")
 	transaction, err := entity.NewLedgerTransaction(transactionID, entries, time.Now().UTC())
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("%v: %s", ErrValidation, err.Error()))
+		return nil, stackErr.Error(fmt.Errorf("%w: %s", ErrValidation, err.Error()))
 	}
 
 	if err := repo.CreateTransaction(ctx, transaction); err != nil {
 		if errors.Is(err, ledgerrepo.ErrDuplicate) {
-			return nil, fmt.Errorf("%v: %s", ErrDuplicateTransaction, transaction.TransactionID)
+			return nil, fmt.Errorf("%w: %s", ErrDuplicateTransaction, transaction.TransactionID)
 		}
 		return nil, stackErr.Error(err)
 	}
@@ -143,7 +143,7 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 
 	transaction, err = repo.GetTransaction(ctx, transaction.TransactionID)
 	if errors.Is(err, ledgerrepo.ErrNotFound) {
-		return nil, fmt.Errorf("%v: %s", ErrTransactionNotFound, transactionID)
+		return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID)
 	}
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -157,7 +157,7 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 	return transaction, nil
 }
 
-func toLedgerEntryInputs(entries []ledgerin.LedgerEntryInput) []entity.LedgerEntryInput {
+func toLedgerEntryInputs(entries []ledgerin.LedgerEntryRequest) []entity.LedgerEntryInput {
 	out := make([]entity.LedgerEntryInput, 0, len(entries))
 	for _, entry := range entries {
 		out = append(out, entity.LedgerEntryInput{
@@ -191,5 +191,5 @@ func wrapValidation(err error) error {
 	if err == nil {
 		return nil
 	}
-	return fmt.Errorf("%v: %s", ErrValidation, err.Error())
+	return fmt.Errorf("%w: %s", ErrValidation, err.Error())
 }

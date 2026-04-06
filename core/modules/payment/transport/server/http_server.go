@@ -1,7 +1,9 @@
+// CODE_GENERATOR: registry
 package server
 
 import (
 	"context"
+
 	"go-socket/core/modules/payment/application/dto/in"
 	"go-socket/core/modules/payment/application/dto/out"
 	paymenthttp "go-socket/core/modules/payment/transport/http"
@@ -12,32 +14,32 @@ import (
 )
 
 type paymentHTTPServer struct {
-	createPayment     cqrs.Dispatcher[*in.CreatePaymentRequest, *out.CreatePaymentResponse]
-	processWebhook    cqrs.Dispatcher[*in.ProcessWebhookRequest, *out.ProcessWebhookResponse]
 	deposit           cqrs.Dispatcher[*in.DepositRequest, *out.DepositResponse]
 	rebuildProjection cqrs.Dispatcher[*in.RebuildProjectionRequest, *out.RebuildProjectionResponse]
 	transfer          cqrs.Dispatcher[*in.TransferRequest, *out.TransferResponse]
 	withdrawal        cqrs.Dispatcher[*in.WithdrawalRequest, *out.WithdrawalResponse]
 	listTransaction   cqrs.Dispatcher[*in.ListTransactionRequest, *out.ListTransactionResponse]
+	createPayment     cqrs.Dispatcher[*in.CreatePaymentRequest, *out.CreatePaymentResponse]
+	processWebhook    cqrs.Dispatcher[*in.ProcessWebhookRequest, *out.ProcessWebhookResponse]
 }
 
 func NewHTTPServer(
-	createPayment cqrs.Dispatcher[*in.CreatePaymentRequest, *out.CreatePaymentResponse],
-	processWebhook cqrs.Dispatcher[*in.ProcessWebhookRequest, *out.ProcessWebhookResponse],
 	deposit cqrs.Dispatcher[*in.DepositRequest, *out.DepositResponse],
 	rebuildProjection cqrs.Dispatcher[*in.RebuildProjectionRequest, *out.RebuildProjectionResponse],
 	transfer cqrs.Dispatcher[*in.TransferRequest, *out.TransferResponse],
 	withdrawal cqrs.Dispatcher[*in.WithdrawalRequest, *out.WithdrawalResponse],
 	listTransaction cqrs.Dispatcher[*in.ListTransactionRequest, *out.ListTransactionResponse],
+	createPayment cqrs.Dispatcher[*in.CreatePaymentRequest, *out.CreatePaymentResponse],
+	processWebhook cqrs.Dispatcher[*in.ProcessWebhookRequest, *out.ProcessWebhookResponse],
 ) (infrahttp.HTTPServer, error) {
 	return &paymentHTTPServer{
-		createPayment:     createPayment,
-		processWebhook:    processWebhook,
 		deposit:           deposit,
 		rebuildProjection: rebuildProjection,
 		transfer:          transfer,
 		withdrawal:        withdrawal,
 		listTransaction:   listTransaction,
+		createPayment:     createPayment,
+		processWebhook:    processWebhook,
 	}, nil
 }
 
@@ -46,7 +48,7 @@ func (s *paymentHTTPServer) RegisterPublicRoutes(routes *gin.RouterGroup) {
 }
 
 func (s *paymentHTTPServer) RegisterPrivateRoutes(routes *gin.RouterGroup) {
-	paymenthttp.RegisterPrivateRoutes(routes, s.createPayment, s.deposit, s.rebuildProjection, s.transfer, s.withdrawal, s.listTransaction)
+	paymenthttp.RegisterPrivateRoutes(routes, s.deposit, s.rebuildProjection, s.transfer, s.withdrawal, s.listTransaction, s.createPayment)
 }
 
 func (s *paymentHTTPServer) Stop(_ context.Context) error {

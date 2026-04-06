@@ -1,3 +1,5 @@
+// CODE_GENERATOR: request
+
 package in
 
 import (
@@ -6,22 +8,23 @@ import (
 )
 
 type ListChatMessagesRequest struct {
-	RoomID    string `json:"room_id" uri:"room_id"`
-	Limit     int    `form:"limit"`
-	BeforeID  string `form:"before_id"`
-	BeforeAt  string `form:"before_at"`
-	Ascending bool   `form:"ascending"`
+	RoomID    string `json:"room_id" form:"room_id" binding:"required"`
+	Limit     int    `json:"limit" form:"limit"`
+	BeforeID  string `json:"before_id" form:"before_id"`
+	BeforeAt  string `json:"before_at" form:"before_at"`
+	Ascending bool   `json:"ascending" form:"ascending"`
 }
 
-func (r *ListChatMessagesRequest) Validate() error {
+func (r *ListChatMessagesRequest) Normalize() {
 	r.RoomID = strings.TrimSpace(r.RoomID)
 	r.BeforeID = strings.TrimSpace(r.BeforeID)
 	r.BeforeAt = strings.TrimSpace(r.BeforeAt)
+}
+
+func (r *ListChatMessagesRequest) Validate() error {
+	r.Normalize()
 	if r.RoomID == "" {
 		return errors.New("room_id is required")
-	}
-	if r.Limit < 0 {
-		r.Limit = 0
 	}
 	return nil
 }

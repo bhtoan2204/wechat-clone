@@ -10,6 +10,7 @@ import (
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/utils"
+	"time"
 )
 
 type listTransactionHandler struct {
@@ -58,7 +59,7 @@ func (l *listTransactionHandler) Handle(ctx context.Context, req *in.ListTransac
 			Type:       history.Type,
 			Amount:     history.Amount,
 			Balance:    history.Balance,
-			Date:       history.CreatedAt,
+			Date:       history.CreatedAt.Format(time.DateTime),
 			Sender:     history.SenderName,
 			SenderID:   history.SenderID,
 			Receiver:   history.ReceiverName,
@@ -67,8 +68,8 @@ func (l *listTransactionHandler) Handle(ctx context.Context, req *in.ListTransac
 	}
 
 	return &out.ListTransactionResponse{
-		Page:   req.Page,
-		Limit:  req.Limit,
-		Record: records,
+		Page:    req.Page,
+		Limit:   req.Limit,
+		Records: records,
 	}, nil
 }

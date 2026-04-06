@@ -9,6 +9,7 @@ import (
 	"go-socket/core/modules/payment/application/dto/out"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
+	"go-socket/core/shared/pkg/stackErr"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -29,18 +30,17 @@ func NewProcessWebhookHandler(
 func (h *processWebhookHandler) Handle(c *gin.Context) (interface{}, error) {
 	ctx := c.Request.Context()
 	logger := logging.FromContext(ctx)
+	var request in.ProcessWebhookRequest
+	request.Provider = c.Param("provider")
+	request.Signature = c.GetHeader("X-Signature")
+
 	payload, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		logger.Errorw("Read request body failed", zap.Error(err))
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "unable to read request body"})
 		return nil, nil
 	}
-
-	request := in.ProcessWebhookRequest{
-		Provider:  c.Param("provider"),
-		Signature: c.GetHeader("X-Signature"),
-		Payload:   string(payload),
-	}
+	request.Payload = string(payload)
 
 	if err := request.Validate(); err != nil {
 		logger.Errorw("Validate request failed", zap.Error(err))
@@ -51,10 +51,7 @@ func (h *processWebhookHandler) Handle(c *gin.Context) (interface{}, error) {
 	result, err := h.processWebhook.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("ProcessWebhook failed", zap.Error(err))
-		writeProviderError(c, err)
-		return nil, nil
+		return nil, stackErr.Error(err)
 	}
-
-	c.JSON(http.StatusOK, result)
-	return nil, nil
+	return result, nil
 }

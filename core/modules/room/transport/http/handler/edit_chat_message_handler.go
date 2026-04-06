@@ -2,9 +2,10 @@
 package handler
 
 import (
-	"errors"
-	roomin "go-socket/core/modules/room/application/dto/in"
-	roomout "go-socket/core/modules/room/application/dto/out"
+	"net/http"
+
+	"go-socket/core/modules/room/application/dto/in"
+	"go-socket/core/modules/room/application/dto/out"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -14,10 +15,12 @@ import (
 )
 
 type editChatMessageHandler struct {
-	editChatMessage cqrs.Dispatcher[*roomin.EditChatMessageRequest, *roomout.ChatMessageResponse]
+	editChatMessage cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageResponse]
 }
 
-func NewEditChatMessageHandler(editChatMessage cqrs.Dispatcher[*roomin.EditChatMessageRequest, *roomout.ChatMessageResponse]) *editChatMessageHandler {
+func NewEditChatMessageHandler(
+	editChatMessage cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageResponse],
+) *editChatMessageHandler {
 	return &editChatMessageHandler{
 		editChatMessage: editChatMessage,
 	}
@@ -26,19 +29,24 @@ func NewEditChatMessageHandler(editChatMessage cqrs.Dispatcher[*roomin.EditChatM
 func (h *editChatMessageHandler) Handle(c *gin.Context) (interface{}, error) {
 	ctx := c.Request.Context()
 	logger := logging.FromContext(ctx)
-	request := roomin.EditChatMessageRequest{MessageID: c.Param("message_id")}
+	var request in.EditChatMessageRequest
+	request.MessageID = c.Param("message_id")
 	if err := c.ShouldBindJSON(&request); err != nil {
 		logger.Errorw("Unmarshal request failed", zap.Error(err))
-		return nil, stackErr.Error(err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
+
 	if err := request.Validate(); err != nil {
 		logger.Errorw("Validate request failed", zap.Error(err))
-		return nil, stackErr.Error(errors.New("validate request failed"))
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
+
 	result, err := h.editChatMessage.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("EditChatMessage failed", zap.Error(err))
-		return nil, stackErr.Error(errors.New("EditChatMessage failed"))
+		return nil, stackErr.Error(err)
 	}
 	return result, nil
 }

@@ -18,5 +18,5 @@ func NewGetAccountBalanceHandler(service *ledgerservice.LedgerService) cqrs.Hand
 }
 
 func (h *getAccountBalanceHandler) Handle(ctx context.Context, req *ledgerin.GetAccountBalanceRequest) (*ledgerout.AccountBalanceResponse, error) {
-	return h.service.GetAccountBalance(ctx, req.AccountId)
+	return h.service.GetAccountBalance(ctx, req.AccountID)
 }

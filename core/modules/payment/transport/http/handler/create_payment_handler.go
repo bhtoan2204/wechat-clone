@@ -8,6 +8,7 @@ import (
 	"go-socket/core/modules/payment/application/dto/out"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
+	"go-socket/core/shared/pkg/stackErr"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -41,22 +42,11 @@ func (h *createPaymentHandler) Handle(c *gin.Context) (interface{}, error) {
 		return nil, nil
 	}
 
-	if accountID, err := accountIDFromContext(ctx); err == nil {
-		if request.DebitAccountID == "" {
-			request.DebitAccountID = accountID
-		} else if request.DebitAccountID != accountID {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "debit_account_id must match authenticated account"})
-			return nil, nil
-		}
-	}
-
 	result, err := h.createPayment.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("CreatePayment failed", zap.Error(err))
-		writeProviderError(c, err)
-		return nil, nil
+		return nil, stackErr.Error(err)
 	}
-
-	c.JSON(http.StatusCreated, result)
+	c.JSON(201, result)
 	return nil, nil
 }

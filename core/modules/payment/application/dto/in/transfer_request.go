@@ -1,15 +1,25 @@
+// CODE_GENERATOR: request
+
 package in
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 type TransferRequest struct {
-	Amount     int64  `json:"amount" form:"amount"`
-	ReceiverID string `json:"receiver_id" form:"receiver_id"`
+	Amount     int64  `json:"amount" form:"amount" binding:"required"`
+	ReceiverID string `json:"receiver_id" form:"receiver_id" binding:"required"`
+}
+
+func (r *TransferRequest) Normalize() {
+	r.ReceiverID = strings.TrimSpace(r.ReceiverID)
 }
 
 func (r *TransferRequest) Validate() error {
-	if r.Amount <= 0 {
-		return errors.New("amount must be greater than 0")
+	r.Normalize()
+	if r.Amount == 0 {
+		return errors.New("amount is required")
 	}
 	if r.ReceiverID == "" {
 		return errors.New("receiver_id is required")

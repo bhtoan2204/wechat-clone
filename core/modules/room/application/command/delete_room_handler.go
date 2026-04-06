@@ -24,7 +24,7 @@ func NewDeleteRoomHandler(roomService *roomservice.RoomCommandService) cqrs.Hand
 
 func (h *deleteRoomHandler) Handle(ctx context.Context, req *in.DeleteRoomRequest) (*out.DeleteRoomResponse, error) {
 	log := logging.FromContext(ctx).Named("DeleteRoom")
-	if err := h.roomService.DeleteRoom(ctx, req.Id); err != nil {
+	if err := h.roomService.DeleteRoom(ctx, req.ID); err != nil {
 		log.Errorw("Failed to delete room", zap.Error(err))
 		return nil, stackErr.Error(err)
 	}

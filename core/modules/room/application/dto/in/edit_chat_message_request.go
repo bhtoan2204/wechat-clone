@@ -1,3 +1,5 @@
+// CODE_GENERATOR: request
+
 package in
 
 import (
@@ -6,13 +8,17 @@ import (
 )
 
 type EditChatMessageRequest struct {
-	MessageID string `json:"message_id" uri:"message_id"`
-	Message   string `json:"message"`
+	MessageID string `json:"message_id" form:"message_id" binding:"required"`
+	Message   string `json:"message" form:"message" binding:"required"`
+}
+
+func (r *EditChatMessageRequest) Normalize() {
+	r.MessageID = strings.TrimSpace(r.MessageID)
+	r.Message = strings.TrimSpace(r.Message)
 }
 
 func (r *EditChatMessageRequest) Validate() error {
-	r.MessageID = strings.TrimSpace(r.MessageID)
-	r.Message = strings.TrimSpace(r.Message)
+	r.Normalize()
 	if r.MessageID == "" {
 		return errors.New("message_id is required")
 	}

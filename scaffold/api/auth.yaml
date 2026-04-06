@@ -74,7 +74,7 @@ endpoints:
 
   - name: AuthGetProfile
     method: GET
-    path: /auth/profile
+    path: /account/profile
     handler: GetProfileHandler
     auth: true
     usecase:
@@ -113,7 +113,7 @@ endpoints:
 
   - name: AuthUpdateProfile
     method: PUT
-    path: /auth/profile
+    path: /account/profile
     handler: UpdateProfileHandler
     auth: true
     usecase:
@@ -127,8 +127,10 @@ endpoints:
           required: true
         - name: username
           type: string
+          pointer: true
         - name: avatar_object_key
           type: string
+          pointer: true
     response:
       struct: UpdateProfileResponse
       fields:
@@ -159,7 +161,7 @@ endpoints:
 
   - name: AuthVerifyEmail
     method: POST
-    path: /auth/verify-email
+    path: /account/verify-email
     handler: VerifyEmailHandler
     auth: true
     usecase:
@@ -176,7 +178,7 @@ endpoints:
 
   - name: AuthConfirmVerifyEmail
     method: POST
-    path: /auth/verify-email/confirm
+    path: /account/verify-email/confirm
     handler: ConfirmVerifyEmailHandler
     usecase:
       name: AuthUsecase
@@ -197,7 +199,7 @@ endpoints:
 
   - name: AuthChangePassword
     method: PUT
-    path: /auth/change-password
+    path: /account/change-password
     handler: ChangePasswordHandler
     auth: true
     usecase:
@@ -220,7 +222,7 @@ endpoints:
 
   - name: AuthGetAvatar
     method: GET
-    path: /auth/avatar/:account_id
+    path: /account/avatar/:account_id
     handler: GetAvatarHandler
     auth: true
     usecase:
@@ -238,4 +240,25 @@ endpoints:
         - name: url
           type: string
         - name: expires_at
+          type: string
+
+  - name: AuthCreatePresignedUrl
+    method: POST
+    path: /account/avatar/presigned-url
+    handler: CreatePresignedUrlHandler
+    auth: true
+    usecase:
+      name: AuthUsecase
+      method: CreatePresignedUrl
+    request:
+      struct: CreatePresignedUrlRequest
+      fields:
+    response:
+      struct: CreatePresignedUrlResponse
+      fields:
+        - name: presigned_url
+          type: string
+        - name: expires_at
+          type: string
+        - name: method
           type: string

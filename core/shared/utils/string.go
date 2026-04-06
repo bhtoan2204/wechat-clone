@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-func EncodeCursor(createdAt time.Time, id string) string {
-	raw := createdAt.UTC().Format(time.RFC3339Nano) + "|" + id
+func EncodeCursor(createdAt string, id string) string {
+	raw := createdAt + "|" + id
 	return base64.StdEncoding.EncodeToString([]byte(raw))
 }
 

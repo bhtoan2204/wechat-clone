@@ -2,7 +2,8 @@
 package handler
 
 import (
-	"errors"
+	"net/http"
+
 	"go-socket/core/modules/account/application/dto/in"
 	"go-socket/core/modules/account/application/dto/out"
 	"go-socket/core/shared/pkg/cqrs"
@@ -17,7 +18,9 @@ type logoutHandler struct {
 	logout cqrs.Dispatcher[*in.LogoutRequest, *out.LogoutResponse]
 }
 
-func NewLogoutHandler(logout cqrs.Dispatcher[*in.LogoutRequest, *out.LogoutResponse]) *logoutHandler {
+func NewLogoutHandler(
+	logout cqrs.Dispatcher[*in.LogoutRequest, *out.LogoutResponse],
+) *logoutHandler {
 	return &logoutHandler{
 		logout: logout,
 	}
@@ -29,16 +32,20 @@ func (h *logoutHandler) Handle(c *gin.Context) (interface{}, error) {
 	var request in.LogoutRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		logger.Errorw("Unmarshal request failed", zap.Error(err))
-		return nil, stackErr.Error(err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
+
 	if err := request.Validate(); err != nil {
 		logger.Errorw("Validate request failed", zap.Error(err))
-		return nil, stackErr.Error(errors.New("validate request failed"))
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return nil, nil
 	}
+
 	result, err := h.logout.Dispatch(ctx, &request)
 	if err != nil {
 		logger.Errorw("Logout failed", zap.Error(err))
-		return nil, stackErr.Error(errors.New("Logout failed"))
+		return nil, stackErr.Error(err)
 	}
 	return result, nil
 }

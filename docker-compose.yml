@@ -1,16 +1,4 @@
 services:
-  # scaffold-generator:
-  #   image: golang:1.24.1
-  #   working_dir: /workspace
-  #   command: >
-  #     sh -lc 'export GOCACHE=/tmp/go-build &&
-  #     go run scaffold/main.go'
-  #   volumes:
-  #     - ./:/workspace
-  #     - go_pkg_mod:/go/pkg/mod
-  #     - go_build_cache:/tmp/go-build
-  #   restart: "no"
-
   redis:
     image: redis:latest
     ports:
@@ -32,23 +20,16 @@ services:
     volumes:
       - cassandra_data:/var/lib/cassandra
     restart: unless-stopped
-
-  cassandra-init:
-    image: cassandra:5.0
-    depends_on:
-      - cassandra
-    entrypoint: >
-      /bin/sh -c "
-      until cqlsh cassandra 9042 -e 'DESCRIBE KEYSPACES'; do
-        echo 'waiting for cassandra';
-        sleep 5;
-      done;
-      cqlsh cassandra 9042 -e \"
-      CREATE KEYSPACE IF NOT EXISTS chat_app
-      WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
-      \";
-      "
-    restart: "no"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "cqlsh localhost 9042 -e 'DESCRIBE KEYSPACES' >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 40s
 
   minio:
     image: minio/minio:latest
@@ -63,28 +44,23 @@ services:
     volumes:
       - minio_data:/data
     restart: unless-stopped
-
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c "
-      until /usr/bin/mc alias set local http://minio:9000 minioadmin minioadmin; do
-        echo 'waiting for minio';
-        sleep 2;
-      done;
-      /usr/bin/mc mb -p local/chat-media || true;
-      /usr/bin/mc anonymous set public local/chat-media || true;
-      "
-    restart: "no"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://localhost:9000/minio/health/live >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   oracle-db:
     image: gvenzl/oracle-free:23.4-slim
     container_name: oracle23c-free
     ports:
       - "1521:1521"
-      - "5500:5500" # EM Express (web UI)
+      - "5500:5500"
     environment:
       ORACLE_PASSWORD: Oracle123
       APP_USER: appuser
@@ -103,6 +79,13 @@ services:
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_log:/var/lib/zookeeper/log
+    healthcheck:
+      test:
+        ["CMD-SHELL", "bash -c 'echo ruok > /dev/tcp/127.0.0.1/2181' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
 
   kafka:
     image: confluentinc/cp-kafka:7.3.2
@@ -118,9 +101,16 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     volumes:
       - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9092' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
 
   connect:
     image: debezium/connect:2.6
@@ -133,28 +123,62 @@ services:
       CONFIG_STORAGE_TOPIC: connect_configs
       OFFSET_STORAGE_TOPIC: connect_offsets
       STATUS_STORAGE_TOPIC: connect_status
-
       CONFIG_STORAGE_REPLICATION_FACTOR: 1
       OFFSET_STORAGE_REPLICATION_FACTOR: 1
       STATUS_STORAGE_REPLICATION_FACTOR: 1
-
       KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       KEY_CONVERTER_SCHEMAS_ENABLE: "false"
       VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     volumes:
       - connector_data:/kafka/connect
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://localhost:8083/ >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
 
-  connector-init:
-    image: curlimages/curl:8.12.1
+  init:
+    build:
+      context: .
+      dockerfile: Dockerfile.init
     depends_on:
-      - connect
+      cassandra:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      connect:
+        condition: service_healthy
     volumes:
       - ./connector:/connector:ro
-    command: ["/bin/sh", "/connector/register_connectors.sh"]
+    entrypoint: >
+      /bin/sh -c "
+      echo 'create keyspace...';
+      cqlsh cassandra 9042 -e \"
+      CREATE KEYSPACE IF NOT EXISTS chat_app
+      WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+      \";
+
+      echo 'create bucket...';
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb -p local/chat-media || true;
+      mc anonymous set public local/chat-media || true;
+
+      echo 'register connectors...';
+      /bin/sh /connector/register_connectors.sh;
+
+      echo 'done';
+      "
     restart: "no"
+    profiles: ["init"]
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -166,8 +190,10 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
     depends_on:
-      - kafka
-      - zookeeper
+      kafka:
+        condition: service_healthy
+      zookeeper:
+        condition: service_healthy
 
   # consul:
   #   image: hashicorp/consul:latest
@@ -178,7 +204,6 @@ services:
   #     - consul_data:/consul/data
   #   command: consul agent -dev -client=0.0.0.0
   #   restart: unless-stopped
-
 volumes:
   go_pkg_mod:
   go_build_cache:

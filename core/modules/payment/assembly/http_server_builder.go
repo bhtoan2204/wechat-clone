@@ -35,13 +35,13 @@ func BuildHTTPServer(_ context.Context, appContext *appCtx.AppContext) (http.HTT
 	listTransaction := cqrs.NewDispatcher(paymentquery.NewListTransactionHandler(paymentRepos))
 
 	server, err := paymentserver.NewHTTPServer(
-		createPayment,
-		processWebhook,
 		deposit,
 		rebuildProjection,
 		transfer,
 		withdrawal,
 		listTransaction,
+		createPayment,
+		processWebhook,
 	)
 	if err != nil {
 		return nil, stackErr.Error(err)

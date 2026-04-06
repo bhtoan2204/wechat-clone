@@ -15,6 +15,7 @@ import (
 
 type Storage interface {
 	PresignedGetObjectURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error)
+	PresignedPutObjectURL(ctx context.Context, objectKey string, expiry time.Duration) (string, time.Time, error)
 }
 
 type minioStorage struct {
@@ -67,4 +68,24 @@ func (s *minioStorage) PresignedGetObjectURL(ctx context.Context, objectKey stri
 		return "", stackErr.Error(err)
 	}
 	return presignedURL.String(), nil
+}
+
+func (s *minioStorage) PresignedPutObjectURL(ctx context.Context, objectKey string, expiry time.Duration) (string, time.Time, error) {
+	objectKey = strings.TrimSpace(objectKey)
+	if objectKey == "" {
+		return "", time.Time{}, stackErr.Error(fmt.Errorf("object key is required"))
+	}
+
+	if expiry <= 0 {
+		expiry = 15 * time.Minute
+	}
+
+	expiredAt := time.Now().Add(expiry)
+
+	presignedURL, err := s.client.PresignedPutObject(ctx, s.bucket, objectKey, expiry)
+	if err != nil {
+		return "", time.Time{}, stackErr.Error(err)
+	}
+
+	return presignedURL.String(), expiredAt, nil
 }

@@ -47,6 +47,5 @@ func (h *createTransactionHandler) Handle(c *gin.Context) (interface{}, error) {
 		logger.Errorw("CreateTransaction failed", zap.Error(err))
 		return nil, stackErr.Error(err)
 	}
-
 	return result, nil
 }

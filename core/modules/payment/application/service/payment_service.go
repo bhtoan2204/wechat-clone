@@ -36,7 +36,7 @@ func NewPaymentService(intentStore PaymentIntentStore, providerRegistry *provide
 
 func (s *PaymentService) CreatePayment(ctx context.Context, req *paymentin.CreatePaymentRequest) (*paymentout.CreatePaymentResponse, error) {
 	log := logging.FromContext(ctx).Named("CreatePayment")
-	req.Normalize()
+	// req.Normalize()
 	if err := wrapValidation(req.Validate()); err != nil {
 		return nil, stackErr.Error(err)
 	}

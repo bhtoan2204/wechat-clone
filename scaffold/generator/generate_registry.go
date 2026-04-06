@@ -36,7 +36,7 @@ func GenerateRegistry(spec *models.APISpec) (string, error) {
 		dst := serverTargetPath(group.Module)
 		if fileExists(dst) {
 			skipped++
-			continue
+			// continue
 		}
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return "", err

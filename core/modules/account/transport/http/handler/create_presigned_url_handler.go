@@ -14,22 +14,22 @@ import (
 	"go.uber.org/zap"
 )
 
-type getProfileHandler struct {
-	getProfile cqrs.Dispatcher[*in.GetProfileRequest, *out.GetProfileResponse]
+type createPresignedUrlHandler struct {
+	createPresignedUrl cqrs.Dispatcher[*in.CreatePresignedUrlRequest, *out.CreatePresignedUrlResponse]
 }
 
-func NewGetProfileHandler(
-	getProfile cqrs.Dispatcher[*in.GetProfileRequest, *out.GetProfileResponse],
-) *getProfileHandler {
-	return &getProfileHandler{
-		getProfile: getProfile,
+func NewCreatePresignedUrlHandler(
+	createPresignedUrl cqrs.Dispatcher[*in.CreatePresignedUrlRequest, *out.CreatePresignedUrlResponse],
+) *createPresignedUrlHandler {
+	return &createPresignedUrlHandler{
+		createPresignedUrl: createPresignedUrl,
 	}
 }
 
-func (h *getProfileHandler) Handle(c *gin.Context) (interface{}, error) {
+func (h *createPresignedUrlHandler) Handle(c *gin.Context) (interface{}, error) {
 	ctx := c.Request.Context()
 	logger := logging.FromContext(ctx)
-	var request in.GetProfileRequest
+	var request in.CreatePresignedUrlRequest
 
 	if err := request.Validate(); err != nil {
 		logger.Errorw("Validate request failed", zap.Error(err))
@@ -37,9 +37,9 @@ func (h *getProfileHandler) Handle(c *gin.Context) (interface{}, error) {
 		return nil, nil
 	}
 
-	result, err := h.getProfile.Dispatch(ctx, &request)
+	result, err := h.createPresignedUrl.Dispatch(ctx, &request)
 	if err != nil {
-		logger.Errorw("GetProfile failed", zap.Error(err))
+		logger.Errorw("CreatePresignedUrl failed", zap.Error(err))
 		return nil, stackErr.Error(err)
 	}
 	return result, nil

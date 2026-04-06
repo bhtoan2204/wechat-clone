@@ -32,5 +32,5 @@ func (h *markChatMessageStatusHandler) Handle(ctx context.Context, req *in.MarkC
 		return nil, stackErr.Error(err)
 	}
 
-	return &out.MarkChatMessageStatusResponse{OK: true}, nil
+	return &out.MarkChatMessageStatusResponse{Ok: true}, nil
 }

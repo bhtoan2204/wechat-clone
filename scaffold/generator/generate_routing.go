@@ -37,7 +37,7 @@ func GenerateRouting(spec *models.APISpec) (string, error) {
 		dst := filepath.Join(group.Module.FsRoot, "transport/http/routes.go")
 		if fileExists(dst) {
 			skipped++
-			continue
+			// continue
 		}
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return "", err

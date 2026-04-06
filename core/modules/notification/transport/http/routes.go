@@ -1,8 +1,9 @@
+// CODE_GENERATOR: routing
 package http
 
 import (
-	notificationin "go-socket/core/modules/notification/application/dto/in"
-	notificationout "go-socket/core/modules/notification/application/dto/out"
+	"go-socket/core/modules/notification/application/dto/in"
+	"go-socket/core/modules/notification/application/dto/out"
 	"go-socket/core/modules/notification/transport/http/handler"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/transport/httpx"
@@ -10,10 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func RegisterPublicRoutes(_ *gin.RouterGroup) {}
 func RegisterPrivateRoutes(
 	routes *gin.RouterGroup,
-	savePushSubscription cqrs.Dispatcher[*notificationin.SavePushSubscriptionRequest, *notificationout.SavePushSubscriptionResponse],
-	listNotification cqrs.Dispatcher[*notificationin.ListNotificationRequest, *notificationout.ListNotificationResponse],
+	savePushSubscription cqrs.Dispatcher[*in.SavePushSubscriptionRequest, *out.SavePushSubscriptionResponse],
+	listNotification cqrs.Dispatcher[*in.ListNotificationRequest, *out.ListNotificationResponse],
 ) {
 	routes.POST("/notification/push-subscriptions", httpx.Wrap(handler.NewSavePushSubscriptionHandler(savePushSubscription)))
 	routes.GET("/notification/list", httpx.Wrap(handler.NewListNotificationHandler(listNotification)))

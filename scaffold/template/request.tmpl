@@ -1,15 +1,16 @@
 // CODE_GENERATOR: request
-{{- $needErrors := false -}}
-{{- range .Fields}}
-  {{- if and .Required .ZeroCheck}}
-    {{- $needErrors = true -}}
-  {{- end}}
-{{- end}}
 
 package {{.PackageName}}
 
-{{- if $needErrors}}
-import "errors"
+{{- if or .NeedsErrors .NeedsStrings}}
+import (
+{{- if .NeedsErrors}}
+	"errors"
+{{- end}}
+{{- if .NeedsStrings}}
+	"strings"
+{{- end}}
+)
 {{- end}}
 
 type {{.StructName}} struct {
@@ -17,8 +18,30 @@ type {{.StructName}} struct {
 	{{.GoName}} {{.Type}} `json:"{{.JSONName}}" form:"{{.JSONName}}"{{if .BindingTag}} binding:"{{.BindingTag}}"{{end}}`
 {{- end}}
 }
+{{- range .AdditionalStructs}}
+
+type {{.StructName}} struct {
+{{- range .Fields}}
+	{{.GoName}} {{.Type}} `json:"{{.JSONName}}" form:"{{.JSONName}}"{{if .BindingTag}} binding:"{{.BindingTag}}"{{end}}`
+{{- end}}
+}
+{{- end}}
+
+{{- if .HasNormalize}}
+
+func (r *{{.StructName}}) Normalize() {
+{{- range .Fields}}
+{{- range .NormalizeLines}}
+	{{.}}
+{{- end}}
+{{- end}}
+}
+{{- end}}
 
 func (r *{{.StructName}}) Validate() error {
+{{- if .HasNormalize}}
+	r.Normalize()
+{{- end}}
 {{- range .Fields}}
 {{- if .Required}}
 {{- if .ZeroCheck}}

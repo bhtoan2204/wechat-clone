@@ -1,3 +1,4 @@
+// CODE_GENERATOR: response
 package out
 
 type ChatPresenceResponse struct {

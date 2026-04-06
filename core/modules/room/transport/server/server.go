@@ -1,82 +1,72 @@
+// CODE_GENERATOR: registry
 package server
 
 import (
 	"context"
-	"fmt"
-	roomin "go-socket/core/modules/room/application/dto/in"
-	roomout "go-socket/core/modules/room/application/dto/out"
+
+	"go-socket/core/modules/room/application/dto/in"
+	"go-socket/core/modules/room/application/dto/out"
 	roomhttp "go-socket/core/modules/room/transport/http"
-	roomsocket "go-socket/core/modules/room/transport/websocket"
 	"go-socket/core/shared/pkg/cqrs"
-	"go-socket/core/shared/pkg/stackErr"
 	infrahttp "go-socket/core/shared/transport/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-type roomServer struct {
-	createRoom               cqrs.Dispatcher[*roomin.CreateRoomRequest, *roomout.CreateRoomResponse]
-	updateRoom               cqrs.Dispatcher[*roomin.UpdateRoomRequest, *roomout.UpdateRoomResponse]
-	deleteRoom               cqrs.Dispatcher[*roomin.DeleteRoomRequest, *roomout.DeleteRoomResponse]
-	getRoom                  cqrs.Dispatcher[*roomin.GetRoomRequest, *roomout.GetRoomResponse]
-	listRoom                 cqrs.Dispatcher[*roomin.ListRoomsRequest, *roomout.ListRoomsResponse]
-	createDirectConversation cqrs.Dispatcher[*roomin.CreateDirectConversationRequest, *roomout.ChatConversationResponse]
-	createGroupChat          cqrs.Dispatcher[*roomin.CreateGroupChatRequest, *roomout.ChatConversationResponse]
-	updateGroupChat          cqrs.Dispatcher[*roomin.UpdateGroupChatRequest, *roomout.ChatConversationResponse]
-	addChatMember            cqrs.Dispatcher[*roomin.AddChatMemberRequest, *roomout.ChatConversationResponse]
-	removeChatMember         cqrs.Dispatcher[*roomin.RemoveChatMemberRequest, *roomout.ChatConversationResponse]
-	pinChatMessage           cqrs.Dispatcher[*roomin.PinChatMessageRequest, *roomout.ChatConversationResponse]
-	listChatConversations    cqrs.Dispatcher[*roomin.ListChatConversationsRequest, []*roomout.ChatConversationResponse]
-	getChatConversation      cqrs.Dispatcher[*roomin.GetChatConversationRequest, *roomout.ChatConversationResponse]
-	listChatMessages         cqrs.Dispatcher[*roomin.ListChatMessagesRequest, []*roomout.ChatMessageResponse]
-	sendChatMessage          cqrs.Dispatcher[*roomin.SendChatMessageRequest, *roomout.ChatMessageResponse]
-	editChatMessage          cqrs.Dispatcher[*roomin.EditChatMessageRequest, *roomout.ChatMessageResponse]
-	deleteChatMessage        cqrs.Dispatcher[*roomin.DeleteChatMessageRequest, *roomout.DeleteChatMessageResponse]
-	forwardChatMessage       cqrs.Dispatcher[*roomin.ForwardChatMessageRequest, *roomout.ChatMessageResponse]
-	markChatMessageStatus    cqrs.Dispatcher[*roomin.MarkChatMessageStatusRequest, *roomout.MarkChatMessageStatusResponse]
-	getChatPresence          cqrs.Dispatcher[*roomin.GetChatPresenceRequest, *roomout.ChatPresenceResponse]
-	roomHub                  roomsocket.IHub
+type roomHTTPServer struct {
+	createRoom               cqrs.Dispatcher[*in.CreateRoomRequest, *out.CreateRoomResponse]
+	listRooms                cqrs.Dispatcher[*in.ListRoomsRequest, *out.ListRoomsResponse]
+	getRoom                  cqrs.Dispatcher[*in.GetRoomRequest, *out.GetRoomResponse]
+	updateRoom               cqrs.Dispatcher[*in.UpdateRoomRequest, *out.UpdateRoomResponse]
+	deleteRoom               cqrs.Dispatcher[*in.DeleteRoomRequest, *out.DeleteRoomResponse]
+	createDirectConversation cqrs.Dispatcher[*in.CreateDirectConversationRequest, *out.ChatConversationResponse]
+	createGroupChat          cqrs.Dispatcher[*in.CreateGroupChatRequest, *out.ChatConversationResponse]
+	updateGroupChat          cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatConversationResponse]
+	listChatConversations    cqrs.Dispatcher[*in.ListChatConversationsRequest, []*out.ChatConversationResponse]
+	getChatConversation      cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationResponse]
+	listChatMessages         cqrs.Dispatcher[*in.ListChatMessagesRequest, []*out.ChatMessageResponse]
+	sendChatMessage          cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageResponse]
+	editChatMessage          cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageResponse]
+	deleteChatMessage        cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse]
+	forwardChatMessage       cqrs.Dispatcher[*in.ForwardChatMessageRequest, *out.ChatMessageResponse]
+	markChatMessageStatus    cqrs.Dispatcher[*in.MarkChatMessageStatusRequest, *out.MarkChatMessageStatusResponse]
+	addChatMember            cqrs.Dispatcher[*in.AddChatMemberRequest, *out.ChatConversationResponse]
+	removeChatMember         cqrs.Dispatcher[*in.RemoveChatMemberRequest, *out.ChatConversationResponse]
+	pinChatMessage           cqrs.Dispatcher[*in.PinChatMessageRequest, *out.ChatConversationResponse]
+	getChatPresence          cqrs.Dispatcher[*in.GetChatPresenceRequest, *out.ChatPresenceResponse]
 }
 
 func NewHTTPServer(
-	createRoom cqrs.Dispatcher[*roomin.CreateRoomRequest, *roomout.CreateRoomResponse],
-	updateRoom cqrs.Dispatcher[*roomin.UpdateRoomRequest, *roomout.UpdateRoomResponse],
-	deleteRoom cqrs.Dispatcher[*roomin.DeleteRoomRequest, *roomout.DeleteRoomResponse],
-	getRoom cqrs.Dispatcher[*roomin.GetRoomRequest, *roomout.GetRoomResponse],
-	listRoom cqrs.Dispatcher[*roomin.ListRoomsRequest, *roomout.ListRoomsResponse],
-	createDirectConversation cqrs.Dispatcher[*roomin.CreateDirectConversationRequest, *roomout.ChatConversationResponse],
-	createGroupChat cqrs.Dispatcher[*roomin.CreateGroupChatRequest, *roomout.ChatConversationResponse],
-	updateGroupChat cqrs.Dispatcher[*roomin.UpdateGroupChatRequest, *roomout.ChatConversationResponse],
-	addChatMember cqrs.Dispatcher[*roomin.AddChatMemberRequest, *roomout.ChatConversationResponse],
-	removeChatMember cqrs.Dispatcher[*roomin.RemoveChatMemberRequest, *roomout.ChatConversationResponse],
-	pinChatMessage cqrs.Dispatcher[*roomin.PinChatMessageRequest, *roomout.ChatConversationResponse],
-	listChatConversations cqrs.Dispatcher[*roomin.ListChatConversationsRequest, []*roomout.ChatConversationResponse],
-	getChatConversation cqrs.Dispatcher[*roomin.GetChatConversationRequest, *roomout.ChatConversationResponse],
-	listChatMessages cqrs.Dispatcher[*roomin.ListChatMessagesRequest, []*roomout.ChatMessageResponse],
-	sendChatMessage cqrs.Dispatcher[*roomin.SendChatMessageRequest, *roomout.ChatMessageResponse],
-	editChatMessage cqrs.Dispatcher[*roomin.EditChatMessageRequest, *roomout.ChatMessageResponse],
-	deleteChatMessage cqrs.Dispatcher[*roomin.DeleteChatMessageRequest, *roomout.DeleteChatMessageResponse],
-	forwardChatMessage cqrs.Dispatcher[*roomin.ForwardChatMessageRequest, *roomout.ChatMessageResponse],
-	markChatMessageStatus cqrs.Dispatcher[*roomin.MarkChatMessageStatusRequest, *roomout.MarkChatMessageStatusResponse],
-	getChatPresence cqrs.Dispatcher[*roomin.GetChatPresenceRequest, *roomout.ChatPresenceResponse],
-	roomHub roomsocket.IHub,
+	createRoom cqrs.Dispatcher[*in.CreateRoomRequest, *out.CreateRoomResponse],
+	listRooms cqrs.Dispatcher[*in.ListRoomsRequest, *out.ListRoomsResponse],
+	getRoom cqrs.Dispatcher[*in.GetRoomRequest, *out.GetRoomResponse],
+	updateRoom cqrs.Dispatcher[*in.UpdateRoomRequest, *out.UpdateRoomResponse],
+	deleteRoom cqrs.Dispatcher[*in.DeleteRoomRequest, *out.DeleteRoomResponse],
+	createDirectConversation cqrs.Dispatcher[*in.CreateDirectConversationRequest, *out.ChatConversationResponse],
+	createGroupChat cqrs.Dispatcher[*in.CreateGroupChatRequest, *out.ChatConversationResponse],
+	updateGroupChat cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatConversationResponse],
+	listChatConversations cqrs.Dispatcher[*in.ListChatConversationsRequest, []*out.ChatConversationResponse],
+	getChatConversation cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationResponse],
+	listChatMessages cqrs.Dispatcher[*in.ListChatMessagesRequest, []*out.ChatMessageResponse],
+	sendChatMessage cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageResponse],
+	editChatMessage cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageResponse],
+	deleteChatMessage cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse],
+	forwardChatMessage cqrs.Dispatcher[*in.ForwardChatMessageRequest, *out.ChatMessageResponse],
+	markChatMessageStatus cqrs.Dispatcher[*in.MarkChatMessageStatusRequest, *out.MarkChatMessageStatusResponse],
+	addChatMember cqrs.Dispatcher[*in.AddChatMemberRequest, *out.ChatConversationResponse],
+	removeChatMember cqrs.Dispatcher[*in.RemoveChatMemberRequest, *out.ChatConversationResponse],
+	pinChatMessage cqrs.Dispatcher[*in.PinChatMessageRequest, *out.ChatConversationResponse],
+	getChatPresence cqrs.Dispatcher[*in.GetChatPresenceRequest, *out.ChatPresenceResponse],
 ) (infrahttp.HTTPServer, error) {
-	if roomHub == nil {
-		return nil, stackErr.Error(fmt.Errorf("room hub can not be nil"))
-	}
-
-	return &roomServer{
+	return &roomHTTPServer{
 		createRoom:               createRoom,
+		listRooms:                listRooms,
+		getRoom:                  getRoom,
 		updateRoom:               updateRoom,
 		deleteRoom:               deleteRoom,
-		getRoom:                  getRoom,
-		listRoom:                 listRoom,
 		createDirectConversation: createDirectConversation,
 		createGroupChat:          createGroupChat,
 		updateGroupChat:          updateGroupChat,
-		addChatMember:            addChatMember,
-		removeChatMember:         removeChatMember,
-		pinChatMessage:           pinChatMessage,
 		listChatConversations:    listChatConversations,
 		getChatConversation:      getChatConversation,
 		listChatMessages:         listChatMessages,
@@ -85,42 +75,21 @@ func NewHTTPServer(
 		deleteChatMessage:        deleteChatMessage,
 		forwardChatMessage:       forwardChatMessage,
 		markChatMessageStatus:    markChatMessageStatus,
+		addChatMember:            addChatMember,
+		removeChatMember:         removeChatMember,
+		pinChatMessage:           pinChatMessage,
 		getChatPresence:          getChatPresence,
-		roomHub:                  roomHub,
 	}, nil
 }
 
-func (s *roomServer) RegisterPublicRoutes(_ *gin.RouterGroup) {
+func (s *roomHTTPServer) RegisterPublicRoutes(routes *gin.RouterGroup) {
+	roomhttp.RegisterPublicRoutes(routes)
 }
 
-func (s *roomServer) RegisterPrivateRoutes(routes *gin.RouterGroup) {
-	roomhttp.RegisterPrivateRoutes(
-		routes,
-		s.createRoom,
-		s.updateRoom,
-		s.deleteRoom,
-		s.getRoom,
-		s.listRoom,
-		s.createDirectConversation,
-		s.createGroupChat,
-		s.updateGroupChat,
-		s.addChatMember,
-		s.removeChatMember,
-		s.pinChatMessage,
-		s.listChatConversations,
-		s.getChatConversation,
-		s.listChatMessages,
-		s.sendChatMessage,
-		s.editChatMessage,
-		s.deleteChatMessage,
-		s.forwardChatMessage,
-		s.markChatMessageStatus,
-		s.getChatPresence,
-		roomsocket.NewWSHandler(s.roomHub).Handle,
-	)
+func (s *roomHTTPServer) RegisterPrivateRoutes(routes *gin.RouterGroup) {
+	roomhttp.RegisterPrivateRoutes(routes, s.createRoom, s.listRooms, s.getRoom, s.updateRoom, s.deleteRoom, s.createDirectConversation, s.createGroupChat, s.updateGroupChat, s.listChatConversations, s.getChatConversation, s.listChatMessages, s.sendChatMessage, s.editChatMessage, s.deleteChatMessage, s.forwardChatMessage, s.markChatMessageStatus, s.addChatMember, s.removeChatMember, s.pinChatMessage, s.getChatPresence)
 }
 
-func (s *roomServer) Stop(ctx context.Context) error {
-	s.roomHub.Close(ctx)
+func (s *roomHTTPServer) Stop(_ context.Context) error {
 	return nil
 }

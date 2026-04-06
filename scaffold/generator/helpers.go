@@ -17,9 +17,17 @@ func fileExists(path string) bool {
 }
 
 func structExistsInDir(dir, structName string) bool {
+	return structExistsInDirExcept(dir, structName, "")
+}
+
+func structExistsInDirExcept(dir, structName, excludePath string) bool {
 	found := false
+	excludePath = filepath.Clean(excludePath)
 	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || found || d == nil || d.IsDir() || filepath.Ext(path) != ".go" {
+			return nil
+		}
+		if excludePath != "" && filepath.Clean(path) == excludePath {
 			return nil
 		}
 		content, readErr := os.ReadFile(path)
@@ -32,6 +40,18 @@ func structExistsInDir(dir, structName string) bool {
 		return nil
 	})
 	return found
+}
+
+func isGeneratedFile(path, kind string) bool {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	marker := "// CODE_GENERATOR:"
+	if kind != "" {
+		marker = "// CODE_GENERATOR: " + kind
+	}
+	return strings.Contains(string(content), marker)
 }
 
 type moduleEndpoints struct {

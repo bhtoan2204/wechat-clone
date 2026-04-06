@@ -19,6 +19,15 @@ endpoints:
         - name: entries
           type: array
           required: true
+          items:
+            struct: LedgerEntryRequest
+            fields:
+              - name: account_id
+                type: string
+                required: true
+              - name: amount
+                type: int64
+                required: true
     response:
       struct: TransactionResponse
       fields:

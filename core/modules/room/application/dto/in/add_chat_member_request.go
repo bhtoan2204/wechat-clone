@@ -1,3 +1,5 @@
+// CODE_GENERATOR: request
+
 package in
 
 import (
@@ -6,15 +8,19 @@ import (
 )
 
 type AddChatMemberRequest struct {
-	RoomID    string `json:"room_id" uri:"room_id"`
-	AccountID string `json:"account_id"`
-	Role      string `json:"role"`
+	RoomID    string `json:"room_id" form:"room_id" binding:"required"`
+	AccountID string `json:"account_id" form:"account_id" binding:"required"`
+	Role      string `json:"role" form:"role"`
 }
 
-func (r *AddChatMemberRequest) Validate() error {
+func (r *AddChatMemberRequest) Normalize() {
 	r.RoomID = strings.TrimSpace(r.RoomID)
 	r.AccountID = strings.TrimSpace(r.AccountID)
 	r.Role = strings.TrimSpace(r.Role)
+}
+
+func (r *AddChatMemberRequest) Validate() error {
+	r.Normalize()
 	if r.RoomID == "" {
 		return errors.New("room_id is required")
 	}

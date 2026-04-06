@@ -11,11 +11,11 @@ func ToGetRoomResponse(room *apptypes.RoomResult) *out.GetRoomResponse {
 	}
 
 	return &out.GetRoomResponse{
-		Id:          room.ID,
+		ID:          room.ID,
 		Name:        room.Name,
 		Description: room.Description,
 		RoomType:    room.RoomType,
-		OwnerId:     room.OwnerID,
+		OwnerID:     room.OwnerID,
 		CreatedAt:   room.CreatedAt,
 		UpdatedAt:   room.UpdatedAt,
 	}
@@ -29,11 +29,11 @@ func ToListRoomsResponse(res *apptypes.ListRoomsResult) *out.ListRoomsResponse {
 	rooms := make([]out.RoomResponse, 0, len(res.Rooms))
 	for _, room := range res.Rooms {
 		rooms = append(rooms, out.RoomResponse{
-			Id:          room.ID,
+			ID:          room.ID,
 			Name:        room.Name,
 			Description: room.Description,
 			RoomType:    room.RoomType,
-			OwnerId:     room.OwnerID,
+			OwnerID:     room.OwnerID,
 			CreatedAt:   room.CreatedAt,
 			UpdatedAt:   room.UpdatedAt,
 		})

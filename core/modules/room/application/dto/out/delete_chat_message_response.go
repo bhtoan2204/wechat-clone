@@ -1,5 +1,6 @@
+// CODE_GENERATOR: response
 package out
 
 type DeleteChatMessageResponse struct {
-	OK bool `json:"ok"`
+	Ok bool `json:"ok"`
 }

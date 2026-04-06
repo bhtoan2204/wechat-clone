@@ -37,6 +37,7 @@ endpoints:
           type: int64
         - name: last_message
           type: object
+          struct: ChatMessageResponse
         - name: members
           type: array
           items:
@@ -90,6 +91,7 @@ endpoints:
           type: int64
         - name: last_message
           type: object
+          struct: ChatMessageResponse
         - name: members
           type: array
           items:
@@ -143,6 +145,7 @@ endpoints:
           type: int64
         - name: last_message
           type: object
+          struct: ChatMessageResponse
         - name: members
           type: array
           items:
@@ -194,6 +197,7 @@ endpoints:
           type: int64
         - name: last_message
           type: object
+          struct: ChatMessageResponse
         - name: members
           type: array
           items:
@@ -243,6 +247,7 @@ endpoints:
           type: int64
         - name: last_message
           type: object
+          struct: ChatMessageResponse
         - name: members
           type: array
           items:
@@ -315,8 +320,10 @@ endpoints:
           type: string
         - name: reply_to
           type: object
+          struct: ChatMessagePreviewResponse
         - name: forwarded_from
           type: object
+          struct: ChatMessagePreviewResponse
 
   - name: ChatSendMessage
     method: POST
@@ -383,8 +390,10 @@ endpoints:
           type: string
         - name: reply_to
           type: object
+          struct: ChatMessagePreviewResponse
         - name: forwarded_from
           type: object
+          struct: ChatMessagePreviewResponse
 
   - name: ChatEditMessage
     method: PATCH
@@ -438,8 +447,10 @@ endpoints:
           type: string
         - name: reply_to
           type: object
+          struct: ChatMessagePreviewResponse
         - name: forwarded_from
           type: object
+          struct: ChatMessagePreviewResponse
 
   - name: ChatDeleteMessage
     method: DELETE
@@ -515,8 +526,10 @@ endpoints:
           type: string
         - name: reply_to
           type: object
+          struct: ChatMessagePreviewResponse
         - name: forwarded_from
           type: object
+          struct: ChatMessagePreviewResponse
 
   - name: ChatMarkMessageStatus
     method: POST
@@ -581,6 +594,7 @@ endpoints:
           type: int64
         - name: last_message
           type: object
+          struct: ChatMessageResponse
         - name: members
           type: array
           items:
@@ -633,6 +647,7 @@ endpoints:
           type: int64
         - name: last_message
           type: object
+          struct: ChatMessageResponse
         - name: members
           type: array
           items:
@@ -685,6 +700,7 @@ endpoints:
           type: int64
         - name: last_message
           type: object
+          struct: ChatMessageResponse
         - name: members
           type: array
           items:

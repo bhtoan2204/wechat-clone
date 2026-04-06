@@ -1,3 +1,5 @@
+// CODE_GENERATOR: request
+
 package in
 
 import (
@@ -6,11 +8,15 @@ import (
 )
 
 type GetChatPresenceRequest struct {
-	AccountID string `json:"account_id" uri:"account_id"`
+	AccountID string `json:"account_id" form:"account_id" binding:"required"`
+}
+
+func (r *GetChatPresenceRequest) Normalize() {
+	r.AccountID = strings.TrimSpace(r.AccountID)
 }
 
 func (r *GetChatPresenceRequest) Validate() error {
-	r.AccountID = strings.TrimSpace(r.AccountID)
+	r.Normalize()
 	if r.AccountID == "" {
 		return errors.New("account_id is required")
 	}

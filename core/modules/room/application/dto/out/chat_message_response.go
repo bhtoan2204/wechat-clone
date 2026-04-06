@@ -1,3 +1,4 @@
+// CODE_GENERATOR: response
 package out
 
 type ChatMessageResponse struct {
@@ -7,15 +8,15 @@ type ChatMessageResponse struct {
 	Message                string                      `json:"message"`
 	MessageType            string                      `json:"message_type"`
 	Status                 string                      `json:"status"`
-	ReplyToMessageID       string                      `json:"reply_to_message_id,omitempty"`
-	ForwardedFromMessageID string                      `json:"forwarded_from_message_id,omitempty"`
-	FileName               string                      `json:"file_name,omitempty"`
-	FileSize               int64                       `json:"file_size,omitempty"`
-	MimeType               string                      `json:"mime_type,omitempty"`
-	ObjectKey              string                      `json:"object_key,omitempty"`
-	EditedAt               string                      `json:"edited_at,omitempty"`
+	ReplyToMessageID       string                      `json:"reply_to_message_id"`
+	ForwardedFromMessageID string                      `json:"forwarded_from_message_id"`
+	FileName               string                      `json:"file_name"`
+	FileSize               int64                       `json:"file_size"`
+	MimeType               string                      `json:"mime_type"`
+	ObjectKey              string                      `json:"object_key"`
+	EditedAt               string                      `json:"edited_at"`
 	DeletedForEveryone     bool                        `json:"deleted_for_everyone"`
 	CreatedAt              string                      `json:"created_at"`
-	ReplyTo                *ChatMessagePreviewResponse `json:"reply_to,omitempty"`
-	ForwardedFrom          *ChatMessagePreviewResponse `json:"forwarded_from,omitempty"`
+	ReplyTo                *ChatMessagePreviewResponse `json:"reply_to"`
+	ForwardedFrom          *ChatMessagePreviewResponse `json:"forwarded_from"`
 }

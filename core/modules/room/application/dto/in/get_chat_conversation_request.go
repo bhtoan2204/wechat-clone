@@ -1,3 +1,5 @@
+// CODE_GENERATOR: request
+
 package in
 
 import (
@@ -6,11 +8,15 @@ import (
 )
 
 type GetChatConversationRequest struct {
-	RoomID string `json:"room_id" uri:"room_id"`
+	RoomID string `json:"room_id" form:"room_id" binding:"required"`
+}
+
+func (r *GetChatConversationRequest) Normalize() {
+	r.RoomID = strings.TrimSpace(r.RoomID)
 }
 
 func (r *GetChatConversationRequest) Validate() error {
-	r.RoomID = strings.TrimSpace(r.RoomID)
+	r.Normalize()
 	if r.RoomID == "" {
 		return errors.New("room_id is required")
 	}

@@ -1,3 +1,5 @@
+// CODE_GENERATOR: request
+
 package in
 
 type ListTransactionRequest struct {
@@ -6,12 +8,5 @@ type ListTransactionRequest struct {
 }
 
 func (r *ListTransactionRequest) Validate() error {
-	if r.Page < 0 {
-		r.Page = 0
-	}
-	if r.Limit < 0 {
-		r.Limit = 10
-	}
-
 	return nil
 }
