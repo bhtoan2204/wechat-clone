@@ -14,8 +14,9 @@ import (
 
 func BuildHTTPServer(_ context.Context, appCtx *appCtx.AppContext) (http.HTTPServer, error) {
 	notificationRepos := notificationrepo.NewRepoImpl(appCtx)
+	notificationReadRepo := notificationrepo.NewNotificationReadRepository(appCtx.GetDB())
 	savePushSubscription := cqrs.NewDispatcher(notificationcommand.NewSavePushSubscriptionHandler(notificationRepos))
-	listNotification := cqrs.NewDispatcher(notificationquery.NewListNotificationHandler(notificationRepos))
+	listNotification := cqrs.NewDispatcher(notificationquery.NewListNotificationHandler(notificationReadRepo))
 	server, err := notificationserver.NewHTTPServer(savePushSubscription, listNotification)
 	if err != nil {
 		return nil, stackErr.Error(err)

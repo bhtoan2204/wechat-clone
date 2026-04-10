@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	appCtx "go-socket/core/context"
 	"go-socket/core/modules/room/domain/repos"
-	"go-socket/core/modules/room/infra/persistent/repository"
 	"go-socket/core/shared/config"
+	sharedevents "go-socket/core/shared/contracts/events"
 	infraMessaging "go-socket/core/shared/infra/messaging"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -74,12 +73,10 @@ func (m *accountOutboxMessage) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func NewMessageHandler(cfg *config.Config, appCtx *appCtx.AppContext) (MessageHandler, error) {
-	repos := repository.NewRepoImpl(appCtx)
-
+func NewMessageHandler(cfg *config.Config, accountRepo repos.RoomAccountProjectionRepository) (MessageHandler, error) {
 	instance := &messageHandler{
 		consumer:    make([]infraMessaging.Consumer, 0),
-		accountRepo: repos.RoomAccountProjectionRepository(),
+		accountRepo: accountRepo,
 	}
 
 	consumeTopics := []string{cfg.KafkaConfig.KafkaRoomConsumer.AccountTopic}
@@ -130,11 +127,11 @@ func (h *messageHandler) handleAccountEvent(ctx context.Context, value []byte) e
 	}
 	log.Infow("handle account event", zap.String("event_name", event.EventName))
 	switch event.EventName {
-	case "EventAccountCreated":
+	case sharedevents.EventAccountCreated:
 		if err := h.handleAccountCreatedEvent(ctx, event.EventData); err != nil {
 			return stackErr.Error(err)
 		}
-	case "EventAccountProfileUpdated":
+	case sharedevents.EventAccountProfileUpdated:
 		if err := h.handleAccountUpdatedEvent(ctx, event.EventData); err != nil {
 			return stackErr.Error(err)
 		}

@@ -2,9 +2,9 @@ package messaging
 
 import (
 	"context"
-	"go-socket/core/modules/account/domain/aggregate"
 	"go-socket/core/modules/notification/application/dto/out"
 	"go-socket/core/modules/notification/domain/entity"
+	sharedevents "go-socket/core/shared/contracts/events"
 	"go-socket/core/shared/utils"
 	"testing"
 )
@@ -12,11 +12,11 @@ import (
 func TestDecodeAccountCreatedPayloadObject(t *testing.T) {
 	raw := []byte(`{"AccountID":"acc-1","Email":"a@example.com","CreatedAt":"2026-03-03T13:05:32.218937909+07:00"}`)
 
-	payloadAny, err := decodeEventPayload(context.Background(), "EventAccountCreated", raw)
+	payloadAny, err := decodeEventPayload(context.Background(), sharedevents.EventAccountCreated, raw)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	payload, ok := payloadAny.(*aggregate.EventAccountCreated)
+	payload, ok := payloadAny.(*sharedevents.AccountCreatedEvent)
 	if !ok {
 		t.Fatalf("expected AccountCreatedEvent, got %T", payloadAny)
 	}
@@ -31,11 +31,11 @@ func TestDecodeAccountCreatedPayloadObject(t *testing.T) {
 func TestDecodeAccountCreatedPayloadEncodedString(t *testing.T) {
 	raw := []byte(`"{\"AccountID\":\"acc-2\",\"Email\":\"b@example.com\",\"CreatedAt\":\"2026-03-03T13:05:32.218937909+07:00\"}"`)
 
-	payloadAny, err := decodeEventPayload(context.Background(), "EventAccountCreated", raw)
+	payloadAny, err := decodeEventPayload(context.Background(), sharedevents.EventAccountCreated, raw)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	payload, ok := payloadAny.(*aggregate.EventAccountCreated)
+	payload, ok := payloadAny.(*sharedevents.AccountCreatedEvent)
 	if !ok {
 		t.Fatalf("expected AccountCreatedEvent, got %T", payloadAny)
 	}
@@ -48,7 +48,7 @@ func TestDecodeAccountCreatedPayloadEncodedString(t *testing.T) {
 }
 
 func TestDecodeAccountCreatedPayloadEmpty(t *testing.T) {
-	_, err := decodeEventPayload(context.Background(), "EventAccountCreated", []byte(`""`))
+	_, err := decodeEventPayload(context.Background(), sharedevents.EventAccountCreated, []byte(`""`))
 	if err == nil {
 		t.Fatalf("expected error when event_data is empty")
 	}

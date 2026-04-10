@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/actorctx"
 	"go-socket/core/shared/pkg/logging"
 
 	"github.com/gin-gonic/gin"
@@ -39,8 +39,8 @@ func (h *wsHandler) Handle(c *gin.Context) {
 		return
 	}
 
-	account, ok := ctx.Value("account").(*xpaseto.PasetoPayload)
-	if !ok || account == nil || account.AccountID == "" {
+	accountID, err := actorctx.AccountIDFromContext(ctx)
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
@@ -51,7 +51,7 @@ func (h *wsHandler) Handle(c *gin.Context) {
 		return
 	}
 
-	client := NewClient(ctx, conn, c.Query("client_id"), account.AccountID)
+	client := NewClient(ctx, conn, c.Query("client_id"), accountID)
 	h.hub.Register(ctx, client)
 
 	clientCtx, cancel := context.WithCancel(ctx)

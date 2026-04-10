@@ -9,7 +9,6 @@ import (
 	ledgerin "go-socket/core/modules/ledger/application/dto/in"
 	"go-socket/core/modules/ledger/domain/entity"
 	ledgerrepos "go-socket/core/modules/ledger/domain/repos"
-	ledgerrepo "go-socket/core/modules/ledger/infra/persistent/repository"
 )
 
 func TestLedgerServiceCreateTransaction(t *testing.T) {
@@ -104,7 +103,7 @@ type fakeLedgerRepo struct {
 
 func (r *fakeLedgerRepo) CreateTransaction(_ context.Context, transaction *entity.LedgerTransaction) error {
 	if _, exists := r.transactions[transaction.TransactionID]; exists {
-		return ledgerrepo.ErrDuplicate
+		return ledgerrepos.ErrDuplicate
 	}
 	r.transactions[transaction.TransactionID] = &entity.LedgerTransaction{
 		TransactionID: transaction.TransactionID,
@@ -139,7 +138,7 @@ func (r *fakeLedgerRepo) GetBalance(_ context.Context, accountID string) (int64,
 func (r *fakeLedgerRepo) GetTransaction(_ context.Context, transactionID string) (*entity.LedgerTransaction, error) {
 	transaction, exists := r.transactions[transactionID]
 	if !exists {
-		return nil, ledgerrepo.ErrNotFound
+		return nil, ledgerrepos.ErrNotFound
 	}
 	return transaction, nil
 }

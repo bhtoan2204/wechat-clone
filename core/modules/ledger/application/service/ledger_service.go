@@ -11,7 +11,6 @@ import (
 	ledgerout "go-socket/core/modules/ledger/application/dto/out"
 	"go-socket/core/modules/ledger/domain/entity"
 	ledgerrepos "go-socket/core/modules/ledger/domain/repos"
-	ledgerrepo "go-socket/core/modules/ledger/infra/persistent/repository"
 	sharedevents "go-socket/core/shared/contracts/events"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -38,40 +37,6 @@ func (s *LedgerService) CreateTransaction(ctx context.Context, req *ledgerin.Cre
 		transaction, err = s.createTransaction(ctx, txRepos.LedgerRepository(), req.TransactionID, toLedgerEntryInputs(req.Entries))
 		return stackErr.Error(err)
 	}); err != nil {
-		return nil, stackErr.Error(err)
-	}
-
-	return toTransactionResponse(transaction), nil
-}
-
-func (s *LedgerService) GetAccountBalance(ctx context.Context, accountID string) (*ledgerout.AccountBalanceResponse, error) {
-	accountID = strings.TrimSpace(accountID)
-	if accountID == "" {
-		return nil, fmt.Errorf("%w: account_id is required", ErrValidation)
-	}
-
-	balance, err := s.baseRepo.LedgerRepository().GetBalance(ctx, accountID)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-
-	return &ledgerout.AccountBalanceResponse{
-		AccountID: accountID,
-		Balance:   balance,
-	}, nil
-}
-
-func (s *LedgerService) GetTransaction(ctx context.Context, transactionID string) (*ledgerout.TransactionResponse, error) {
-	transactionID = strings.TrimSpace(transactionID)
-	if transactionID == "" {
-		return nil, fmt.Errorf("%w: transaction_id is required", ErrValidation)
-	}
-
-	transaction, err := s.baseRepo.LedgerRepository().GetTransaction(ctx, transactionID)
-	if errors.Is(err, ledgerrepo.ErrNotFound) {
-		return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID)
-	}
-	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 
@@ -108,7 +73,7 @@ func (s *LedgerService) RecordPaymentSucceeded(ctx context.Context, evt *sharede
 			return stackErr.Error(fmt.Errorf("%w: %s", ErrValidation, err.Error()))
 		}
 		if err := txRepos.PaymentRepository().MarkProcessed(ctx, processedEvent); err != nil {
-			if errors.Is(err, ledgerrepo.ErrDuplicate) {
+			if errors.Is(err, ledgerrepos.ErrDuplicate) {
 				return nil
 			}
 			return stackErr.Error(err)
@@ -131,7 +96,7 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 	}
 
 	if err := repo.CreateTransaction(ctx, transaction); err != nil {
-		if errors.Is(err, ledgerrepo.ErrDuplicate) {
+		if errors.Is(err, ledgerrepos.ErrDuplicate) {
 			return nil, fmt.Errorf("%w: %s", ErrDuplicateTransaction, transaction.TransactionID)
 		}
 		return nil, stackErr.Error(err)
@@ -142,7 +107,7 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 	}
 
 	transaction, err = repo.GetTransaction(ctx, transaction.TransactionID)
-	if errors.Is(err, ledgerrepo.ErrNotFound) {
+	if errors.Is(err, ledgerrepos.ErrNotFound) {
 		return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID)
 	}
 	if err != nil {

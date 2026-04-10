@@ -69,12 +69,12 @@ func (s *MessageCommandService) SendMessage(ctx context.Context, accountID strin
 				return stackErr.Error(err)
 			}
 
-			payload, _ := currentAccountPayload(ctx)
+			actor, _ := currentActor(ctx)
 			senderName := accountID
 			senderEmail := ""
-			if payload != nil {
-				senderName = payload.Email
-				senderEmail = payload.Email
+			if actor != nil && actor.Email != "" {
+				senderName = actor.Email
+				senderEmail = actor.Email
 			}
 			return s.aggregateService.PublishMessageCreated(ctx, txRepos.RoomOutboxEventsRepository(), roomID, message.ID, accountID, senderName, senderEmail, message.Message, message.CreatedAt)
 		}); err != nil {

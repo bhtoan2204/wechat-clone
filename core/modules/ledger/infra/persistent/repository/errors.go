@@ -4,12 +4,14 @@ import (
 	"errors"
 	"strings"
 
+	ledgerrepos "go-socket/core/modules/ledger/domain/repos"
+
 	"gorm.io/gorm"
 )
 
 var (
-	ErrNotFound  = errors.New("not found")
-	ErrDuplicate = errors.New("duplicate value")
+	ErrNotFound  = ledgerrepos.ErrNotFound
+	ErrDuplicate = ledgerrepos.ErrDuplicate
 )
 
 func mapError(err error) error {

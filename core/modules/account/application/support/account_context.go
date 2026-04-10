@@ -4,21 +4,21 @@ import (
 	"context"
 	"errors"
 
-	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/actorctx"
 )
 
-func AccountPayloadFromCtx(ctx context.Context) (*xpaseto.PasetoPayload, error) {
-	payload, ok := ctx.Value("account").(*xpaseto.PasetoPayload)
-	if !ok || payload == nil || payload.AccountID == "" {
+func ActorFromCtx(ctx context.Context) (*actorctx.Actor, error) {
+	actor, ok := actorctx.FromContext(ctx)
+	if !ok || actor == nil {
 		return nil, errors.New("unauthorized")
 	}
-	return payload, nil
+	return actor, nil
 }
 
 func AccountIDFromCtx(ctx context.Context) (string, error) {
-	payload, err := AccountPayloadFromCtx(ctx)
+	actor, err := ActorFromCtx(ctx)
 	if err != nil {
 		return "", err
 	}
-	return payload.AccountID, nil
+	return actor.AccountID, nil
 }

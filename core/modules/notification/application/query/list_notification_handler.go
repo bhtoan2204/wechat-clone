@@ -2,11 +2,9 @@ package query
 
 import (
 	"context"
-	"errors"
 	"go-socket/core/modules/notification/application/dto/in"
 	"go-socket/core/modules/notification/application/dto/out"
-	"go-socket/core/modules/notification/domain/repos"
-	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/actorctx"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -16,31 +14,27 @@ import (
 )
 
 type listNotificationHandler struct {
-	notificationRepo repos.NotificationRepository
+	notificationRepo NotificationReadRepository
 }
 
-func NewListNotificationHandler(repos repos.Repos) cqrs.Handler[*in.ListNotificationRequest, *out.ListNotificationResponse] {
+func NewListNotificationHandler(notificationRepo NotificationReadRepository) cqrs.Handler[*in.ListNotificationRequest, *out.ListNotificationResponse] {
 	return &listNotificationHandler{
-		notificationRepo: repos.NotificationRepository(),
+		notificationRepo: notificationRepo,
 	}
 }
 
 func (h *listNotificationHandler) Handle(ctx context.Context, req *in.ListNotificationRequest) (*out.ListNotificationResponse, error) {
 	log := logging.FromContext(ctx).Named("ListNotification")
-	account := ctx.Value("account")
-	if account == nil {
-		log.Errorw("Account not found", zap.Error(errors.New("account not found")))
-		return nil, stackErr.Error(errors.New("account not found"))
-	}
-	payload, ok := account.(*xpaseto.PasetoPayload)
-	if !ok {
-		return nil, stackErr.Error(errors.New("invalid account payload"))
+	accountID, err := actorctx.AccountIDFromContext(ctx)
+	if err != nil {
+		log.Errorw("Account not found", zap.Error(err))
+		return nil, stackErr.Error(err)
 	}
 	options := utils.QueryOptions{
 		Conditions: []utils.Condition{
 			{
 				Field:    "account_id",
-				Value:    payload.AccountID,
+				Value:    accountID,
 				Operator: utils.Equal,
 			},
 		},

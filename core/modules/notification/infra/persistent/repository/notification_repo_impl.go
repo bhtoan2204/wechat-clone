@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"go-socket/core/modules/notification/application/dto/out"
+	notificationquery "go-socket/core/modules/notification/application/query"
 	"go-socket/core/modules/notification/domain/entity"
 	"go-socket/core/modules/notification/domain/repos"
 	"go-socket/core/modules/notification/infra/persistent/models"
@@ -17,8 +18,15 @@ type notificationRepoImpl struct {
 	db *gorm.DB
 }
 
-func NewNotificationRepoImpl(db *gorm.DB) repos.NotificationRepository {
+var _ repos.NotificationRepository = (*notificationRepoImpl)(nil)
+var _ notificationquery.NotificationReadRepository = (*notificationRepoImpl)(nil)
+
+func NewNotificationRepoImpl(db *gorm.DB) *notificationRepoImpl {
 	return &notificationRepoImpl{db: db}
+}
+
+func NewNotificationReadRepository(db *gorm.DB) notificationquery.NotificationReadRepository {
+	return NewNotificationRepoImpl(db)
 }
 
 func (r *notificationRepoImpl) CreateNotification(ctx context.Context, notification *entity.NotificationEntity) error {

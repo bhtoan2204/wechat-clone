@@ -2,10 +2,12 @@ package command
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go-socket/core/modules/payment/application/dto/in"
 	"go-socket/core/modules/payment/application/dto/out"
+	"go-socket/core/modules/payment/domain/aggregate"
 	"go-socket/core/modules/payment/domain/repos"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
@@ -48,10 +50,16 @@ func (h *depositHandler) Handle(ctx context.Context, req *in.DepositRequest) (*o
 		}
 
 		if err := agg.Deposit(transactionID, req.Amount, now); err != nil {
+			if errors.Is(err, aggregate.ErrInvalidPaymentAmount) {
+				return stackErr.Error(ErrInvalidPaymentAmount)
+			}
 			return stackErr.Error(err)
 		}
 
 		if err := txRepos.PaymentBalanceAggregateRepository().Save(ctx, agg); err != nil {
+			if errors.Is(err, repos.ErrPaymentVersionConflict) {
+				return stackErr.Error(ErrPaymentVersionConflict)
+			}
 			return stackErr.Error(err)
 		}
 

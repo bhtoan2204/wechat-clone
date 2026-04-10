@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	appCtx "go-socket/core/context"
 	"go-socket/core/modules/payment/application/dto/in"
 	"go-socket/core/modules/payment/application/dto/out"
 	paymentservice "go-socket/core/modules/payment/application/service"
@@ -28,11 +27,9 @@ type createPaymentHandler struct {
 }
 
 func NewCreatePayment(
-	appCtx *appCtx.AppContext,
 	baseRepo repos.Repos,
 	services paymentservice.Services,
 ) cqrs.Handler[*in.CreatePaymentRequest, *out.CreatePaymentResponse] {
-	_ = appCtx
 	return &createPaymentHandler{
 		baseRepo:        baseRepo,
 		providerService: services.ProviderService(),

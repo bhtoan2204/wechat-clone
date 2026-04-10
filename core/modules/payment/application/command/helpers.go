@@ -3,14 +3,14 @@ package command
 import (
 	"context"
 
-	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/actorctx"
 )
 
 func accountIDFromContext(ctx context.Context) (string, error) {
-	account, ok := ctx.Value("account").(*xpaseto.PasetoPayload)
-	if !ok || account == nil || account.AccountID == "" {
+	accountID, err := actorctx.AccountIDFromContext(ctx)
+	if err != nil {
 		return "", ErrPaymentAccountNotFound
 	}
 
-	return account.AccountID, nil
+	return accountID, nil
 }

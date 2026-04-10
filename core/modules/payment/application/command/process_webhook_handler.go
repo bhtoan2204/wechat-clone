@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	appCtx "go-socket/core/context"
 	"go-socket/core/modules/payment/application/dto/in"
 	"go-socket/core/modules/payment/application/dto/out"
 	paymentservice "go-socket/core/modules/payment/application/service"
@@ -20,11 +19,9 @@ type processWebhookHandler struct {
 }
 
 func NewProcessWebhook(
-	appCtx *appCtx.AppContext,
 	baseRepo repos.Repos,
 	services paymentservice.Services,
 ) cqrs.Handler[*in.ProcessWebhookRequest, *out.ProcessWebhookResponse] {
-	_ = appCtx
 	return &processWebhookHandler{
 		baseRepo:        baseRepo,
 		providerService: services.ProviderService(),

@@ -3,13 +3,12 @@ package command
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"go-socket/core/modules/notification/application/dto/in"
 	"go-socket/core/modules/notification/application/dto/out"
 	"go-socket/core/modules/notification/domain/entity"
 	repos "go-socket/core/modules/notification/domain/repos"
-	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/actorctx"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -29,16 +28,10 @@ func NewSavePushSubscriptionHandler(baseRepo repos.Repos) cqrs.Handler[*in.SaveP
 func (h *savePushSubscriptionHandler) Handle(ctx context.Context, req *in.SavePushSubscriptionRequest) (*out.SavePushSubscriptionResponse, error) {
 	log := logging.FromContext(ctx).Named("SavePushSubscription")
 
-	account := ctx.Value("account")
-	if account == nil {
+	accountID, err := actorctx.AccountIDFromContext(ctx)
+	if err != nil {
 		log.Errorw("account not found in context")
 		return nil, stackErr.Error(ErrAccountNotFound)
-	}
-
-	payload, ok := account.(*xpaseto.PasetoPayload)
-	if !ok {
-		log.Errorw("invalid account payload")
-		return nil, stackErr.Error(errors.New("invalid account payload"))
 	}
 
 	keysBytes, err := json.Marshal(req.Keys)
@@ -49,7 +42,7 @@ func (h *savePushSubscriptionHandler) Handle(ctx context.Context, req *in.SavePu
 
 	subscription := &entity.PushSubscription{
 		ID:        uuid.New().String(),
-		AccountID: payload.AccountID,
+		AccountID: accountID,
 		Endpoint:  req.Endpoint,
 		Keys:      string(keysBytes),
 	}

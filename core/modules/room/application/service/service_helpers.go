@@ -8,7 +8,7 @@ import (
 
 	"go-socket/core/modules/room/domain/entity"
 	"go-socket/core/modules/room/domain/repos"
-	"go-socket/core/shared/infra/xpaseto"
+	"go-socket/core/shared/pkg/actorctx"
 	"go-socket/core/shared/pkg/stackErr"
 
 	"gorm.io/gorm"
@@ -53,10 +53,6 @@ func presenceKey(accountID string) string {
 	return "chat:presence:" + strings.TrimSpace(accountID)
 }
 
-func currentAccountPayload(ctx context.Context) (*xpaseto.PasetoPayload, bool) {
-	payload, ok := ctx.Value("account").(*xpaseto.PasetoPayload)
-	if !ok || payload == nil {
-		return nil, false
-	}
-	return payload, true
+func currentActor(ctx context.Context) (*actorctx.Actor, bool) {
+	return actorctx.FromContext(ctx)
 }

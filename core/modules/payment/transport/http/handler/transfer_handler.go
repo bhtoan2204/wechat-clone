@@ -5,8 +5,6 @@ import (
 	"go-socket/core/modules/payment/application/command"
 	"go-socket/core/modules/payment/application/dto/in"
 	"go-socket/core/modules/payment/application/dto/out"
-	"go-socket/core/modules/payment/domain/aggregate"
-	paymentrepos "go-socket/core/modules/payment/domain/repos"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -45,13 +43,16 @@ func (h *transferHandler) Handle(c *gin.Context) (interface{}, error) {
 		case errors.Is(err, command.ErrPaymentAccountNotFound):
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return nil, nil
-		case errors.Is(err, aggregate.ErrInvalidPaymentAmount):
+		case errors.Is(err, command.ErrPaymentReceiverNotFound):
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return nil, nil
+		case errors.Is(err, command.ErrInvalidPaymentAmount):
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return nil, nil
-		case errors.Is(err, aggregate.ErrInsufficientBalance):
+		case errors.Is(err, command.ErrInsufficientBalance):
 			c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return nil, nil
-		case errors.Is(err, paymentrepos.ErrPaymentVersionConflict):
+		case errors.Is(err, command.ErrPaymentVersionConflict):
 			c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return nil, nil
 		default:

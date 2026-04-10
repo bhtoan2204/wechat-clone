@@ -9,7 +9,7 @@ import (
 )
 
 func BuildServer(cfg *config.Config, appCtx *appCtx.AppContext) (ledgerserver.Server, error) {
-	messageHandler, err := ledgermessaging.NewMessageHandler(cfg, appCtx)
+	messageHandler, err := ledgermessaging.NewMessageHandler(cfg, BuildService(appCtx))
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

@@ -2,6 +2,8 @@ package command
 
 import (
 	"context"
+	"errors"
+	"go-socket/core/modules/payment/domain/aggregate"
 	"go-socket/core/modules/payment/domain/repos"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -49,10 +51,20 @@ func (h *withdrawalHandler) Handle(ctx context.Context, req *in.WithdrawalReques
 		}
 
 		if err := agg.Withdraw(transactionID, req.Amount, now); err != nil {
-			return stackErr.Error(err)
+			switch {
+			case errors.Is(err, aggregate.ErrInvalidPaymentAmount):
+				return stackErr.Error(ErrInvalidPaymentAmount)
+			case errors.Is(err, aggregate.ErrInsufficientBalance):
+				return stackErr.Error(ErrInsufficientBalance)
+			default:
+				return stackErr.Error(err)
+			}
 		}
 
 		if err := txRepos.PaymentBalanceAggregateRepository().Save(ctx, agg); err != nil {
+			if errors.Is(err, repos.ErrPaymentVersionConflict) {
+				return stackErr.Error(ErrPaymentVersionConflict)
+			}
 			return stackErr.Error(err)
 		}
 

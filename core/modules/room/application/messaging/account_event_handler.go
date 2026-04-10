@@ -5,20 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"go-socket/core/modules/account/domain/aggregate"
 	"go-socket/core/modules/room/domain/entity"
+	sharedevents "go-socket/core/shared/contracts/events"
 	"go-socket/core/shared/pkg/stackErr"
 )
 
 func (h *messageHandler) handleAccountCreatedEvent(ctx context.Context, raw json.RawMessage) error {
-	payloadAny, err := decodeEventPayload(ctx, "EventAccountCreated", raw)
+	payloadAny, err := decodeEventPayload(ctx, sharedevents.EventAccountCreated, raw)
 	if err != nil {
 		return stackErr.Error(fmt.Errorf("decode event payload failed: %v", err))
 	}
 
-	payload, ok := payloadAny.(*aggregate.EventAccountCreated)
+	payload, ok := payloadAny.(*sharedevents.AccountCreatedEvent)
 	if !ok {
-		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", "EventAccountCreated"))
+		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", sharedevents.EventAccountCreated))
 	}
 
 	if err := h.accountRepo.ProjectAccount(ctx, &entity.AccountEntity{
@@ -33,35 +33,32 @@ func (h *messageHandler) handleAccountCreatedEvent(ctx context.Context, raw json
 }
 
 func (h *messageHandler) handleAccountUpdatedEvent(ctx context.Context, raw json.RawMessage) error {
-	payloadAny, err := decodeEventPayload(ctx, "EventAccountProfileUpdated", raw)
+	payloadAny, err := decodeEventPayload(ctx, sharedevents.EventAccountProfileUpdated, raw)
 	if err != nil {
 		return stackErr.Error(fmt.Errorf("decode event payload failed: %v", err))
 	}
 
-	payload, ok := payloadAny.(*aggregate.EventAccountProfileUpdated)
+	payload, ok := payloadAny.(*sharedevents.AccountProfileUpdatedEvent)
 	if !ok {
-		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", "EventAccountProfileUpdated"))
+		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", sharedevents.EventAccountProfileUpdated))
 	}
 
 	if err := h.accountRepo.ProjectAccount(ctx, &entity.AccountEntity{
-		AccountID:   payload.AccountID,
-		DisplayName: payload.DisplayName,
-		UpdatedAt:   payload.UpdatedAt,
-		AvatarObjectKey: func(data *string) string {
-			if data != nil {
-				return *payload.AvatarObjectKey
-			}
-			return ""
-		}(payload.AvatarObjectKey),
-		Username: func(data *string) string {
-			if data != nil {
-				return *payload.AvatarObjectKey
-			}
-			return ""
-		}(payload.Username),
+		AccountID:       payload.AccountID,
+		DisplayName:     payload.DisplayName,
+		UpdatedAt:       payload.UpdatedAt,
+		AvatarObjectKey: optionalStringValue(payload.AvatarObjectKey),
+		Username:        optionalStringValue(payload.Username),
 	}); err != nil {
 		return stackErr.Error(err)
 	}
 
 	return nil
+}
+
+func optionalStringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }

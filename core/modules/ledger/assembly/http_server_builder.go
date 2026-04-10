@@ -13,9 +13,10 @@ import (
 
 func BuildHTTPServer(_ context.Context, appContext *appCtx.AppContext) (infrahttp.HTTPServer, error) {
 	ledgerService := BuildService(appContext)
+	ledgerQueryService := BuildQueryService(appContext)
 	createTransaction := cqrs.NewDispatcher(ledgercommand.NewCreateTransactionHandler(ledgerService))
-	getAccountBalance := cqrs.NewDispatcher(ledgerquery.NewGetAccountBalanceHandler(ledgerService))
-	getTransaction := cqrs.NewDispatcher(ledgerquery.NewGetTransactionHandler(ledgerService))
+	getAccountBalance := cqrs.NewDispatcher(ledgerquery.NewGetAccountBalanceHandler(ledgerQueryService))
+	getTransaction := cqrs.NewDispatcher(ledgerquery.NewGetTransactionHandler(ledgerQueryService))
 
 	return ledgerserver.NewHTTPServer(createTransaction, getAccountBalance, getTransaction)
 }

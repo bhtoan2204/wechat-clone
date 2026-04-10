@@ -74,7 +74,7 @@ func (r *paymentRepoImpl) UpdateIntentProviderState(ctx context.Context, transac
 		return mapError(result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return ErrNotFound
+		return ledgerrepos.ErrNotFound
 	}
 	return nil
 }
@@ -90,7 +90,7 @@ func (r *paymentRepoImpl) UpdateIntentStatus(ctx context.Context, transactionID,
 		return mapError(result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return ErrNotFound
+		return ledgerrepos.ErrNotFound
 	}
 	return nil
 }

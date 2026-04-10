@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	appCtx "go-socket/core/context"
 	ledgerservice "go-socket/core/modules/ledger/application/service"
-	ledgerrepo "go-socket/core/modules/ledger/infra/persistent/repository"
 	"go-socket/core/shared/config"
 	sharedevents "go-socket/core/shared/contracts/events"
 	infraMessaging "go-socket/core/shared/infra/messaging"
@@ -29,10 +27,10 @@ type messageHandler struct {
 	ledgerService *ledgerservice.LedgerService
 }
 
-func NewMessageHandler(cfg *config.Config, appCtx *appCtx.AppContext) (MessageHandler, error) {
+func NewMessageHandler(cfg *config.Config, ledgerService *ledgerservice.LedgerService) (MessageHandler, error) {
 	instance := &messageHandler{
 		consumer:      make([]infraMessaging.Consumer, 0, 1),
-		ledgerService: ledgerservice.NewLedgerService(ledgerrepo.NewRepoImpl(appCtx)),
+		ledgerService: ledgerService,
 	}
 
 	topic := strings.TrimSpace(cfg.KafkaConfig.KafkaLedgerConsumer.PaymentOutboxTopic)

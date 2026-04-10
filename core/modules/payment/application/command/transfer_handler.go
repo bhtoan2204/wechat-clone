@@ -5,6 +5,7 @@ import (
 	"errors"
 	"go-socket/core/modules/payment/application/dto/in"
 	"go-socket/core/modules/payment/application/dto/out"
+	"go-socket/core/modules/payment/domain/aggregate"
 	"go-socket/core/modules/payment/domain/repos"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
@@ -44,7 +45,7 @@ func (h *transferHandler) Handle(ctx context.Context, req *in.TransferRequest) (
 	}
 	if receiver == nil {
 		log.Errorw("Receiver account projection not found")
-		return nil, stackErr.Error(errors.New("receiver account projection not found"))
+		return nil, stackErr.Error(ErrPaymentReceiverNotFound)
 	}
 
 	transactionID := uuid.NewString()
@@ -60,9 +61,19 @@ func (h *transferHandler) Handle(ctx context.Context, req *in.TransferRequest) (
 			return stackErr.Error(err)
 		}
 		if err := senderAgg.Transfer(transactionID, req.Amount, receiverID, now); err != nil {
-			return stackErr.Error(err)
+			switch {
+			case errors.Is(err, aggregate.ErrInvalidPaymentAmount):
+				return stackErr.Error(ErrInvalidPaymentAmount)
+			case errors.Is(err, aggregate.ErrInsufficientBalance):
+				return stackErr.Error(ErrInsufficientBalance)
+			default:
+				return stackErr.Error(err)
+			}
 		}
 		if err := txRepos.PaymentBalanceAggregateRepository().Save(ctx, senderAgg); err != nil {
+			if errors.Is(err, repos.ErrPaymentVersionConflict) {
+				return stackErr.Error(ErrPaymentVersionConflict)
+			}
 			return stackErr.Error(err)
 		}
 
@@ -71,9 +82,15 @@ func (h *transferHandler) Handle(ctx context.Context, req *in.TransferRequest) (
 			return stackErr.Error(err)
 		}
 		if err := receiverAgg.Receive(transactionID, req.Amount, accountID, now); err != nil {
+			if errors.Is(err, aggregate.ErrInvalidPaymentAmount) {
+				return stackErr.Error(ErrInvalidPaymentAmount)
+			}
 			return stackErr.Error(err)
 		}
 		if err := txRepos.PaymentBalanceAggregateRepository().Save(ctx, receiverAgg); err != nil {
+			if errors.Is(err, repos.ErrPaymentVersionConflict) {
+				return stackErr.Error(ErrPaymentVersionConflict)
+			}
 			return stackErr.Error(err)
 		}
 

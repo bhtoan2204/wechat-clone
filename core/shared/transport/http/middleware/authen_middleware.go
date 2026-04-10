@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	appCtx "go-socket/core/context"
+	"go-socket/core/shared/pkg/actorctx"
 	"net/http"
 	"strings"
 
@@ -30,7 +31,11 @@ func AuthenMiddleware(appCtx *appCtx.AppContext) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
-		ctx := context.WithValue(c.Request.Context(), "account", claims)
+		ctx := actorctx.WithActor(c.Request.Context(), actorctx.Actor{
+			AccountID: claims.AccountID,
+			Email:     claims.Email,
+		})
+		ctx = context.WithValue(ctx, "account", claims)
 		c.Request = c.Request.WithContext(ctx)
 		c.Set("account", claims)
 		c.Next()

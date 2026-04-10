@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	appCtx "go-socket/core/context"
 	paymentrepos "go-socket/core/modules/payment/domain/repos"
-	"go-socket/core/modules/payment/infra/persistent/repository"
 	"go-socket/core/shared/config"
 	infraMessaging "go-socket/core/shared/infra/messaging"
 	eventpkg "go-socket/core/shared/pkg/event"
@@ -27,8 +25,7 @@ type processor struct {
 	eventSerializer       eventpkg.Serializer
 }
 
-func NewProcessor(cfg *config.Config, appCtx *appCtx.AppContext) (Processor, error) {
-	repos := repository.NewRepoImpl(appCtx)
+func NewProcessor(cfg *config.Config, repos paymentrepos.Repos) (Processor, error) {
 	eventSerializer, err := newProjectionSerializer()
 	if err != nil {
 		return nil, stackErr.Error(err)

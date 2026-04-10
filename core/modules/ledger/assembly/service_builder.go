@@ -9,3 +9,7 @@ import (
 func BuildService(appContext *appCtx.AppContext) *service.LedgerService {
 	return service.NewLedgerService(ledgerrepo.NewRepoImpl(appContext))
 }
+
+func BuildQueryService(appContext *appCtx.AppContext) *service.LedgerQueryService {
+	return service.NewLedgerQueryService(ledgerrepo.NewRepoImpl(appContext))
+}
