@@ -6,30 +6,30 @@ services:
     volumes:
       - redis_data:/data
 
-  cassandra:
-    image: cassandra:5.0
-    container_name: chat-cassandra
-    ports:
-      - "9042:9042"
-    environment:
-      CASSANDRA_CLUSTER_NAME: chat-cluster
-      CASSANDRA_DC: dc1
-      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
-      MAX_HEAP_SIZE: 512M
-      HEAP_NEWSIZE: 128M
-    volumes:
-      - cassandra_data:/var/lib/cassandra
-    restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "cqlsh localhost 9042 -e 'DESCRIBE KEYSPACES' >/dev/null 2>&1 || exit 1",
-        ]
-      interval: 15s
-      timeout: 10s
-      retries: 20
-      start_period: 40s
+  # cassandra:
+  #   image: cassandra:5.0
+  #   container_name: chat-cassandra
+  #   ports:
+  #     - "9042:9042"
+  #   environment:
+  #     CASSANDRA_CLUSTER_NAME: chat-cluster
+  #     CASSANDRA_DC: dc1
+  #     CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+  #     MAX_HEAP_SIZE: 512M
+  #     HEAP_NEWSIZE: 128M
+  #   volumes:
+  #     - cassandra_data:/var/lib/cassandra
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test:
+  #       [
+  #         "CMD-SHELL",
+  #         "cqlsh localhost 9042 -e 'DESCRIBE KEYSPACES' >/dev/null 2>&1 || exit 1",
+  #       ]
+  #     interval: 15s
+  #     timeout: 10s
+  #     retries: 20
+  #     start_period: 40s
 
   minio:
     image: minio/minio:latest
@@ -181,20 +181,20 @@ services:
     restart: "no"
     profiles: ["init"]
 
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
-    ports:
-      - "9000:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
-    depends_on:
-      kafka:
-        condition: service_healthy
-      zookeeper:
-        condition: service_healthy
+  # kafka-ui:
+  #   image: provectuslabs/kafka-ui:latest
+  #   container_name: kafka-ui
+  #   ports:
+  #     - "9000:8080"
+  #   environment:
+  #     KAFKA_CLUSTERS_0_NAME: local
+  #     KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+  #     KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+  #   depends_on:
+  #     kafka:
+  #       condition: service_healthy
+  #     zookeeper:
+  #       condition: service_healthy
 
   # consul:
   #   image: hashicorp/consul:latest
