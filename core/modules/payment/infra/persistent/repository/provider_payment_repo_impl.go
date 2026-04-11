@@ -28,6 +28,56 @@ func newProviderPaymentRepoImpl(db *gorm.DB) paymentrepos.ProviderPaymentReposit
 	}
 }
 
+func (r *providerPaymentRepoImpl) CreatePaymentIntent(ctx context.Context, intent *entity.PaymentIntent, createdEvent eventpkg.Event) error {
+	if err := r.CreateIntent(ctx, intent); err != nil {
+		return err
+	}
+	return r.appendOutboxEvents(ctx, createdEvent)
+}
+
+func (r *providerPaymentRepoImpl) SavePaymentIntent(ctx context.Context, intent *entity.PaymentIntent, outboxEvents ...eventpkg.Event) error {
+	if intent == nil {
+		return paymentrepos.ErrProviderPaymentNotFound
+	}
+
+	result := r.db.WithContext(ctx).
+		Model(&model.ProviderPaymentIntentModel{}).
+		Where("transaction_id = ?", intent.TransactionID).
+		Updates(map[string]interface{}{
+			"provider":          intent.Provider,
+			"external_ref":      toStorageExternalRef(intent.Provider, intent.TransactionID, intent.ExternalRef),
+			"amount":            intent.Amount,
+			"currency":          intent.Currency,
+			"debit_account_id":  intent.DebitAccountID,
+			"credit_account_id": intent.CreditAccountID,
+			"status":            intent.Status,
+			"created_at":        intent.CreatedAt,
+			"updated_at":        intent.UpdatedAt,
+		})
+	if result.Error != nil {
+		return mapError(result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return paymentrepos.ErrProviderPaymentNotFound
+	}
+
+	return r.appendOutboxEvents(ctx, outboxEvents...)
+}
+
+func (r *providerPaymentRepoImpl) FinalizeSuccessfulPayment(
+	ctx context.Context,
+	intent *entity.PaymentIntent,
+	processedEvent *entity.ProcessedPaymentEvent,
+	successEvent eventpkg.Event,
+	outboxEvents ...eventpkg.Event,
+) error {
+	if err := r.MarkProcessed(ctx, processedEvent); err != nil {
+		return err
+	}
+	outboxEvents = append(outboxEvents, successEvent)
+	return r.SavePaymentIntent(ctx, intent, outboxEvents...)
+}
+
 func (r *providerPaymentRepoImpl) CreateIntent(ctx context.Context, intent *entity.PaymentIntent) error {
 	err := r.db.WithContext(ctx).Create(&model.ProviderPaymentIntentModel{
 		TransactionID:   intent.TransactionID,
@@ -127,6 +177,19 @@ func (r *providerPaymentRepoImpl) MarkProcessed(ctx context.Context, event *enti
 }
 
 func (r *providerPaymentRepoImpl) AppendOutboxEvent(ctx context.Context, evt eventpkg.Event) error {
+	return r.appendOutboxEvents(ctx, evt)
+}
+
+func (r *providerPaymentRepoImpl) appendOutboxEvents(ctx context.Context, events ...eventpkg.Event) error {
+	for _, evt := range events {
+		if err := r.appendOutboxEvent(ctx, evt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *providerPaymentRepoImpl) appendOutboxEvent(ctx context.Context, evt eventpkg.Event) error {
 	data, err := r.serializer.Marshal(evt.EventData)
 	if err != nil {
 		return fmt.Errorf("marshal event data failed: %v", err)

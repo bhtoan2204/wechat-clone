@@ -10,7 +10,9 @@ import (
 	"go-socket/core/modules/account/domain/aggregate"
 	"go-socket/core/modules/account/domain/entity"
 	accountrepos "go-socket/core/modules/account/domain/repos"
+	accountcache "go-socket/core/modules/account/infra/cache"
 	"go-socket/core/modules/account/infra/persistent/models"
+	sharedcache "go-socket/core/shared/infra/cache"
 	eventpkg "go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/stackErr"
 
@@ -23,14 +25,32 @@ const (
 )
 
 type accountAggregateRepoImpl struct {
-	db         *gorm.DB
-	serializer eventpkg.Serializer
+	db               *gorm.DB
+	serializer       eventpkg.Serializer
+	projectionWriter *accountRepoImpl
 }
 
-func NewAccountAggregateRepoImpl(db *gorm.DB) accountrepos.AccountAggregateRepository {
+func NewAccountAggregateRepoImpl(
+	db *gorm.DB,
+	cache sharedcache.Cache,
+	afterCommit afterCommitRegistrar,
+) accountrepos.AccountAggregateRepository {
+	if afterCommit == nil {
+		afterCommit = func(ctx context.Context, fn func(context.Context)) {
+			if fn != nil {
+				fn(ctx)
+			}
+		}
+	}
+
 	return &accountAggregateRepoImpl{
 		db:         db,
 		serializer: newAccountAggregateSerializer(),
+		projectionWriter: &accountRepoImpl{
+			db:           db,
+			accountCache: accountcache.NewAccountCache(cache),
+			afterCommit:  afterCommit,
+		},
 	}
 }
 
@@ -86,6 +106,16 @@ func (r *accountAggregateRepoImpl) Save(ctx context.Context, agg *aggregate.Acco
 	if agg == nil {
 		return stackErr.Error(fmt.Errorf("account aggregate is nil"))
 	}
+
+	snapshot, err := agg.Snapshot()
+	if err != nil {
+		return stackErr.Error(err)
+	}
+
+	if err := r.db.WithContext(ctx).Save(r.projectionWriter.toModel(snapshot)).Error; err != nil {
+		return stackErr.Error(fmt.Errorf("save account projection failed: %v", err))
+	}
+	r.projectionWriter.syncCacheAfterCommit(ctx, snapshot)
 
 	events := agg.Root().CloneEvents()
 	if len(events) == 0 {

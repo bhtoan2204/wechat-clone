@@ -8,12 +8,17 @@ import (
 )
 
 type ProviderPaymentRepository interface {
-	CreateIntent(ctx context.Context, intent *entity.PaymentIntent) error
+	CreatePaymentIntent(ctx context.Context, intent *entity.PaymentIntent, createdEvent eventpkg.Event) error
+	SavePaymentIntent(ctx context.Context, intent *entity.PaymentIntent, outboxEvents ...eventpkg.Event) error
+	FinalizeSuccessfulPayment(
+		ctx context.Context,
+		intent *entity.PaymentIntent,
+		processedEvent *entity.ProcessedPaymentEvent,
+		successEvent eventpkg.Event,
+		outboxEvents ...eventpkg.Event,
+	) error
+
 	GetIntentByTransactionID(ctx context.Context, transactionID string) (*entity.PaymentIntent, error)
 	GetIntentByExternalRef(ctx context.Context, provider, externalRef string) (*entity.PaymentIntent, error)
-	UpdateIntentProviderState(ctx context.Context, transactionID, externalRef, status string) error
-	UpdateIntentStatus(ctx context.Context, transactionID, status string) error
 	IsProcessed(ctx context.Context, provider, idempotencyKey string) (bool, error)
-	MarkProcessed(ctx context.Context, event *entity.ProcessedPaymentEvent) error
-	AppendOutboxEvent(ctx context.Context, event eventpkg.Event) error
 }

@@ -14,6 +14,7 @@ import (
 	repos "go-socket/core/modules/payment/domain/repos"
 	"go-socket/core/modules/payment/providers"
 	"go-socket/core/shared/pkg/cqrs"
+	eventpkg "go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
 
@@ -63,10 +64,11 @@ func (u *createPaymentHandler) Handle(ctx context.Context, req *in.CreatePayment
 	}
 
 	if err := u.baseRepo.WithTransaction(ctx, func(tx repos.Repos) error {
-		if err := tx.ProviderPaymentRepository().CreateIntent(ctx, intent); err != nil {
-			return stackErr.Error(err)
-		}
-		return tx.ProviderPaymentRepository().AppendOutboxEvent(ctx, intent.CreatedEvent(req.Metadata, now))
+		return stackErr.Error(tx.ProviderPaymentRepository().CreatePaymentIntent(
+			ctx,
+			intent,
+			intent.CreatedEvent(req.Metadata, now),
+		))
 	}); err != nil {
 		if errors.Is(err, repos.ErrProviderPaymentDuplicateIntent) {
 			return nil, fmt.Errorf("%v: %s", paymentservice.ErrDuplicatePayment, transactionID)
@@ -89,7 +91,7 @@ func (u *createPaymentHandler) Handle(ctx context.Context, req *in.CreatePayment
 			zap.Error(err),
 		)
 		if stateErr := intent.MarkCreateFailed(time.Now().UTC()); stateErr == nil {
-			_ = updateIntentStatus(ctx, u.baseRepo.ProviderPaymentRepository(), intent.TransactionID, intent.Status)
+			_ = u.baseRepo.ProviderPaymentRepository().SavePaymentIntent(ctx, intent)
 		}
 		return nil, stackErr.Error(err)
 	}
@@ -110,38 +112,41 @@ func (u *createPaymentHandler) Handle(ctx context.Context, req *in.CreatePayment
 	}
 
 	if err := u.baseRepo.WithTransaction(ctx, func(tx repos.Repos) error {
-		if err := persistedIntent.ApplyProviderResult(providerResult, time.Now().UTC()); err != nil {
-			return stackErr.Error(err)
-		}
-		if err := tx.ProviderPaymentRepository().UpdateIntentProviderState(ctx, persistedIntent.TransactionID, persistedIntent.ExternalRef, persistedIntent.Status); err != nil {
+		updatedAt := time.Now().UTC()
+		if err := persistedIntent.ApplyProviderResult(providerResult, updatedAt); err != nil {
 			return stackErr.Error(err)
 		}
 
+		outboxEvents := make([]eventpkg.Event, 0, 1)
 		if response.CheckoutURL != "" || persistedIntent.ExternalRef != "" {
-			if err := tx.ProviderPaymentRepository().AppendOutboxEvent(ctx, persistedIntent.CheckoutSessionCreatedEvent(response.CheckoutURL, time.Now().UTC())); err != nil {
-				return stackErr.Error(err)
-			}
+			outboxEvents = append(outboxEvents, persistedIntent.CheckoutSessionCreatedEvent(response.CheckoutURL, updatedAt))
 		}
 
 		if persistedIntent.Status == entity.PaymentStatusSuccess {
-			return finalizeSuccessfulPaymentTx(ctx, tx.ProviderPaymentRepository(), persistedIntent, entity.PaymentProviderResult{
-				TransactionID: response.TransactionID,
-				Status:        persistedIntent.Status,
-				Amount:        persistedIntent.Amount,
-				Currency:      persistedIntent.Currency,
-				ExternalRef:   persistedIntent.ExternalRef,
-			})
+			return finalizeSuccessfulPaymentTx(
+				ctx,
+				tx.ProviderPaymentRepository(),
+				persistedIntent,
+				entity.PaymentProviderResult{
+					TransactionID: response.TransactionID,
+					Status:        persistedIntent.Status,
+					Amount:        persistedIntent.Amount,
+					Currency:      persistedIntent.Currency,
+					ExternalRef:   persistedIntent.ExternalRef,
+				},
+				outboxEvents...,
+			)
 		}
 		if persistedIntent.Status == entity.PaymentStatusFailed {
-			return tx.ProviderPaymentRepository().AppendOutboxEvent(ctx, persistedIntent.FailedEvent(entity.PaymentProviderResult{
+			outboxEvents = append(outboxEvents, persistedIntent.FailedEvent(entity.PaymentProviderResult{
 				TransactionID: response.TransactionID,
 				Status:        persistedIntent.Status,
 				Amount:        persistedIntent.Amount,
 				Currency:      persistedIntent.Currency,
 				ExternalRef:   persistedIntent.ExternalRef,
-			}, time.Now().UTC()))
+			}, updatedAt))
 		}
-		return nil
+		return tx.ProviderPaymentRepository().SavePaymentIntent(ctx, persistedIntent, outboxEvents...)
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}

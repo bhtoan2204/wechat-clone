@@ -11,6 +11,7 @@ import (
 	"go-socket/core/modules/payment/domain/entity"
 	repos "go-socket/core/modules/payment/domain/repos"
 	"go-socket/core/modules/payment/providers"
+	eventpkg "go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/stackErr"
 )
 
@@ -24,7 +25,7 @@ func finalizeSuccessfulPayment(ctx context.Context, baseRepo repos.Repos, store 
 		if err := intent.ApplyProviderResult(result, time.Now().UTC()); err != nil {
 			return false, err
 		}
-		if err := store.UpdateIntentProviderState(ctx, intent.TransactionID, intent.ExternalRef, intent.Status); err != nil {
+		if err := store.SavePaymentIntent(ctx, intent); err != nil {
 			return false, err
 		}
 		return true, nil
@@ -42,27 +43,37 @@ func finalizeSuccessfulPayment(ctx context.Context, baseRepo repos.Repos, store 
 	return false, nil
 }
 
-func finalizeSuccessfulPaymentTx(ctx context.Context, store repos.ProviderPaymentRepository, intent *entity.PaymentIntent, result entity.PaymentProviderResult) error {
-	processedEvent, err := intent.NewProcessedEvent(result, time.Now().UTC())
+func finalizeSuccessfulPaymentTx(
+	ctx context.Context,
+	store repos.ProviderPaymentRepository,
+	intent *entity.PaymentIntent,
+	result entity.PaymentProviderResult,
+	outboxEvents ...eventpkg.Event,
+) error {
+	updatedAt := time.Now().UTC()
+	if err := intent.ApplyProviderResult(result, updatedAt); err != nil {
+		return stackErr.Error(err)
+	}
+
+	processedEvent, err := intent.NewProcessedEvent(result, updatedAt)
 	if err != nil {
 		return stackErr.Error(err)
 	}
 
-	if err := store.MarkProcessed(ctx, processedEvent); err != nil {
+	if err := store.FinalizeSuccessfulPayment(
+		ctx,
+		intent,
+		processedEvent,
+		intent.SucceededEvent(result, updatedAt),
+		outboxEvents...,
+	); err != nil {
 		if errors.Is(err, repos.ErrProviderPaymentDuplicateProcessed) {
 			return err
 		}
 		return stackErr.Error(err)
 	}
 
-	if err := intent.ApplyProviderResult(result, time.Now().UTC()); err != nil {
-		return stackErr.Error(err)
-	}
-	if err := store.UpdateIntentProviderState(ctx, intent.TransactionID, intent.ExternalRef, intent.Status); err != nil {
-		return stackErr.Error(err)
-	}
-
-	return store.AppendOutboxEvent(ctx, intent.SucceededEvent(result, time.Now().UTC()))
+	return nil
 }
 
 func findIntent(ctx context.Context, store repos.ProviderPaymentRepository, provider string, result *providers.PaymentResult) (*entity.PaymentIntent, error) {
@@ -87,10 +98,6 @@ func findIntent(ctx context.Context, store repos.ProviderPaymentRepository, prov
 	}
 
 	return nil, fmt.Errorf("%v: transaction_id=%s external_ref=%s", paymentservice.ErrPaymentIntentNotFound, result.TransactionID, result.ExternalRef)
-}
-
-func updateIntentStatus(ctx context.Context, store repos.ProviderPaymentRepository, transactionID, status string) error {
-	return store.UpdateIntentStatus(ctx, transactionID, status)
 }
 
 func coalesce(values ...string) string {

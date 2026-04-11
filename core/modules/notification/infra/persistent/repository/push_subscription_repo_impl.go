@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 
+	"go-socket/core/modules/notification/domain/aggregate"
 	"go-socket/core/modules/notification/domain/entity"
 	notificationrepos "go-socket/core/modules/notification/domain/repos"
 	"go-socket/core/modules/notification/infra/persistent/models"
 	"go-socket/core/shared/pkg/stackErr"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type pushSubscriptionRepoImpl struct {
@@ -20,27 +22,46 @@ func NewPushSubscriptionRepoImpl(db *gorm.DB) notificationrepos.PushSubscription
 	return &pushSubscriptionRepoImpl{db: db}
 }
 
-func (r *pushSubscriptionRepoImpl) UpsertPushSubscription(ctx context.Context, subscription *entity.PushSubscription) error {
-	m := r.toPushSubscriptionModel(subscription)
-
+func (r *pushSubscriptionRepoImpl) LoadByAccountAndEndpoint(ctx context.Context, accountID, endpoint string) (*aggregate.PushSubscriptionAggregate, error) {
 	var existing models.PushSubscriptionModel
-	err := r.db.WithContext(ctx).
-		Where("account_id = ? AND endpoint = ?", subscription.AccountID, subscription.Endpoint).
-		First(&existing).Error
-	if err != nil {
+	if err := r.db.WithContext(ctx).
+		Where("account_id = ? AND endpoint = ?", accountID, endpoint).
+		First(&existing).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if createErr := r.db.WithContext(ctx).Create(m).Error; createErr != nil {
-				return stackErr.Error(createErr)
-			}
-			return nil
+			return nil, notificationrepos.ErrPushSubscriptionNotFound
 		}
+		return nil, stackErr.Error(err)
+	}
+
+	agg, err := aggregate.NewPushSubscriptionAggregate(existing.ID)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	if err := agg.Restore(r.toPushSubscriptionEntity(&existing)); err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return agg, nil
+}
+
+func (r *pushSubscriptionRepoImpl) Save(ctx context.Context, subscription *aggregate.PushSubscriptionAggregate) error {
+	snapshot, err := subscription.Snapshot()
+	if err != nil {
 		return stackErr.Error(err)
 	}
 
-	if updateErr := r.db.WithContext(ctx).
-		Model(&existing).
-		Updates(map[string]interface{}{"keys": subscription.Keys}).Error; updateErr != nil {
-		return stackErr.Error(updateErr)
+	if err := r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "account_id"},
+				{Name: "endpoint"},
+			},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"keys":       snapshot.Keys,
+				"updated_at": snapshot.UpdatedAt,
+			}),
+		}).
+		Create(r.toPushSubscriptionModel(snapshot)).Error; err != nil {
+		return stackErr.Error(err)
 	}
 
 	return nil

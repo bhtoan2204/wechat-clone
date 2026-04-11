@@ -56,13 +56,6 @@ func (u *updateProfileHandler) Handle(ctx context.Context, req *in.UpdateProfile
 	}
 
 	if txErr := u.baseRepo.WithTransaction(ctx, func(txRepos repos.Repos) error {
-		accountEntity, err := accountAggregate.Snapshot()
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		if err := txRepos.AccountRepository().UpdateAccount(ctx, accountEntity); err != nil {
-			return stackErr.Error(err)
-		}
 		return txRepos.AccountAggregateRepository().Save(ctx, accountAggregate)
 	}); txErr != nil {
 		log.Errorw("Failed to persist updated profile", zap.Error(txErr))

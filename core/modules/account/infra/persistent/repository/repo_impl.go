@@ -32,7 +32,7 @@ func newRepoImplWithDB(db *gorm.DB, cache sharedcache.Cache, inTransaction bool)
 		inTransaction: inTransaction,
 	}
 	r.accountRepo = NewAccountRepoImpl(db, cache, !inTransaction, r.runAfterCommit)
-	r.accountAggregateRepo = NewAccountAggregateRepoImpl(db)
+	r.accountAggregateRepo = NewAccountAggregateRepoImpl(db, cache, r.runAfterCommit)
 	return r
 }
 

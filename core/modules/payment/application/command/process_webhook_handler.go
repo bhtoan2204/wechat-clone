@@ -10,6 +10,7 @@ import (
 	"go-socket/core/modules/payment/domain/entity"
 	repos "go-socket/core/modules/payment/domain/repos"
 	"go-socket/core/shared/pkg/cqrs"
+	eventpkg "go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/stackErr"
 )
 
@@ -56,16 +57,15 @@ func (u *processWebhookHandler) Handle(ctx context.Context, req *in.ProcessWebho
 
 	if domainResult.Status != entity.PaymentStatusSuccess {
 		if err := u.baseRepo.WithTransaction(ctx, func(tx repos.Repos) error {
-			if err := intent.ApplyProviderResult(domainResult, time.Now().UTC()); err != nil {
+			updatedAt := time.Now().UTC()
+			if err := intent.ApplyProviderResult(domainResult, updatedAt); err != nil {
 				return stackErr.Error(err)
 			}
-			if err := tx.ProviderPaymentRepository().UpdateIntentProviderState(ctx, intent.TransactionID, intent.ExternalRef, intent.Status); err != nil {
-				return stackErr.Error(err)
-			}
+			outboxEvents := make([]eventpkg.Event, 0, 1)
 			if intent.Status == entity.PaymentStatusFailed {
-				return tx.ProviderPaymentRepository().AppendOutboxEvent(ctx, intent.FailedEvent(domainResult, time.Now().UTC()))
+				outboxEvents = append(outboxEvents, intent.FailedEvent(domainResult, updatedAt))
 			}
-			return nil
+			return tx.ProviderPaymentRepository().SavePaymentIntent(ctx, intent, outboxEvents...)
 		}); err != nil {
 			return nil, stackErr.Error(err)
 		}
