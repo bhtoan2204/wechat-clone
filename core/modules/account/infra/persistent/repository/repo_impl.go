@@ -5,6 +5,7 @@ import (
 	"go-socket/core/modules/account/domain/repos"
 	sharedcache "go-socket/core/shared/infra/cache"
 	"go-socket/core/shared/pkg/logging"
+	"go-socket/core/shared/pkg/stackErr"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -49,7 +50,7 @@ func (r *repoImpl) WithTransaction(ctx context.Context, fn func(repos.Repos) err
 	tx := r.db.WithContext(ctx).Begin()
 	if beginErr := tx.Error; beginErr != nil {
 		log.Errorw("Failed to begin transaction", zap.Error(beginErr))
-		return beginErr
+		return stackErr.Error(beginErr)
 	}
 	tr := newRepoImplWithDB(tx, r.cache, true)
 
@@ -66,7 +67,7 @@ func (r *repoImpl) WithTransaction(ctx context.Context, fn func(repos.Repos) err
 		}
 		if commitErr := tx.Commit().Error; commitErr != nil {
 			log.Errorw("Commit failed", zap.Error(commitErr))
-			err = commitErr
+			err = stackErr.Error(commitErr)
 		} else {
 			tr.flushAfterCommit(ctx)
 			log.Infow("Transaction committed")
@@ -75,7 +76,7 @@ func (r *repoImpl) WithTransaction(ctx context.Context, fn func(repos.Repos) err
 
 	err = fn(tr)
 
-	return err
+	return stackErr.Error(err)
 }
 
 func (r *repoImpl) runAfterCommit(ctx context.Context, fn func(context.Context)) {

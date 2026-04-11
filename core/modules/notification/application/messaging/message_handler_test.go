@@ -70,11 +70,11 @@ func (s *emailSenderStub) Send(_ context.Context, to, subject, body string) erro
 }
 
 type notificationRepoStub struct {
-	created *entity.NotificationEntity
+	created []*entity.NotificationEntity
 }
 
 func (s *notificationRepoStub) CreateNotification(_ context.Context, notification *entity.NotificationEntity) error {
-	s.created = notification
+	s.created = append(s.created, notification)
 	return nil
 }
 
@@ -110,7 +110,52 @@ func TestHandleAccountEventWithLowercaseFields(t *testing.T) {
 	if stub.subject != "Welcome to Go Socket" {
 		t.Fatalf("expected welcome subject, got %s", stub.subject)
 	}
-	if repo.created == nil {
+	if len(repo.created) != 1 {
 		t.Fatalf("expected notification to be created")
+	}
+}
+
+func TestHandleRoomOutboxEventCreatesMentionNotifications(t *testing.T) {
+	repo := &notificationRepoStub{}
+	handler := &messageHandler{notificationRepo: repo}
+
+	raw := []byte(`{
+		"id": 11,
+		"aggregate_id": "room-1",
+		"aggregate_type": "RoomAggregate",
+		"version": 3,
+		"event_name": "EventRoomMessageCreated",
+		"event_data": {
+			"room_id": "room-1",
+			"room_name": "Backend",
+			"room_type": "group",
+			"message_id": "msg-1",
+			"message_content": "hello team",
+			"message_type": "text",
+			"message_sender_id": "acc-1",
+			"message_sender_name": "Alice",
+			"message_sent_at": "2026-04-12T10:00:00Z",
+			"mention_all": false,
+			"mentioned_account_ids": ["acc-2", "acc-3", "acc-2"]
+		},
+		"metadata": "{}",
+		"created_at": "2026-04-12T10:00:00Z"
+	}`)
+
+	if err := handler.handleRoomOutboxEvent(context.Background(), raw); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(repo.created) != 2 {
+		t.Fatalf("expected 2 mention notifications, got %d", len(repo.created))
+	}
+	if repo.created[0].Type != "room.mention" {
+		t.Fatalf("expected room mention notification type, got %s", repo.created[0].Type)
+	}
+	if repo.created[0].Subject != "Alice mentioned you in Backend" {
+		t.Fatalf("unexpected subject %q", repo.created[0].Subject)
+	}
+	if repo.created[0].Body != "hello team" {
+		t.Fatalf("unexpected body %q", repo.created[0].Body)
 	}
 }

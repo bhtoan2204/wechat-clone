@@ -2,6 +2,7 @@ package aggregate
 
 import (
 	roomtypes "go-socket/core/modules/room/types"
+	sharedevents "go-socket/core/shared/contracts/events"
 	"go-socket/core/shared/pkg/stackErr"
 	"time"
 )
@@ -41,14 +42,45 @@ func (r *RoomAggregate) RecordMemberRemoved(memberID string, memberRole roomtype
 	})
 }
 
-func (r *RoomAggregate) RecordMessageCreated(messageID, senderID, senderName, senderEmail, content string, sentAt time.Time) error {
+func (r *RoomAggregate) RecordMessageCreated(
+	roomName,
+	roomType,
+	messageID,
+	senderID,
+	senderName,
+	senderEmail,
+	content,
+	messageType,
+	replyToMessageID,
+	forwardedFromMessageID,
+	fileName,
+	mimeType,
+	objectKey string,
+	fileSize int64,
+	sentAt time.Time,
+	mentions []sharedevents.RoomMessageMention,
+	mentionAll bool,
+	mentionedAccountIDs []string,
+) error {
 	return r.ApplyChange(r, &EventRoomMessageCreated{
-		RoomID:             r.AggregateID(),
-		MessageID:          messageID,
-		MessageContent:     content,
-		MessageSenderID:    senderID,
-		MessageSenderName:  senderName,
-		MessageSenderEmail: senderEmail,
-		MessageSentAt:      sentAt,
+		RoomID:                 r.AggregateID(),
+		RoomName:               roomName,
+		RoomType:               roomType,
+		MessageID:              messageID,
+		MessageContent:         content,
+		MessageType:            messageType,
+		ReplyToMessageID:       replyToMessageID,
+		ForwardedFromMessageID: forwardedFromMessageID,
+		FileName:               fileName,
+		FileSize:               fileSize,
+		MimeType:               mimeType,
+		ObjectKey:              objectKey,
+		MessageSenderID:        senderID,
+		MessageSenderName:      senderName,
+		MessageSenderEmail:     senderEmail,
+		MessageSentAt:          sentAt,
+		Mentions:               mentions,
+		MentionAll:             mentionAll,
+		MentionedAccountIDs:    mentionedAccountIDs,
 	})
 }

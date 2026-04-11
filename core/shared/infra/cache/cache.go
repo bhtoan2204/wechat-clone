@@ -85,7 +85,10 @@ func (c *cache) SetObject(ctx context.Context, key string, val interface{}, dura
 	if err != nil {
 		return stackErr.Error(err)
 	}
-	return c.rc.Set(ctx, key, dataBytes, duration).Err()
+	if err := c.rc.Set(ctx, key, dataBytes, duration).Err(); err != nil {
+		return stackErr.Error(err)
+	}
+	return nil
 }
 
 func (c *cache) Delete(ctx context.Context, key string) error {
@@ -113,7 +116,10 @@ func (c *cache) LGet(ctx context.Context, key string) ([]byte, error) {
 }
 
 func (c *cache) LSet(ctx context.Context, key string, val []byte) error {
-	return c.rc.LPush(ctx, key, val).Err()
+	if err := c.rc.LPush(ctx, key, val).Err(); err != nil {
+		return stackErr.Error(err)
+	}
+	return nil
 }
 
 func (c *cache) LLen(ctx context.Context, key string) (int64, error) {
@@ -137,7 +143,7 @@ func (c *cache) Decr(ctx context.Context, key string) (int64, error) {
 	if err != nil {
 		return -1, stackErr.Error(fmt.Errorf("decrby key=%s from redis failed err=%v", key, err))
 	}
-	return val, err
+	return val, nil
 }
 
 func (c *cache) Incr(ctx context.Context, key string) (int64, error) {
@@ -145,7 +151,7 @@ func (c *cache) Incr(ctx context.Context, key string) (int64, error) {
 	if err != nil {
 		return -1, stackErr.Error(fmt.Errorf("incrBy key=%s from redis failed err=%v", key, err))
 	}
-	return val, err
+	return val, nil
 }
 
 func (c *cache) DecrBy(ctx context.Context, key string, value int64) (int64, error) {
@@ -153,7 +159,7 @@ func (c *cache) DecrBy(ctx context.Context, key string, value int64) (int64, err
 	if err != nil {
 		return -1, stackErr.Error(fmt.Errorf("decrby key=%s from redis failed err=%v", key, err))
 	}
-	return val, err
+	return val, nil
 }
 
 func (c *cache) IncrBy(ctx context.Context, key string, value int64) (int64, error) {
@@ -161,7 +167,7 @@ func (c *cache) IncrBy(ctx context.Context, key string, value int64) (int64, err
 	if err != nil {
 		return -1, stackErr.Error(fmt.Errorf("incrBy key=%s from redis failed err=%v", key, err))
 	}
-	return val, err
+	return val, nil
 }
 
 func (c *cache) LRange(ctx context.Context, key string, from int, to int) ([]string, error) {
@@ -227,7 +233,7 @@ func (c *cache) ZRevRank(ctx context.Context, key string, member string) (int64,
 func (c *cache) ZScore(ctx context.Context, key string, member string) (float64, error) {
 	result, err := c.rc.ZScore(ctx, key, member).Result()
 	if errors.Is(err, redis.Nil) {
-		return -1, err
+		return -1, stackErr.Error(err)
 	}
 
 	if err != nil {
@@ -282,11 +288,18 @@ func (c *cache) SetValWithExp(ctx context.Context, key string, value string, sec
 }
 
 func (c *cache) GetVal(ctx context.Context, key string) (string, error) {
-	return c.rc.Get(ctx, key).Result()
+	val, err := c.rc.Get(ctx, key).Result()
+	if err != nil {
+		return "", stackErr.Error(err)
+	}
+	return val, nil
 }
 
 func (c *cache) SetExpireTime(ctx context.Context, key string, seconds int64) error {
-	return c.rc.Expire(ctx, key, time.Second*time.Duration(seconds)).Err()
+	if err := c.rc.Expire(ctx, key, time.Second*time.Duration(seconds)).Err(); err != nil {
+		return stackErr.Error(err)
+	}
+	return nil
 }
 
 func (c *cache) Exists(ctx context.Context, keys ...string) int64 {
@@ -302,13 +315,23 @@ func (c *cache) GetSMembers(ctx context.Context, key string) ([]string, error) {
 }
 
 func (c *cache) SetSAdd(ctx context.Context, key string, members ...interface{}) error {
-	return c.rc.SAdd(ctx, key, members).Err()
+	if err := c.rc.SAdd(ctx, key, members).Err(); err != nil {
+		return stackErr.Error(err)
+	}
+	return nil
 }
 
 func (c *cache) SetNX(ctx context.Context, key string, seconds int64, data interface{}) (bool, error) {
-	return c.rc.SetNX(ctx, key, data, time.Second*time.Duration(seconds)).Result()
+	ok, err := c.rc.SetNX(ctx, key, data, time.Second*time.Duration(seconds)).Result()
+	if err != nil {
+		return false, stackErr.Error(err)
+	}
+	return ok, nil
 }
 
 func (c *cache) Select(ctx context.Context, index int) error {
-	return c.rc.Do(ctx, "SELECT", index).Err()
+	if err := c.rc.Do(ctx, "SELECT", index).Err(); err != nil {
+		return stackErr.Error(err)
+	}
+	return nil
 }

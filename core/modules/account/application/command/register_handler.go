@@ -92,7 +92,7 @@ func (u *registerHandler) Handle(ctx context.Context, req *in.RegisterRequest) (
 
 	if txErr := u.baseRepo.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		if err := txRepos.AccountAggregateRepository().Save(ctx, accountAggregate); err != nil {
-			return fmt.Errorf("save account aggregate failed: %v", err)
+			return stackErr.Error(fmt.Errorf("save account aggregate failed: %v", err))
 		}
 		return nil
 	}); txErr != nil {

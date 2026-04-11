@@ -50,7 +50,7 @@ func (s *LedgerService) RecordPaymentSucceeded(ctx context.Context, evt *sharede
 		return stackErr.Error(fmt.Errorf("%w: %s", ErrValidation, err.Error()))
 	}
 
-	return s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
+	return stackErr.Error(s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
 		processed, err := txRepos.PaymentRepository().IsProcessed(ctx, "payment-service", booking.IdempotencyKey)
 		if err != nil {
 			return stackErr.Error(err)
@@ -85,7 +85,7 @@ func (s *LedgerService) RecordPaymentSucceeded(ctx context.Context, evt *sharede
 			zap.Bool("already_booked", alreadyBooked),
 		)
 		return nil
-	})
+	}))
 }
 
 func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.LedgerRepository, transactionID string, entries []entity.LedgerEntryInput) (*entity.LedgerTransaction, error) {
@@ -97,7 +97,7 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 
 	if err := repo.CreateTransaction(ctx, transaction); err != nil {
 		if errors.Is(err, ledgerrepos.ErrDuplicate) {
-			return nil, fmt.Errorf("%w: %s", ErrDuplicateTransaction, transaction.TransactionID)
+			return nil, stackErr.Error(fmt.Errorf("%w: %s", ErrDuplicateTransaction, transaction.TransactionID))
 		}
 		return nil, stackErr.Error(err)
 	}
@@ -108,7 +108,7 @@ func (s *LedgerService) createTransaction(ctx context.Context, repo ledgerrepos.
 
 	transaction, err = repo.GetTransaction(ctx, transaction.TransactionID)
 	if errors.Is(err, ledgerrepos.ErrNotFound) {
-		return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID)
+		return nil, stackErr.Error(fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID))
 	}
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -156,5 +156,5 @@ func wrapValidation(err error) error {
 	if err == nil {
 		return nil
 	}
-	return fmt.Errorf("%w: %s", ErrValidation, err.Error())
+	return stackErr.Error(fmt.Errorf("%w: %s", ErrValidation, err.Error()))
 }

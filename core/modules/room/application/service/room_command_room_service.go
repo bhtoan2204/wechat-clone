@@ -21,12 +21,12 @@ func (s *RoomCommandService) CreateRoom(ctx context.Context, accountID string, c
 
 	if err := s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		if err := txRepos.RoomRepository().CreateRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		if err := txRepos.RoomReadRepository().UpsertRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
-		return s.aggregateService.PublishRoomCreated(ctx, txRepos.RoomOutboxEventsRepository(), room.ID, room.RoomType, 1)
+		return stackErr.Error(s.aggregateService.PublishRoomCreated(ctx, txRepos.RoomOutboxEventsRepository(), room.ID, room.RoomType, 1))
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -49,9 +49,9 @@ func (s *RoomCommandService) UpdateRoom(ctx context.Context, accountID, roomID s
 	}
 	if err := s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		if err := txRepos.RoomRepository().UpdateRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
-		return txRepos.RoomReadRepository().UpdateRoom(ctx, room)
+		return stackErr.Error(txRepos.RoomReadRepository().UpdateRoom(ctx, room))
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -60,14 +60,14 @@ func (s *RoomCommandService) UpdateRoom(ctx context.Context, accountID, roomID s
 }
 
 func (s *RoomCommandService) DeleteRoom(ctx context.Context, roomID string) error {
-	return s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
+	return stackErr.Error(s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		if err := txRepos.RoomRepository().DeleteRoom(ctx, roomID); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
-		return txRepos.RoomReadRepository().DeleteRoom(ctx, roomID)
-	})
+		return stackErr.Error(txRepos.RoomReadRepository().DeleteRoom(ctx, roomID))
+	}))
 }
 
 func (s *RoomCommandService) JoinRoom(ctx context.Context, accountID string, command apptypes.JoinRoomCommand) error {
-	return errors.New("not implemented")
+	return stackErr.Error(errors.New("not implemented"))
 }

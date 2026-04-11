@@ -19,28 +19,42 @@ func (s *MessageCommandService) CreateMessage(ctx context.Context, accountID str
 func (s *MessageCommandService) SendMessage(ctx context.Context, accountID string, command apptypes.SendMessageCommand) (*apptypes.MessageResult, error) {
 	roomID := strings.TrimSpace(command.RoomID)
 	if roomID == "" {
-		return nil, errors.New("room_id is required")
+		return nil, stackErr.Error(errors.New("room_id is required"))
 	}
 
 	if _, room, err := requireRoomRole(ctx, s.repos.RoomRepository(), s.repos.RoomMemberRepository(), roomID, accountID); err != nil {
 		return nil, stackErr.Error(err)
 	} else {
 		now := time.Now().UTC()
-		message, err := entity.NewMessage(newUUID(), roomID, accountID, entity.MessageParams{
-			Message:                command.Message,
-			MessageType:            command.MessageType,
-			ReplyToMessageID:       command.ReplyToMessageID,
-			ForwardedFromMessageID: command.ForwardedFromMessageID,
-			FileName:               command.FileName,
-			FileSize:               command.FileSize,
-			MimeType:               command.MimeType,
-			ObjectKey:              command.ObjectKey,
-		}, now)
-		if err != nil {
-			return nil, stackErr.Error(err)
-		}
+		var message *entity.MessageEntity
 
 		if err := s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
+			members, err := txRepos.RoomMemberReadRepository().ListRoomMembers(ctx, roomID)
+			if err != nil {
+				return stackErr.Error(err)
+			}
+
+			mentionState, err := resolveMessageMentions(ctx, txRepos, room, accountID, command, members)
+			if err != nil {
+				return stackErr.Error(err)
+			}
+
+			message, err = entity.NewMessage(newUUID(), roomID, accountID, entity.MessageParams{
+				Message:                command.Message,
+				MessageType:            command.MessageType,
+				Mentions:               mentionState.Mentions,
+				MentionAll:             mentionState.MentionAll,
+				ReplyToMessageID:       command.ReplyToMessageID,
+				ForwardedFromMessageID: command.ForwardedFromMessageID,
+				FileName:               command.FileName,
+				FileSize:               command.FileSize,
+				MimeType:               command.MimeType,
+				ObjectKey:              command.ObjectKey,
+			}, now)
+			if err != nil {
+				return stackErr.Error(err)
+			}
+
 			if err := txRepos.MessageRepository().CreateMessage(ctx, message); err != nil {
 				return stackErr.Error(err)
 			}
@@ -48,10 +62,6 @@ func (s *MessageCommandService) SendMessage(ctx context.Context, accountID strin
 				return stackErr.Error(err)
 			}
 
-			members, err := txRepos.RoomMemberReadRepository().ListRoomMembers(ctx, roomID)
-			if err != nil {
-				return stackErr.Error(err)
-			}
 			for _, member := range members {
 				if member.AccountID == accountID {
 					continue
@@ -69,14 +79,30 @@ func (s *MessageCommandService) SendMessage(ctx context.Context, accountID strin
 				return stackErr.Error(err)
 			}
 
-			actor, _ := currentActor(ctx)
-			senderName := accountID
-			senderEmail := ""
-			if actor != nil && actor.Email != "" {
-				senderName = actor.Email
-				senderEmail = actor.Email
-			}
-			return s.aggregateService.PublishMessageCreated(ctx, txRepos.RoomOutboxEventsRepository(), roomID, message.ID, accountID, senderName, senderEmail, message.Message, message.CreatedAt)
+			senderName, senderEmail := buildSenderIdentity(ctx, txRepos, accountID)
+			return s.aggregateService.PublishMessageCreated(
+				ctx,
+				txRepos.RoomOutboxEventsRepository(),
+				roomID,
+				room.Name,
+				string(room.RoomType),
+				message.ID,
+				accountID,
+				senderName,
+				senderEmail,
+				message.Message,
+				message.MessageType,
+				message.ReplyToMessageID,
+				message.ForwardedFromMessageID,
+				message.FileName,
+				message.MimeType,
+				message.ObjectKey,
+				message.FileSize,
+				message.CreatedAt,
+				mentionState.OutboxMentions,
+				mentionState.MentionAll,
+				mentionState.MentionedAccountIDs,
+			)
 		}); err != nil {
 			return nil, stackErr.Error(err)
 		}
@@ -95,9 +121,12 @@ func (s *MessageCommandService) EditMessage(ctx context.Context, accountID, mess
 	}
 	if err := s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		if err := txRepos.MessageRepository().UpdateMessage(ctx, message); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
-		return txRepos.MessageReadRepository().UpsertMessage(ctx, message)
+		if err := txRepos.MessageReadRepository().UpsertMessage(ctx, message); err != nil {
+			return stackErr.Error(err)
+		}
+		return nil
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -120,18 +149,21 @@ func (s *MessageCommandService) DeleteMessage(ctx context.Context, accountID, me
 	switch scope {
 	case "everyone":
 		if err := message.DeleteForEveryone(accountID, now); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
-		return s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
+		return stackErr.Error(s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
 			if err := txRepos.MessageRepository().UpdateMessage(ctx, message); err != nil {
 				return stackErr.Error(err)
 			}
-			return txRepos.MessageReadRepository().UpsertMessage(ctx, message)
-		})
+			if err := txRepos.MessageReadRepository().UpsertMessage(ctx, message); err != nil {
+				return stackErr.Error(err)
+			}
+			return nil
+		}))
 	case "me":
-		return s.repos.MessageReadRepository().UpsertMessageDeletion(ctx, messageID, accountID, now)
+		return stackErr.Error(s.repos.MessageReadRepository().UpsertMessageDeletion(ctx, messageID, accountID, now))
 	default:
-		return errors.New("scope must be one of: me, everyone")
+		return stackErr.Error(errors.New("scope must be one of: me, everyone"))
 	}
 }
 
@@ -170,22 +202,22 @@ func (s *MessageCommandService) MarkMessageStatus(ctx context.Context, accountID
 	now := time.Now().UTC()
 	deliveredAt := &now
 	var seenAt *time.Time
-	return s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
+	return stackErr.Error(s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		member, err := txRepos.RoomMemberReadRepository().GetRoomMemberByAccount(ctx, message.RoomID, accountID)
 		if err == nil && member != nil {
 			var applyErr error
 			status, deliveredAt, seenAt, applyErr = member.ApplyReceiptStatus(status, now)
 			if applyErr != nil {
-				return applyErr
+				return stackErr.Error(applyErr)
 			}
 		}
 
 		if err := txRepos.MessageReadRepository().UpsertMessageReceipt(ctx, messageID, accountID, status, deliveredAt, seenAt, now, now); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		if err == nil && member != nil {
-			return txRepos.RoomMemberReadRepository().UpsertRoomMember(ctx, member)
+			return stackErr.Error(txRepos.RoomMemberReadRepository().UpsertRoomMember(ctx, member))
 		}
 		return nil
-	})
+	}))
 }

@@ -20,6 +20,19 @@ type MessagePreviewResult struct {
 	MessageType string
 }
 
+type MessageMentionResult struct {
+	AccountID   string
+	DisplayName string
+	Username    string
+}
+
+type MentionCandidateResult struct {
+	AccountID       string
+	DisplayName     string
+	Username        string
+	AvatarObjectKey string
+}
+
 type MessageResult struct {
 	ID                     string
 	RoomID                 string
@@ -27,6 +40,8 @@ type MessageResult struct {
 	Message                string
 	MessageType            string
 	Status                 string
+	Mentions               []MessageMentionResult
+	MentionAll             bool
 	ReplyToMessageID       string
 	ForwardedFromMessageID string
 	FileName               string

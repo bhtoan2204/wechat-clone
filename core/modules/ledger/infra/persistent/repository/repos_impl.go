@@ -6,6 +6,7 @@ import (
 	appCtx "go-socket/core/context"
 	ledgerrepos "go-socket/core/modules/ledger/domain/repos"
 	"go-socket/core/shared/pkg/logging"
+	"go-socket/core/shared/pkg/stackErr"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -45,7 +46,7 @@ func (r *repoImpl) WithTransaction(ctx context.Context, fn func(ledgerrepos.Repo
 	tx := r.db.WithContext(ctx).Begin()
 	if beginErr := tx.Error; beginErr != nil {
 		log.Errorw("failed to begin transaction", zap.Error(beginErr))
-		return beginErr
+		return stackErr.Error(beginErr)
 	}
 
 	tr := newRepoImplWithDB(r.appCtx, tx)
@@ -65,7 +66,7 @@ func (r *repoImpl) WithTransaction(ctx context.Context, fn func(ledgerrepos.Repo
 
 		if commitErr := tx.Commit().Error; commitErr != nil {
 			log.Errorw("commit failed", zap.Error(commitErr))
-			err = commitErr
+			err = stackErr.Error(commitErr)
 			return
 		}
 
@@ -73,5 +74,5 @@ func (r *repoImpl) WithTransaction(ctx context.Context, fn func(ledgerrepos.Repo
 	}()
 
 	err = fn(tr)
-	return err
+	return stackErr.Error(err)
 }

@@ -141,7 +141,7 @@ func (r *accountAggregateRepoImpl) loadProjection(ctx context.Context, accountID
 	if err := r.db.WithContext(ctx).
 		Where("id = ?", accountID).
 		First(&model).Error; err != nil {
-		return nil, err
+		return nil, stackErr.Error(err)
 	}
 
 	mapper := &accountRepoImpl{}
@@ -151,7 +151,7 @@ func (r *accountAggregateRepoImpl) loadProjection(ctx context.Context, accountID
 func (r *accountAggregateRepoImpl) buildEventModel(evt eventpkg.Event) (models.AccountOutboxEventModel, error) {
 	data, err := r.serializer.Marshal(evt.EventData)
 	if err != nil {
-		return models.AccountOutboxEventModel{}, fmt.Errorf("marshal account event data failed: %v", err)
+		return models.AccountOutboxEventModel{}, stackErr.Error(fmt.Errorf("marshal account event data failed: %v", err))
 	}
 
 	createdAt := time.Now().UTC()
@@ -175,19 +175,19 @@ func (r *accountAggregateRepoImpl) toDomainEvent(eventModel models.AccountOutbox
 		payloadFactory, ok = r.serializer.Type(accountAggregateType, eventModel.EventName)
 	}
 	if !ok {
-		return eventpkg.Event{}, fmt.Errorf(
+		return eventpkg.Event{}, stackErr.Error(fmt.Errorf(
 			"unsupported account event: aggregate_type=%s event_name=%s",
 			eventModel.AggregateType,
 			eventModel.EventName,
-		)
+		))
 	}
 
 	payload := cloneAccountPayload(payloadFactory())
 	if payload == nil {
-		return eventpkg.Event{}, fmt.Errorf("account event payload prototype is nil")
+		return eventpkg.Event{}, stackErr.Error(fmt.Errorf("account event payload prototype is nil"))
 	}
 	if err := r.serializer.Unmarshal([]byte(eventModel.EventData), payload); err != nil {
-		return eventpkg.Event{}, err
+		return eventpkg.Event{}, stackErr.Error(err)
 	}
 
 	aggregateType := eventModel.AggregateType

@@ -1,6 +1,10 @@
 package messaging
 
-import "fmt"
+import (
+	"fmt"
+
+	"go-socket/core/shared/pkg/stackErr"
+)
 
 type Config struct {
 	Servers      string
@@ -13,11 +17,11 @@ type Config struct {
 
 func (c *Config) Validate() error {
 	if len(c.Servers) == 0 {
-		return fmt.Errorf("server cant empty")
+		return stackErr.Error(fmt.Errorf("server cant empty"))
 	}
 
 	if len(c.ConsumeTopic) == 0 {
-		return fmt.Errorf("do not have any topic")
+		return stackErr.Error(fmt.Errorf("do not have any topic"))
 	}
 
 	return nil

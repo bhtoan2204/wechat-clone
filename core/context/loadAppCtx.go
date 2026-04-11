@@ -6,8 +6,10 @@ import (
 	"go-socket/core/shared/config"
 	"go-socket/core/shared/constant"
 	"go-socket/core/shared/infra/cache"
+	cassandraclient "go-socket/core/shared/infra/cassandra"
 	dbinfra "go-socket/core/shared/infra/db"
 	"go-socket/core/shared/infra/discovery"
+	elasticclient "go-socket/core/shared/infra/elasticsearch"
 	"go-socket/core/shared/infra/redis"
 	"go-socket/core/shared/infra/smtp"
 	"go-socket/core/shared/infra/storage"
@@ -65,6 +67,18 @@ func LoadAppCtx(ctx context.Context, cfg *config.Config) (*AppContext, error) {
 
 	locker := lock.NewLock(redisClient)
 	opts = append(opts, WithLocker(locker))
+
+	cassandraSession, err := cassandraclient.NewSession(ctx, cfg.CassandraConfig)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	opts = append(opts, WithCassandraSession(cassandraSession))
+
+	elasticsearchClient, err := elasticclient.NewClient(cfg.ElasticsearchConfig)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	opts = append(opts, WithElasticsearchClient(elasticsearchClient))
 
 	return NewAppContext(ctx, opts...)
 }

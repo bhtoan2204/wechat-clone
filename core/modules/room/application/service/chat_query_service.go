@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
 	apptypes "go-socket/core/modules/room/application/types"
+	"go-socket/core/modules/room/domain/entity"
 	"go-socket/core/modules/room/domain/repos"
 	"go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/utils"
@@ -95,6 +97,55 @@ func (s *ChatQueryService) ListMessages(ctx context.Context, accountID string, q
 	return out, nil
 }
 
+func (s *ChatQueryService) SearchMentionCandidates(ctx context.Context, accountID string, query apptypes.SearchMentionCandidatesQuery) ([]apptypes.MentionCandidateResult, error) {
+	roomID := strings.TrimSpace(query.RoomID)
+	if roomID == "" {
+		return nil, stackErr.Error(errors.New("room_id is required"))
+	}
+
+	room, err := s.repos.RoomReadRepository().GetRoomByID(ctx, roomID)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	if err := room.RequireGroup(); err != nil {
+		return nil, stackErr.Error(entity.ErrRoomMentionsRequireGroup)
+	}
+
+	member, err := s.repos.RoomMemberReadRepository().GetRoomMemberByAccount(ctx, roomID, accountID)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	if member == nil {
+		return nil, stackErr.Error(entity.ErrRoomMemberRequired)
+	}
+
+	candidates, err := s.repos.RoomMemberReadRepository().SearchMentionCandidates(
+		ctx,
+		roomID,
+		query.Query,
+		accountID,
+		query.Limit,
+	)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	results := make([]apptypes.MentionCandidateResult, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidate == nil {
+			continue
+		}
+		results = append(results, apptypes.MentionCandidateResult{
+			AccountID:       candidate.AccountID,
+			DisplayName:     resolveMentionCandidateDisplayName(candidate),
+			Username:        strings.TrimSpace(candidate.Username),
+			AvatarObjectKey: strings.TrimSpace(candidate.AvatarObjectKey),
+		})
+	}
+
+	return results, nil
+}
+
 func (s *ChatQueryService) GetPresence(ctx context.Context, query apptypes.GetPresenceQuery) (*apptypes.PresenceResult, error) {
 	accountID := query.AccountID
 	if s.redis == nil {
@@ -109,4 +160,19 @@ func (s *ChatQueryService) GetPresence(ctx context.Context, query apptypes.GetPr
 		status = "online"
 	}
 	return &apptypes.PresenceResult{AccountID: accountID, Status: status}, nil
+}
+
+func resolveMentionCandidateDisplayName(candidate *entity.MentionCandidate) string {
+	if candidate == nil {
+		return ""
+	}
+
+	switch {
+	case strings.TrimSpace(candidate.DisplayName) != "":
+		return strings.TrimSpace(candidate.DisplayName)
+	case strings.TrimSpace(candidate.Username) != "":
+		return strings.TrimSpace(candidate.Username)
+	default:
+		return strings.TrimSpace(candidate.AccountID)
+	}
 }

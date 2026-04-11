@@ -19,7 +19,10 @@ func NewMessageRepoImpl(db *gorm.DB) repos.MessageRepository {
 }
 
 func (r *messageRepoImpl) CreateMessage(ctx context.Context, message *entity.MessageEntity) error {
-	m := r.toModel(message)
+	m, err := r.toModel(message)
+	if err != nil {
+		return stackErr.Error(err)
+	}
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
 		return stackErr.Error(err)
 	}
@@ -27,12 +30,17 @@ func (r *messageRepoImpl) CreateMessage(ctx context.Context, message *entity.Mes
 }
 
 func (r *messageRepoImpl) UpdateMessage(ctx context.Context, message *entity.MessageEntity) error {
-	m := r.toModel(message)
+	m, err := r.toModel(message)
+	if err != nil {
+		return stackErr.Error(err)
+	}
 	return r.db.WithContext(ctx).Model(&models.MessageModel{}).Where("id = ?", message.ID).Updates(map[string]interface{}{
 		"room_id":                   m.RoomID,
 		"sender_id":                 m.SenderID,
 		"message":                   m.Message,
 		"message_type":              m.MessageType,
+		"mentions_json":             m.MentionsJSON,
+		"mention_all":               m.MentionAll,
 		"reply_to_message_id":       m.ReplyToMessageID,
 		"forwarded_from_message_id": m.ForwardedFromMessageID,
 		"file_name":                 m.FileName,
@@ -50,34 +58,53 @@ func (r *messageRepoImpl) GetMessageByID(ctx context.Context, id string) (*entit
 	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
 		return nil, stackErr.Error(err)
 	}
-	return r.toEntity(&m), nil
+	entityMessage, err := r.toEntity(&m)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return entityMessage, nil
 }
 
-func (r *messageRepoImpl) toModel(e *entity.MessageEntity) *models.MessageModel {
+func (r *messageRepoImpl) toModel(e *entity.MessageEntity) (*models.MessageModel, error) {
+	mentionsJSON, err := marshalMessageMentions(e.Mentions)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
 	return &models.MessageModel{
 		ID:                     e.ID,
 		RoomID:                 e.RoomID,
 		SenderID:               e.SenderID,
 		Message:                e.Message,
 		MessageType:            e.MessageType,
+		MentionsJSON:           mentionsJSON,
+		MentionAll:             e.MentionAll,
 		ReplyToMessageID:       nullableString(e.ReplyToMessageID),
 		ForwardedFromMessageID: nullableString(e.ForwardedFromMessageID),
 		FileName:               nullableString(e.FileName),
+		FileSize:               int64Ptr(e.FileSize),
 		MimeType:               nullableString(e.MimeType),
 		ObjectKey:              nullableString(e.ObjectKey),
 		EditedAt:               e.EditedAt,
 		DeletedForEveryoneAt:   e.DeletedForEveryoneAt,
 		CreatedAt:              e.CreatedAt,
-	}
+	}, nil
 }
 
-func (r *messageRepoImpl) toEntity(m *models.MessageModel) *entity.MessageEntity {
+func (r *messageRepoImpl) toEntity(m *models.MessageModel) (*entity.MessageEntity, error) {
+	mentions, err := unmarshalMessageMentions(m.MentionsJSON)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
 	return &entity.MessageEntity{
 		ID:                     m.ID,
 		RoomID:                 m.RoomID,
 		SenderID:               m.SenderID,
 		Message:                m.Message,
 		MessageType:            m.MessageType,
+		Mentions:               mentions,
+		MentionAll:             m.MentionAll,
 		ReplyToMessageID:       derefString(m.ReplyToMessageID),
 		ForwardedFromMessageID: derefString(m.ForwardedFromMessageID),
 		FileName:               derefString(m.FileName),
@@ -87,7 +114,7 @@ func (r *messageRepoImpl) toEntity(m *models.MessageModel) *entity.MessageEntity
 		EditedAt:               m.EditedAt,
 		DeletedForEveryoneAt:   m.DeletedForEveryoneAt,
 		CreatedAt:              m.CreatedAt,
-	}
+	}, nil
 }
 
 func nullableString(value string) *string {

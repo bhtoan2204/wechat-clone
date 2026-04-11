@@ -54,7 +54,7 @@ func NewPaseto(symmetricKey string, issuer string, ttl time.Duration) (PasetoSer
 
 func (p *pasetoService) GenerateToken(ctx context.Context, account *entity.Account) (string, time.Time, error) {
 	if account == nil {
-		return "", time.Time{}, fmt.Errorf("account is nil")
+		return "", time.Time{}, stackErr.Error(fmt.Errorf("account is nil"))
 	}
 	now := time.Now().UTC()
 	exp := now.Add(p.ttl).UTC()
@@ -68,7 +68,7 @@ func (p *pasetoService) GenerateToken(ctx context.Context, account *entity.Accou
 
 	token, err := p.paseto.Encrypt(p.symmetricKey, payload, nil)
 	if err != nil {
-		return "", time.Time{}, err
+		return "", time.Time{}, stackErr.Error(err)
 	}
 	return token, exp, nil
 }

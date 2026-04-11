@@ -3,12 +3,14 @@ package utils
 import (
 	"fmt"
 	"net"
+
+	"go-socket/core/shared/pkg/stackErr"
 )
 
 func GetInternalIP() (string, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		return "", err
+		return "", stackErr.Error(err)
 	}
 	for _, iface := range interfaces {
 		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
@@ -36,5 +38,5 @@ func GetInternalIP() (string, error) {
 			return ip.String(), nil
 		}
 	}
-	return "", fmt.Errorf("Could not find the internal IP address")
+	return "", stackErr.Error(fmt.Errorf("Could not find the internal IP address"))
 }

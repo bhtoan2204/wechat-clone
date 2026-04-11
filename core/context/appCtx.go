@@ -11,6 +11,8 @@ import (
 	"go-socket/core/shared/infra/xpaseto"
 	"go-socket/core/shared/pkg/hasher"
 
+	es8 "github.com/elastic/go-elasticsearch/v8"
+	"github.com/gocql/gocql"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -18,16 +20,18 @@ import (
 type Option func(*AppContext)
 
 type AppContext struct {
-	cfg          *config.Config
-	redisClient  *redis.Client
-	db           *gorm.DB
-	cache        cache.Cache
-	hasher       hasher.Hasher
-	paseto       xpaseto.PasetoService
-	smtp         smtp.SMTP
-	storage      storage.Storage
-	consulClient discovery.ConsulClient
-	locker       lock.Lock
+	cfg           *config.Config
+	redisClient   *redis.Client
+	db            *gorm.DB
+	cache         cache.Cache
+	hasher        hasher.Hasher
+	paseto        xpaseto.PasetoService
+	smtp          smtp.SMTP
+	storage       storage.Storage
+	consulClient  discovery.ConsulClient
+	locker        lock.Lock
+	cassandra     *gocql.Session
+	elasticsearch *es8.Client
 }
 
 func NewAppContext(ctx context.Context, opts ...Option) (*AppContext, error) {
@@ -98,6 +102,18 @@ func WithLocker(locker lock.Lock) Option {
 	}
 }
 
+func WithCassandraSession(session *gocql.Session) Option {
+	return func(appCtx *AppContext) {
+		appCtx.cassandra = session
+	}
+}
+
+func WithElasticsearchClient(client *es8.Client) Option {
+	return func(appCtx *AppContext) {
+		appCtx.elasticsearch = client
+	}
+}
+
 func (appCtx *AppContext) GetRedisClient() *redis.Client {
 	return appCtx.redisClient
 }
@@ -138,7 +154,18 @@ func (appCtx *AppContext) Locker() lock.Lock {
 	return appCtx.locker
 }
 
+func (appCtx *AppContext) GetCassandraSession() *gocql.Session {
+	return appCtx.cassandra
+}
+
+func (appCtx *AppContext) GetElasticsearchClient() *es8.Client {
+	return appCtx.elasticsearch
+}
+
 func (appCtx *AppContext) Close() {
+	if appCtx.cassandra != nil {
+		appCtx.cassandra.Close()
+	}
 	if appCtx.redisClient != nil {
 		appCtx.redisClient.Close()
 	}

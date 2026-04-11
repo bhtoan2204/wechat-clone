@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/base64"
 	"errors"
+	"go-socket/core/shared/pkg/stackErr"
 	"strings"
 	"time"
 )
@@ -15,17 +16,17 @@ func EncodeCursor(createdAt string, id string) string {
 func DecodeCursor(cursor string) (time.Time, string, error) {
 	data, err := base64.StdEncoding.DecodeString(cursor)
 	if err != nil {
-		return time.Time{}, "", err
+		return time.Time{}, "", stackErr.Error(err)
 	}
 
 	parts := strings.Split(string(data), "|")
 	if len(parts) != 2 {
-		return time.Time{}, "", errors.New("invalid cursor")
+		return time.Time{}, "", stackErr.Error(errors.New("invalid cursor"))
 	}
 
 	t, err := time.Parse(time.RFC3339Nano, parts[0])
 	if err != nil {
-		return time.Time{}, "", err
+		return time.Time{}, "", stackErr.Error(err)
 	}
 
 	return t, parts[1], nil

@@ -34,20 +34,20 @@ func NewPublisher(store Store) Publisher {
 
 func (p *publisher) Publish(ctx context.Context, events ...Event) error {
 	if p == nil || p.store == nil {
-		return ErrEventStoreNil
+		return stackErr.Error(ErrEventStoreNil)
 	}
 	for _, ev := range events {
 		if ev.AggregateID == "" {
-			return ErrIDEmpty
+			return stackErr.Error(ErrIDEmpty)
 		}
 		if ev.EventName == "" {
-			return ErrEventNameEmpty
+			return stackErr.Error(ErrEventNameEmpty)
 		}
 		if ev.CreatedAt <= 0 {
 			ev.CreatedAt = time.Now().Unix()
 		}
 		if err := p.store.Append(ctx, ev); err != nil {
-			return fmt.Errorf("append event=%s failed: %v", ev.EventName, err)
+			return stackErr.Error(fmt.Errorf("append event=%s failed: %v", ev.EventName, err))
 		}
 	}
 	return nil
@@ -55,11 +55,11 @@ func (p *publisher) Publish(ctx context.Context, events ...Event) error {
 
 func (p *publisher) PublishAggregate(ctx context.Context, agg Aggregate) error {
 	if agg == nil {
-		return ErrAggregateNil
+		return stackErr.Error(ErrAggregateNil)
 	}
 	root := agg.Root()
 	if root == nil {
-		return ErrAggregateRootNil
+		return stackErr.Error(ErrAggregateRootNil)
 	}
 	events := root.CloneEvents()
 	if len(events) == 0 {

@@ -8,6 +8,7 @@ import (
 	paymentrepos "go-socket/core/modules/payment/domain/repos"
 	"go-socket/core/modules/payment/infra/persistent/model"
 	eventpkg "go-socket/core/shared/pkg/event"
+	"go-socket/core/shared/pkg/stackErr"
 
 	"gorm.io/gorm"
 )
@@ -27,7 +28,7 @@ func newPaymentOutboxEventsRepoImpl(db *gorm.DB) paymentrepos.PaymentOutboxEvent
 func (p *paymentOutboxEventsRepoImpl) Append(ctx context.Context, evt eventpkg.Event) error {
 	data, err := p.serializer.Marshal(evt.EventData)
 	if err != nil {
-		return fmt.Errorf("marshal event data failed: %v", err)
+		return stackErr.Error(fmt.Errorf("marshal event data failed: %v", err))
 	}
 
 	createdAt := time.Now().UTC()
@@ -35,7 +36,7 @@ func (p *paymentOutboxEventsRepoImpl) Append(ctx context.Context, evt eventpkg.E
 		createdAt = time.Unix(evt.CreatedAt, 0).UTC()
 	}
 
-	return p.db.WithContext(ctx).Create(&model.PaymentOutboxEventModel{
+	return stackErr.Error(p.db.WithContext(ctx).Create(&model.PaymentOutboxEventModel{
 		AggregateID:   evt.AggregateID,
 		AggregateType: evt.AggregateType,
 		Version:       evt.Version,
@@ -43,5 +44,5 @@ func (p *paymentOutboxEventsRepoImpl) Append(ctx context.Context, evt eventpkg.E
 		EventData:     string(data),
 		Metadata:      "{}",
 		CreatedAt:     createdAt,
-	}).Error
+	}).Error)
 }

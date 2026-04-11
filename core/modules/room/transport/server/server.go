@@ -25,6 +25,7 @@ type roomHTTPServer struct {
 	listChatConversations    cqrs.Dispatcher[*in.ListChatConversationsRequest, []*out.ChatConversationResponse]
 	getChatConversation      cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationResponse]
 	listChatMessages         cqrs.Dispatcher[*in.ListChatMessagesRequest, []*out.ChatMessageResponse]
+	searchChatMentions       cqrs.Dispatcher[*in.SearchChatMentionsRequest, []*out.ChatMentionCandidateResponse]
 	sendChatMessage          cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageResponse]
 	editChatMessage          cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageResponse]
 	deleteChatMessage        cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse]
@@ -48,6 +49,7 @@ func NewHTTPServer(
 	listChatConversations cqrs.Dispatcher[*in.ListChatConversationsRequest, []*out.ChatConversationResponse],
 	getChatConversation cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationResponse],
 	listChatMessages cqrs.Dispatcher[*in.ListChatMessagesRequest, []*out.ChatMessageResponse],
+	searchChatMentions cqrs.Dispatcher[*in.SearchChatMentionsRequest, []*out.ChatMentionCandidateResponse],
 	sendChatMessage cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageResponse],
 	editChatMessage cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageResponse],
 	deleteChatMessage cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse],
@@ -70,6 +72,7 @@ func NewHTTPServer(
 		listChatConversations:    listChatConversations,
 		getChatConversation:      getChatConversation,
 		listChatMessages:         listChatMessages,
+		searchChatMentions:       searchChatMentions,
 		sendChatMessage:          sendChatMessage,
 		editChatMessage:          editChatMessage,
 		deleteChatMessage:        deleteChatMessage,
@@ -87,7 +90,7 @@ func (s *roomHTTPServer) RegisterPublicRoutes(routes *gin.RouterGroup) {
 }
 
 func (s *roomHTTPServer) RegisterPrivateRoutes(routes *gin.RouterGroup) {
-	roomhttp.RegisterPrivateRoutes(routes, s.createRoom, s.listRooms, s.getRoom, s.updateRoom, s.deleteRoom, s.createDirectConversation, s.createGroupChat, s.updateGroupChat, s.listChatConversations, s.getChatConversation, s.listChatMessages, s.sendChatMessage, s.editChatMessage, s.deleteChatMessage, s.forwardChatMessage, s.markChatMessageStatus, s.addChatMember, s.removeChatMember, s.pinChatMessage, s.getChatPresence)
+	roomhttp.RegisterPrivateRoutes(routes, s.createRoom, s.listRooms, s.getRoom, s.updateRoom, s.deleteRoom, s.createDirectConversation, s.createGroupChat, s.updateGroupChat, s.listChatConversations, s.getChatConversation, s.listChatMessages, s.searchChatMentions, s.sendChatMessage, s.editChatMessage, s.deleteChatMessage, s.forwardChatMessage, s.markChatMessageStatus, s.addChatMember, s.removeChatMember, s.pinChatMessage, s.getChatPresence)
 }
 
 func (s *roomHTTPServer) Stop(_ context.Context) error {

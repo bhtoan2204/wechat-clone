@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"go-socket/core/shared/pkg/stackErr"
 )
 
 const (
@@ -28,6 +30,8 @@ var (
 type MessageParams struct {
 	Message                string
 	MessageType            string
+	Mentions               []MessageMention
+	MentionAll             bool
 	ReplyToMessageID       string
 	ForwardedFromMessageID string
 	FileName               string
@@ -43,20 +47,24 @@ func NewMessage(id, roomID, senderID string, params MessageParams, now time.Time
 	messageType := NormalizeMessageType(params.MessageType)
 	content := strings.TrimSpace(params.Message)
 	objectKey := strings.TrimSpace(params.ObjectKey)
+	mentions, err := NormalizeMessageMentions(params.Mentions)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
 
 	switch {
 	case id == "":
-		return nil, ErrMessageIDRequired
+		return nil, stackErr.Error(ErrMessageIDRequired)
 	case roomID == "":
-		return nil, ErrMessageRoomRequired
+		return nil, stackErr.Error(ErrMessageRoomRequired)
 	case senderID == "":
-		return nil, ErrMessageSenderRequired
+		return nil, stackErr.Error(ErrMessageSenderRequired)
 	case messageType == "":
-		return nil, ErrMessageTypeInvalid
+		return nil, stackErr.Error(ErrMessageTypeInvalid)
 	case messageType == MessageTypeText && content == "":
-		return nil, ErrMessageBodyRequired
+		return nil, stackErr.Error(ErrMessageBodyRequired)
 	case (messageType == MessageTypeImage || messageType == MessageTypeFile) && objectKey == "":
-		return nil, ErrMessageObjectKeyRequired
+		return nil, stackErr.Error(ErrMessageObjectKeyRequired)
 	}
 
 	return &MessageEntity{
@@ -65,6 +73,8 @@ func NewMessage(id, roomID, senderID string, params MessageParams, now time.Time
 		SenderID:               senderID,
 		Message:                content,
 		MessageType:            messageType,
+		Mentions:               mentions,
+		MentionAll:             params.MentionAll,
 		ReplyToMessageID:       strings.TrimSpace(params.ReplyToMessageID),
 		ForwardedFromMessageID: strings.TrimSpace(params.ForwardedFromMessageID),
 		FileName:               strings.TrimSpace(params.FileName),
@@ -99,13 +109,13 @@ func NormalizeMessageType(value string) string {
 
 func (m *MessageEntity) Edit(actorID, content string, editedAt time.Time) error {
 	if strings.TrimSpace(actorID) != strings.TrimSpace(m.SenderID) {
-		return ErrMessageCannotEditOther
+		return stackErr.Error(ErrMessageCannotEditOther)
 	}
 	if NormalizeMessageType(m.MessageType) == MessageTypeSystem {
-		return ErrMessageCannotEditSystem
+		return stackErr.Error(ErrMessageCannotEditSystem)
 	}
 	if content = strings.TrimSpace(content); content == "" {
-		return ErrMessageBodyRequired
+		return stackErr.Error(ErrMessageBodyRequired)
 	}
 
 	now := normalizeRoomTime(editedAt)

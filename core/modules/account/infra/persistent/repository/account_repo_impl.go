@@ -272,7 +272,7 @@ func (r *accountRepoImpl) lookupAccountEmail(ctx context.Context, id string) (st
 		Select("email").
 		Where("id = ?", id).
 		First(&model).Error; err != nil {
-		return "", err
+		return "", stackErr.Error(err)
 	}
 	return model.Email, nil
 }

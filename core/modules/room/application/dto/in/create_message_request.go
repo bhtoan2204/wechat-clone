@@ -2,7 +2,11 @@
 
 package in
 
-import "errors"
+import (
+	"errors"
+
+	"go-socket/core/shared/pkg/stackErr"
+)
 
 type CreateMessageRequest struct {
 	RoomID  string `json:"room_id" form:"room_id"`
@@ -11,10 +15,10 @@ type CreateMessageRequest struct {
 
 func (r *CreateMessageRequest) Validate() error {
 	if r.RoomID == "" {
-		return errors.New("room_id is required")
+		return stackErr.Error(errors.New("room_id is required"))
 	}
 	if r.Message == "" {
-		return errors.New("message is required")
+		return stackErr.Error(errors.New("message is required"))
 	}
 	return nil
 }

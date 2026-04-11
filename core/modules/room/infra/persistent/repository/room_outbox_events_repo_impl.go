@@ -6,6 +6,7 @@ import (
 	"go-socket/core/modules/room/domain/repos"
 	"go-socket/core/modules/room/infra/persistent/models"
 	eventpkg "go-socket/core/shared/pkg/event"
+	"go-socket/core/shared/pkg/stackErr"
 	"time"
 
 	"gorm.io/gorm"
@@ -26,7 +27,7 @@ func NewRoomOutboxEventsRepoImpl(db *gorm.DB) repos.RoomOutboxEventsRepository {
 func (r *roomOutboxEventsRepoImpl) Append(ctx context.Context, evt eventpkg.Event) error {
 	data, err := r.serializer.Marshal(evt.EventData)
 	if err != nil {
-		return fmt.Errorf("marshal event data failed: %v", err)
+		return stackErr.Error(fmt.Errorf("marshal event data failed: %v", err))
 	}
 
 	createdAt := time.Now().UTC()
@@ -34,7 +35,7 @@ func (r *roomOutboxEventsRepoImpl) Append(ctx context.Context, evt eventpkg.Even
 		createdAt = time.Unix(evt.CreatedAt, 0).UTC()
 	}
 
-	return r.db.WithContext(ctx).Create(&models.RoomOutboxEventModel{
+	return stackErr.Error(r.db.WithContext(ctx).Create(&models.RoomOutboxEventModel{
 		AggregateID:   evt.AggregateID,
 		AggregateType: evt.AggregateType,
 		Version:       evt.Version,
@@ -42,5 +43,5 @@ func (r *roomOutboxEventsRepoImpl) Append(ctx context.Context, evt eventpkg.Even
 		EventData:     string(data),
 		Metadata:      "{}",
 		CreatedAt:     createdAt,
-	}).Error
+	}).Error)
 }

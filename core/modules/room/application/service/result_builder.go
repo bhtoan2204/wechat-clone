@@ -97,7 +97,7 @@ func buildConversationResult(
 	})
 
 	if err := eg.Wait(); err != nil {
-		return nil, err
+		return nil, stackErr.Error(err)
 	}
 
 	accountMap := lo.SliceToMap(accountProjections, func(acc *entity.AccountEntity) (string, *entity.AccountEntity) {
@@ -196,6 +196,7 @@ func buildMessageResult(ctx context.Context, readRepos repos.QueryRepos, viewerI
 		Message:                message.Message,
 		MessageType:            message.MessageType,
 		Status:                 status,
+		MentionAll:             message.MentionAll,
 		ReplyToMessageID:       message.ReplyToMessageID,
 		ForwardedFromMessageID: message.ForwardedFromMessageID,
 		FileName:               message.FileName,
@@ -210,6 +211,17 @@ func buildMessageResult(ctx context.Context, readRepos repos.QueryRepos, viewerI
 	}
 	if message.DeletedForEveryoneAt != nil {
 		result.Message = ""
+	}
+
+	if len(message.Mentions) > 0 {
+		result.Mentions = make([]apptypes.MessageMentionResult, 0, len(message.Mentions))
+		for _, mention := range message.Mentions {
+			result.Mentions = append(result.Mentions, apptypes.MessageMentionResult{
+				AccountID:   mention.AccountID,
+				DisplayName: mention.DisplayName,
+				Username:    mention.Username,
+			})
+		}
 	}
 
 	if message.ReplyToMessageID != "" {

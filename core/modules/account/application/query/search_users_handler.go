@@ -11,6 +11,7 @@ import (
 	"go-socket/core/modules/account/domain/entity"
 	repos "go-socket/core/modules/account/domain/repos"
 	"go-socket/core/shared/pkg/cqrs"
+	"go-socket/core/shared/pkg/stackErr"
 	"strings"
 
 	"github.com/samber/lo"
@@ -32,12 +33,12 @@ func NewSearchUsers(
 
 func (u *searchUsersHandler) Handle(ctx context.Context, req *in.SearchUsersRequest) (*out.SearchUsersResponse, error) {
 	if req == nil {
-		return nil, fmt.Errorf("request is required")
+		return nil, stackErr.Error(fmt.Errorf("request is required"))
 	}
 
 	q := strings.TrimSpace(req.Q)
 	if q == "" {
-		return nil, fmt.Errorf("q is required")
+		return nil, stackErr.Error(fmt.Errorf("q is required"))
 	}
 
 	limit := req.Limit
@@ -55,7 +56,7 @@ func (u *searchUsersHandler) Handle(ctx context.Context, req *in.SearchUsersRequ
 
 	accounts, total, err := u.accountRepos.SearchUsers(ctx, q, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("search users: %w", err)
+		return nil, stackErr.Error(fmt.Errorf("search users: %w", err))
 	}
 
 	return &out.SearchUsersResponse{

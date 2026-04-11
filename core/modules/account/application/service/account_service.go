@@ -6,6 +6,7 @@ import (
 	"go-socket/core/modules/account/domain/aggregate"
 	"go-socket/core/modules/account/domain/repos"
 	"go-socket/core/modules/account/domain/rules"
+	"go-socket/core/shared/pkg/stackErr"
 
 	"gorm.io/gorm"
 )
@@ -28,9 +29,9 @@ func (s *accountService) LoadAccountAggregate(ctx context.Context, accountID str
 	accountAggregate, err := s.baseRepo.AccountAggregateRepository().Load(ctx, accountID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, rules.ErrAccountNotFound
+			return nil, stackErr.Error(rules.ErrAccountNotFound)
 		}
-		return nil, err
+		return nil, stackErr.Error(err)
 	}
 	return accountAggregate, nil
 }

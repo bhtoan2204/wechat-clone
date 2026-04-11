@@ -25,6 +25,7 @@ func RegisterPrivateRoutes(
 	listChatConversations cqrs.Dispatcher[*in.ListChatConversationsRequest, []*out.ChatConversationResponse],
 	getChatConversation cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationResponse],
 	listChatMessages cqrs.Dispatcher[*in.ListChatMessagesRequest, []*out.ChatMessageResponse],
+	searchChatMentions cqrs.Dispatcher[*in.SearchChatMentionsRequest, []*out.ChatMentionCandidateResponse],
 	sendChatMessage cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageResponse],
 	editChatMessage cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageResponse],
 	deleteChatMessage cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse],
@@ -46,6 +47,7 @@ func RegisterPrivateRoutes(
 	routes.GET("/chat/conversations", httpx.Wrap(handler.NewListChatConversationsHandler(listChatConversations)))
 	routes.GET("/chat/conversations/:room_id", httpx.Wrap(handler.NewGetChatConversationHandler(getChatConversation)))
 	routes.GET("/chat/conversations/:room_id/messages", httpx.Wrap(handler.NewListChatMessagesHandler(listChatMessages)))
+	routes.GET("/chat/rooms/:room_id/mentions/search", httpx.Wrap(handler.NewSearchChatMentionsHandler(searchChatMentions)))
 	routes.POST("/chat/messages", httpx.Wrap(handler.NewSendChatMessageHandler(sendChatMessage)))
 	routes.PATCH("/chat/messages/:message_id", httpx.Wrap(handler.NewEditChatMessageHandler(editChatMessage)))
 	routes.DELETE("/chat/messages/:message_id", httpx.Wrap(handler.NewDeleteChatMessageHandler(deleteChatMessage)))

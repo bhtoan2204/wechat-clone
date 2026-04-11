@@ -64,4 +64,5 @@ type RoomMemberReadRepository interface {
 	DeleteRoomMember(ctx context.Context, roomID, accountID string) error
 	ListRoomMembers(ctx context.Context, roomID string) ([]*entity.RoomMemberEntity, error)
 	GetRoomMemberByAccount(ctx context.Context, roomID, accountID string) (*entity.RoomMemberEntity, error)
+	SearchMentionCandidates(ctx context.Context, roomID, keyword, excludeAccountID string, limit int) ([]*entity.MentionCandidate, error)
 }

@@ -53,7 +53,7 @@ func (p *PaymentBalanceAggregate) Transition(e event.Event) error {
 	case *EventPaymentTransactionReceived:
 		return p.onReceived(e.AggregateID, data)
 	default:
-		return errors.New("unsupported event type")
+		return stackErr.Error(errors.New("unsupported event type"))
 	}
 }
 

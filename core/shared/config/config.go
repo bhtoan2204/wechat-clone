@@ -1,16 +1,18 @@
 package config
 
 type Config struct {
-	ServerConfig   ServerConfig
-	RedisConfig    RedisConfig
-	DBConfig       DBConfig
-	AuthConfig     AuthConfig
-	KafkaConfig    KafkaConfig
-	SecurityConfig SecurityConfig
-	WebPushConfig  WebPushConfig
-	ConsulConfig   ConsulConfig
-	LedgerConfig   LedgerConfig
-	StorageConfig  StorageConfig
+	ServerConfig        ServerConfig
+	RedisConfig         RedisConfig
+	DBConfig            DBConfig
+	AuthConfig          AuthConfig
+	KafkaConfig         KafkaConfig
+	SecurityConfig      SecurityConfig
+	WebPushConfig       WebPushConfig
+	ConsulConfig        ConsulConfig
+	LedgerConfig        LedgerConfig
+	StorageConfig       StorageConfig
+	CassandraConfig     CassandraConfig
+	ElasticsearchConfig ElasticsearchConfig
 }
 
 type ServerConfig struct {
@@ -55,7 +57,8 @@ type KafkaConfig struct {
 type KafkaNotificationConsumer struct {
 	NotificationGroup string `env:"KAFKA_NOTIFICATION_CONSUMER_GROUP"`
 
-	AccountTopic string `env:"KAFKA_CONSUMER_ACCOUNT_TOPIC"`
+	AccountTopic    string `env:"KAFKA_CONSUMER_ACCOUNT_TOPIC"`
+	RoomOutboxTopic string `env:"KAFKA_CONSUMER_ROOM_OUTBOX_TOPIC"`
 }
 
 type KafkaPaymentConsumer struct {
@@ -66,8 +69,9 @@ type KafkaPaymentConsumer struct {
 }
 
 type KafkaRoomConsumer struct {
-	RoomGroup    string `env:"KAFKA_ROOM_CONSUMER_GROUP"`
-	AccountTopic string `env:"KAFKA_CONSUMER_ACCOUNT_TOPIC"`
+	RoomGroup       string `env:"KAFKA_ROOM_CONSUMER_GROUP"`
+	AccountTopic    string `env:"KAFKA_CONSUMER_ACCOUNT_TOPIC"`
+	RoomOutboxTopic string `env:"KAFKA_CONSUMER_ROOM_OUTBOX_TOPIC"`
 }
 
 type KafkaLedgerConsumer struct {
@@ -112,4 +116,30 @@ type StorageConfig struct {
 	MinIOSecretKey string `env:"MINIO_SECRET_KEY"`
 	MinIOBucket    string `env:"MINIO_BUCKET"`
 	MinIOUseSSL    bool   `env:"MINIO_USE_SSL"`
+}
+
+type CassandraConfig struct {
+	Enabled               bool   `env:"CASSANDRA_ENABLED"`
+	Hosts                 string `env:"CASSANDRA_HOSTS"`
+	Port                  int    `env:"CASSANDRA_PORT,default=9042"`
+	Keyspace              string `env:"CASSANDRA_KEYSPACE,default=chat_app"`
+	Username              string `env:"CASSANDRA_USERNAME"`
+	Password              string `env:"CASSANDRA_PASSWORD"`
+	LocalDC               string `env:"CASSANDRA_LOCAL_DC,default=dc1"`
+	Consistency           string `env:"CASSANDRA_CONSISTENCY,default=quorum"`
+	ReplicationClass      string `env:"CASSANDRA_REPLICATION_CLASS,default=SimpleStrategy"`
+	ReplicationFactor     int    `env:"CASSANDRA_REPLICATION_FACTOR,default=1"`
+	ConnectTimeoutSeconds int    `env:"CASSANDRA_CONNECT_TIMEOUT_SECONDS,default=10"`
+	TimeoutSeconds        int    `env:"CASSANDRA_TIMEOUT_SECONDS,default=10"`
+	RoomTimelineTable     string `env:"CASSANDRA_ROOM_TIMELINE_TABLE,default=room_message_timelines"`
+}
+
+type ElasticsearchConfig struct {
+	Enabled                  bool   `env:"ELASTICSEARCH_ENABLED"`
+	Addresses                string `env:"ELASTICSEARCH_ADDRESSES"`
+	Username                 string `env:"ELASTICSEARCH_USERNAME"`
+	Password                 string `env:"ELASTICSEARCH_PASSWORD"`
+	RoomMessageIndex         string `env:"ELASTICSEARCH_ROOM_MESSAGE_INDEX,default=room_messages_v1"`
+	ConnectTimeoutSeconds    int    `env:"ELASTICSEARCH_CONNECT_TIMEOUT_SECONDS,default=10"`
+	ResponseHeaderTimeoutSec int    `env:"ELASTICSEARCH_RESPONSE_HEADER_TIMEOUT_SECONDS,default=10"`
 }

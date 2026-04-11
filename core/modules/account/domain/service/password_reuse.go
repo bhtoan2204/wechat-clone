@@ -5,6 +5,7 @@ import (
 
 	"go-socket/core/modules/account/domain/rules"
 	valueobject "go-socket/core/modules/account/domain/value_object"
+	"go-socket/core/shared/pkg/stackErr"
 )
 
 type PasswordReuseChecker interface {
@@ -19,10 +20,10 @@ func EnsurePasswordIsNew(
 ) error {
 	isSamePassword, err := checker.Verify(ctx, newPassword.Value(), currentHash.Value())
 	if err != nil {
-		return err
+		return stackErr.Error(err)
 	}
 	if isSamePassword {
-		return rules.ErrAccountPasswordSameAsOldOne
+		return stackErr.Error(rules.ErrAccountPasswordSameAsOldOne)
 	}
 	return nil
 }

@@ -304,6 +304,19 @@ endpoints:
           type: string
         - name: status
           type: string
+        - name: mentions
+          type: array
+          items:
+            struct: ChatMessageMentionResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: display_name
+                type: string
+              - name: username
+                type: string
+        - name: mention_all
+          type: bool
         - name: reply_to_message_id
           type: string
         - name: forwarded_from_message_id
@@ -329,6 +342,37 @@ endpoints:
           type: object
           struct: ChatMessagePreviewResponse
 
+  - name: ChatSearchMentions
+    method: GET
+    path: /chat/rooms/:room_id/mentions/search
+    handler: SearchChatMentionsHandler
+    auth: true
+    usecase:
+      name: MessageUsecase
+      method: SearchChatMentions
+    request:
+      struct: SearchChatMentionsRequest
+      fields:
+        - name: room_id
+          type: string
+          required: true
+        - name: q
+          type: string
+        - name: limit
+          type: int
+    response:
+      struct: ChatMentionCandidateResponse
+      collection: true
+      fields:
+        - name: account_id
+          type: string
+        - name: display_name
+          type: string
+        - name: username
+          type: string
+        - name: avatar_object_key
+          type: string
+
   - name: ChatSendMessage
     method: POST
     path: /chat/messages
@@ -347,6 +391,15 @@ endpoints:
           type: string
         - name: message_type
           type: string
+        - name: mentions
+          type: array
+          items:
+            struct: SendChatMessageMentionRequest
+            fields:
+              - name: account_id
+                type: string
+        - name: mention_all
+          type: bool
         - name: reply_to_message_id
           type: string
         - name: forwarded_from_message_id
@@ -374,6 +427,19 @@ endpoints:
           type: string
         - name: status
           type: string
+        - name: mentions
+          type: array
+          items:
+            struct: ChatMessageMentionResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: display_name
+                type: string
+              - name: username
+                type: string
+        - name: mention_all
+          type: bool
         - name: reply_to_message_id
           type: string
         - name: forwarded_from_message_id
@@ -431,6 +497,19 @@ endpoints:
           type: string
         - name: status
           type: string
+        - name: mentions
+          type: array
+          items:
+            struct: ChatMessageMentionResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: display_name
+                type: string
+              - name: username
+                type: string
+        - name: mention_all
+          type: bool
         - name: reply_to_message_id
           type: string
         - name: forwarded_from_message_id
@@ -510,6 +589,19 @@ endpoints:
           type: string
         - name: status
           type: string
+        - name: mentions
+          type: array
+          items:
+            struct: ChatMessageMentionResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: display_name
+                type: string
+              - name: username
+                type: string
+        - name: mention_all
+          type: bool
         - name: reply_to_message_id
           type: string
         - name: forwarded_from_message_id

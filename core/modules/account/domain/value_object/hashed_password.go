@@ -13,7 +13,7 @@ type HashedPassword struct {
 func NewHashedPassword(value string) (HashedPassword, error) {
 	normalized, err := normalizePasswordValue(value)
 	if err != nil {
-		return HashedPassword{}, err
+		return HashedPassword{}, stackErr.Error(err)
 	}
 	return HashedPassword{value: normalized}, nil
 }

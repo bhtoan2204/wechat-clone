@@ -60,7 +60,7 @@ func (c *consulClientImpl) GetService(ctx context.Context, serviceID string) (*a
 
 	service, exists := services[serviceID]
 	if !exists {
-		return nil, fmt.Errorf("service with ID %s not found on agent", serviceID)
+		return nil, stackErr.Error(fmt.Errorf("service with ID %s not found on agent", serviceID))
 	}
 
 	return service, nil

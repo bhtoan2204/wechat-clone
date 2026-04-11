@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	appCtx "go-socket/core/context"
+	"go-socket/core/shared/pkg/stackErr"
 )
 
 // ModuleBuilder builds a module HTTP server.
@@ -14,11 +15,11 @@ func BuildModuleServers(ctx context.Context, appCtx *appCtx.AppContext, builders
 	servers := make([]HTTPServer, 0, len(builders))
 	for idx, builder := range builders {
 		if builder == nil {
-			return nil, fmt.Errorf("module builder %d is nil", idx)
+			return nil, stackErr.Error(fmt.Errorf("module builder %d is nil", idx))
 		}
 		server, err := builder(ctx, appCtx)
 		if err != nil {
-			return nil, fmt.Errorf("build module server %d failed: %v", idx, err)
+			return nil, stackErr.Error(fmt.Errorf("build module server %d failed: %v", idx, err))
 		}
 		if server == nil {
 			continue

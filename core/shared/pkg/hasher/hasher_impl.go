@@ -48,18 +48,18 @@ func (h *hasherImpl) Hash(ctx context.Context, value string) (string, error) {
 func (h *hasherImpl) Verify(ctx context.Context, val string, hash string) (bool, error) {
 	parts := strings.Split(hash, "$")
 	if len(parts) != 2 {
-		return false, fmt.Errorf("invalid stored hash format")
+		return false, stackErr.Error(fmt.Errorf("invalid stored hash format"))
 	}
 	encodedSalt, encodedHash := parts[0], parts[1]
 
 	salt, err := base64.RawStdEncoding.DecodeString(encodedSalt)
 	if err != nil {
-		return false, fmt.Errorf("failed to decode salt: %v", err)
+		return false, stackErr.Error(fmt.Errorf("failed to decode salt: %v", err))
 	}
 
 	expectedHash, err := base64.RawStdEncoding.DecodeString(encodedHash)
 	if err != nil {
-		return false, fmt.Errorf("failed to decode hash: %v", err)
+		return false, stackErr.Error(fmt.Errorf("failed to decode hash: %v", err))
 	}
 
 	computedHash := argon2.IDKey([]byte(val), salt, h.Time, h.Memory, h.Threads, h.KeyLen)

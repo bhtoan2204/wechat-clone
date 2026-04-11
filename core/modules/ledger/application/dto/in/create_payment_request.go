@@ -3,6 +3,8 @@ package in
 import (
 	"errors"
 	"strings"
+
+	"go-socket/core/shared/pkg/stackErr"
 )
 
 type CreatePaymentRequest struct {
@@ -26,25 +28,25 @@ func (r *CreatePaymentRequest) Normalize() {
 func (r *CreatePaymentRequest) Validate() error {
 	r.Normalize()
 	if r.Provider == "" {
-		return errors.New("provider is required")
+		return stackErr.Error(errors.New("provider is required"))
 	}
 	if r.TransactionID == "" {
-		return errors.New("transaction_id is required")
+		return stackErr.Error(errors.New("transaction_id is required"))
 	}
 	if r.Amount <= 0 {
-		return errors.New("amount must be greater than 0")
+		return stackErr.Error(errors.New("amount must be greater than 0"))
 	}
 	if r.Currency == "" {
-		return errors.New("currency is required")
+		return stackErr.Error(errors.New("currency is required"))
 	}
 	if r.DebitAccountID == "" {
-		return errors.New("debit_account_id is required")
+		return stackErr.Error(errors.New("debit_account_id is required"))
 	}
 	if r.CreditAccountID == "" {
-		return errors.New("credit_account_id is required")
+		return stackErr.Error(errors.New("credit_account_id is required"))
 	}
 	if r.DebitAccountID == r.CreditAccountID {
-		return errors.New("debit_account_id and credit_account_id must be different")
+		return stackErr.Error(errors.New("debit_account_id and credit_account_id must be different"))
 	}
 	return nil
 }

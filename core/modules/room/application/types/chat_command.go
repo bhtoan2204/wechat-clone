@@ -30,10 +30,16 @@ type PinMessageCommand struct {
 	MessageID string
 }
 
+type SendMessageMentionCommand struct {
+	AccountID string
+}
+
 type SendMessageCommand struct {
 	RoomID                 string
 	Message                string
 	MessageType            string
+	Mentions               []SendMessageMentionCommand
+	MentionAll             bool
 	ReplyToMessageID       string
 	ForwardedFromMessageID string
 	FileName               string

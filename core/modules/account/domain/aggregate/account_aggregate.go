@@ -7,6 +7,7 @@ import (
 	valueobject "go-socket/core/modules/account/domain/value_object"
 	accounttypes "go-socket/core/modules/account/types"
 	"go-socket/core/shared/pkg/event"
+	"go-socket/core/shared/pkg/stackErr"
 	"time"
 )
 
@@ -59,7 +60,7 @@ func (a *AccountAggregate) Transition(e event.Event) error {
 	case *EventAccountBanned:
 		return a.onAccountBanned(data)
 	default:
-		return errors.New("unsupported event type")
+		return stackErr.Error(errors.New("unsupported event type"))
 	}
 }
 
@@ -123,12 +124,12 @@ func (a *AccountAggregate) Register(
 	now time.Time,
 ) error {
 	if a.IsRegistered() {
-		return rules.ErrAccountAlreadyRegistered
+		return stackErr.Error(rules.ErrAccountAlreadyRegistered)
 	}
 
 	normalizedDisplayName, err := rules.NormalizeDisplayName(displayName)
 	if err != nil {
-		return err
+		return stackErr.Error(err)
 	}
 	createdAt := rules.NormalizeAccountTime(now)
 
@@ -144,12 +145,12 @@ func (a *AccountAggregate) Register(
 
 func (a *AccountAggregate) UpdateProfile(displayName string, username, avatarObjectKey *string, now time.Time) (bool, error) {
 	if !a.IsRegistered() {
-		return false, rules.ErrAccountNotRegistered
+		return false, stackErr.Error(rules.ErrAccountNotRegistered)
 	}
 
 	normalizedDisplayName, err := rules.NormalizeDisplayName(displayName)
 	if err != nil {
-		return false, err
+		return false, stackErr.Error(err)
 	}
 	normalizedUsername := cloneOptionalString(a.Username)
 	if username != nil {
@@ -174,7 +175,7 @@ func (a *AccountAggregate) UpdateProfile(displayName string, username, avatarObj
 		AvatarObjectKey: normalizedAvatarObjectKey,
 		UpdatedAt:       updatedAt,
 	}); err != nil {
-		return false, err
+		return false, stackErr.Error(err)
 	}
 
 	return true, nil
@@ -182,7 +183,7 @@ func (a *AccountAggregate) UpdateProfile(displayName string, username, avatarObj
 
 func (a *AccountAggregate) RequestEmailVerification(token string, requestedAt time.Time) error {
 	if err := a.EnsureEmailVerificationAllowed(); err != nil {
-		return err
+		return stackErr.Error(err)
 	}
 
 	return a.ApplyChange(a, &EventAccountEmailVerificationRequested{
@@ -195,23 +196,23 @@ func (a *AccountAggregate) RequestEmailVerification(token string, requestedAt ti
 
 func (a *AccountAggregate) EnsureEmailVerificationAllowed() error {
 	if !a.IsRegistered() {
-		return rules.ErrAccountNotRegistered
+		return stackErr.Error(rules.ErrAccountNotRegistered)
 	}
 	if a.EmailVerifiedAt != nil {
-		return rules.ErrAccountAlreadyVerified
+		return stackErr.Error(rules.ErrAccountAlreadyVerified)
 	}
 	return nil
 }
 
 func (a *AccountAggregate) ConfirmEmailVerified(email valueobject.Email, verifiedAt time.Time) error {
 	if !a.IsRegistered() {
-		return rules.ErrAccountNotRegistered
+		return stackErr.Error(rules.ErrAccountNotRegistered)
 	}
 	if a.EmailVerifiedAt != nil {
-		return rules.ErrAccountAlreadyVerified
+		return stackErr.Error(rules.ErrAccountAlreadyVerified)
 	}
 	if a.Email != email.Value() {
-		return rules.ErrAccountEmailMismatch
+		return stackErr.Error(rules.ErrAccountEmailMismatch)
 	}
 
 	return a.ApplyChange(a, &EventAccountEmailVerified{
@@ -222,10 +223,10 @@ func (a *AccountAggregate) ConfirmEmailVerified(email valueobject.Email, verifie
 
 func (a *AccountAggregate) ChangePassword(passwordHash valueobject.HashedPassword, now time.Time) (bool, error) {
 	if !a.IsRegistered() {
-		return false, rules.ErrAccountNotRegistered
+		return false, stackErr.Error(rules.ErrAccountNotRegistered)
 	}
 	if a.PasswordHash == passwordHash.Value() {
-		return false, rules.ErrAccountPasswordSameAsOldOne
+		return false, stackErr.Error(rules.ErrAccountPasswordSameAsOldOne)
 	}
 
 	changedAt := rules.NormalizeAccountTime(now)
@@ -234,7 +235,7 @@ func (a *AccountAggregate) ChangePassword(passwordHash valueobject.HashedPasswor
 		PasswordHash:      passwordHash.Value(),
 		PasswordChangedAt: changedAt,
 	}); err != nil {
-		return false, err
+		return false, stackErr.Error(err)
 	}
 
 	return true, nil
@@ -243,15 +244,15 @@ func (a *AccountAggregate) ChangePassword(passwordHash valueobject.HashedPasswor
 func (a *AccountAggregate) Snapshot() (*entity.Account, error) {
 	email, err := valueobject.NewEmail(a.Email)
 	if err != nil {
-		return nil, err
+		return nil, stackErr.Error(err)
 	}
 	passwordHash, err := valueobject.NewHashedPassword(a.PasswordHash)
 	if err != nil {
-		return nil, err
+		return nil, stackErr.Error(err)
 	}
 	status, err := rules.NormalizeStatus(a.Status)
 	if err != nil {
-		return nil, err
+		return nil, stackErr.Error(err)
 	}
 
 	return &entity.Account{

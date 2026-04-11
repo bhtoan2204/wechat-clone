@@ -10,6 +10,7 @@ import (
 	paymentrepos "go-socket/core/modules/payment/domain/repos"
 	"go-socket/core/modules/payment/infra/persistent/model"
 	eventpkg "go-socket/core/shared/pkg/event"
+	"go-socket/core/shared/pkg/stackErr"
 
 	"gorm.io/gorm"
 )
@@ -30,9 +31,9 @@ func newProviderPaymentRepoImpl(db *gorm.DB) paymentrepos.ProviderPaymentReposit
 
 func (r *providerPaymentRepoImpl) CreatePaymentIntent(ctx context.Context, intent *entity.PaymentIntent, createdEvent eventpkg.Event) error {
 	if err := r.CreateIntent(ctx, intent); err != nil {
-		return err
+		return stackErr.Error(err)
 	}
-	return r.appendOutboxEvents(ctx, createdEvent)
+	return stackErr.Error(r.appendOutboxEvents(ctx, createdEvent))
 }
 
 func (r *providerPaymentRepoImpl) SavePaymentIntent(ctx context.Context, intent *entity.PaymentIntent, outboxEvents ...eventpkg.Event) error {
@@ -72,10 +73,10 @@ func (r *providerPaymentRepoImpl) FinalizeSuccessfulPayment(
 	outboxEvents ...eventpkg.Event,
 ) error {
 	if err := r.MarkProcessed(ctx, processedEvent); err != nil {
-		return err
+		return stackErr.Error(err)
 	}
 	outboxEvents = append(outboxEvents, successEvent)
-	return r.SavePaymentIntent(ctx, intent, outboxEvents...)
+	return stackErr.Error(r.SavePaymentIntent(ctx, intent, outboxEvents...))
 }
 
 func (r *providerPaymentRepoImpl) CreateIntent(ctx context.Context, intent *entity.PaymentIntent) error {
@@ -183,7 +184,7 @@ func (r *providerPaymentRepoImpl) AppendOutboxEvent(ctx context.Context, evt eve
 func (r *providerPaymentRepoImpl) appendOutboxEvents(ctx context.Context, events ...eventpkg.Event) error {
 	for _, evt := range events {
 		if err := r.appendOutboxEvent(ctx, evt); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 	}
 	return nil
@@ -192,7 +193,7 @@ func (r *providerPaymentRepoImpl) appendOutboxEvents(ctx context.Context, events
 func (r *providerPaymentRepoImpl) appendOutboxEvent(ctx context.Context, evt eventpkg.Event) error {
 	data, err := r.serializer.Marshal(evt.EventData)
 	if err != nil {
-		return fmt.Errorf("marshal event data failed: %v", err)
+		return stackErr.Error(fmt.Errorf("marshal event data failed: %v", err))
 	}
 
 	createdAt := time.Now().UTC()
@@ -200,7 +201,7 @@ func (r *providerPaymentRepoImpl) appendOutboxEvent(ctx context.Context, evt eve
 		createdAt = time.Unix(evt.CreatedAt, 0).UTC()
 	}
 
-	return r.db.WithContext(ctx).Create(&model.PaymentOutboxEventModel{
+	return stackErr.Error(r.db.WithContext(ctx).Create(&model.PaymentOutboxEventModel{
 		AggregateID:   evt.AggregateID,
 		AggregateType: evt.AggregateType,
 		Version:       evt.Version,
@@ -208,7 +209,7 @@ func (r *providerPaymentRepoImpl) appendOutboxEvent(ctx context.Context, evt eve
 		EventData:     string(data),
 		Metadata:      "{}",
 		CreatedAt:     createdAt,
-	}).Error
+	}).Error)
 }
 
 func toProviderPaymentIntentEntity(modelIntent *model.ProviderPaymentIntentModel) *entity.PaymentIntent {

@@ -8,6 +8,8 @@ type MessageEntity struct {
 	SenderID               string
 	Message                string
 	MessageType            string
+	Mentions               []MessageMention
+	MentionAll             bool
 	ReplyToMessageID       string
 	ForwardedFromMessageID string
 	FileName               string

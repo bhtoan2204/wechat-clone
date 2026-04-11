@@ -17,15 +17,15 @@ import (
 func requireRoomRole(ctx context.Context, roomRepo repos.RoomRepository, memberRepo repos.RoomMemberRepository, roomID, accountID string) (*entity.RoomMemberEntity, *entity.Room, error) {
 	room, err := roomRepo.GetRoomByID(ctx, roomID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, stackErr.Error(err)
 	}
 
 	member, err := memberRepo.GetRoomMemberByAccount(ctx, roomID, accountID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil, errors.New("account is not a member of this room")
+			return nil, nil, stackErr.Error(errors.New("account is not a member of this room"))
 		}
-		return nil, nil, err
+		return nil, nil, stackErr.Error(err)
 	}
 
 	return member, room, nil

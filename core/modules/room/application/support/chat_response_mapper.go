@@ -41,6 +41,15 @@ func ToMessageResponse(res *apptypes.MessageResult) *out.ChatMessageResponse {
 		return nil
 	}
 
+	mentions := make([]out.ChatMessageMentionResponse, 0, len(res.Mentions))
+	for _, mention := range res.Mentions {
+		mentions = append(mentions, out.ChatMessageMentionResponse{
+			AccountID:   mention.AccountID,
+			DisplayName: mention.DisplayName,
+			Username:    mention.Username,
+		})
+	}
+
 	return &out.ChatMessageResponse{
 		ID:                     res.ID,
 		RoomID:                 res.RoomID,
@@ -48,6 +57,8 @@ func ToMessageResponse(res *apptypes.MessageResult) *out.ChatMessageResponse {
 		Message:                res.Message,
 		MessageType:            res.MessageType,
 		Status:                 res.Status,
+		Mentions:               mentions,
+		MentionAll:             res.MentionAll,
 		ReplyToMessageID:       res.ReplyToMessageID,
 		ForwardedFromMessageID: res.ForwardedFromMessageID,
 		FileName:               res.FileName,

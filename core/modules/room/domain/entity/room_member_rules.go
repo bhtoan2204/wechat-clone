@@ -109,7 +109,7 @@ func (m *RoomMemberEntity) CanRemoveFrom(room *Room, targetAccountID string) err
 func (m *RoomMemberEntity) ApplyReceiptStatus(status string, updatedAt time.Time) (string, *time.Time, *time.Time, error) {
 	normalizedStatus, err := NormalizeReceiptStatus(status)
 	if err != nil {
-		return "", nil, nil, err
+		return "", nil, nil, stackErr.Error(err)
 	}
 
 	now := normalizeRoomTime(updatedAt)

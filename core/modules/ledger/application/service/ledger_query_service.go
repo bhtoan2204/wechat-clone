@@ -22,7 +22,7 @@ func NewLedgerQueryService(baseRepo ledgerrepos.Repos) *LedgerQueryService {
 func (s *LedgerQueryService) GetAccountBalance(ctx context.Context, accountID string) (*ledgerout.AccountBalanceResponse, error) {
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
-		return nil, fmt.Errorf("%w: account_id is required", ErrValidation)
+		return nil, stackErr.Error(fmt.Errorf("%w: account_id is required", ErrValidation))
 	}
 
 	balance, err := s.baseRepo.LedgerRepository().GetBalance(ctx, accountID)
@@ -39,12 +39,12 @@ func (s *LedgerQueryService) GetAccountBalance(ctx context.Context, accountID st
 func (s *LedgerQueryService) GetTransaction(ctx context.Context, transactionID string) (*ledgerout.TransactionResponse, error) {
 	transactionID = strings.TrimSpace(transactionID)
 	if transactionID == "" {
-		return nil, fmt.Errorf("%w: transaction_id is required", ErrValidation)
+		return nil, stackErr.Error(fmt.Errorf("%w: transaction_id is required", ErrValidation))
 	}
 
 	transaction, err := s.baseRepo.LedgerRepository().GetTransaction(ctx, transactionID)
 	if errors.Is(err, ledgerrepos.ErrNotFound) {
-		return nil, fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID)
+		return nil, stackErr.Error(fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID))
 	}
 	if err != nil {
 		return nil, stackErr.Error(err)

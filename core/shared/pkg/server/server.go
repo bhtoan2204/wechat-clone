@@ -51,11 +51,11 @@ func (s *Server) ServeHTTP(ctx context.Context, srv *http.Server) error {
 	// This will block until the context is closed.
 	err := srv.Serve(s.listener)
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return fmt.Errorf("failed to serve: %v", err)
+		return stackErr.Error(fmt.Errorf("failed to serve: %v", err))
 	}
 
 	err = <-errCh
-	return err
+	return stackErr.Error(err)
 }
 
 // ServeHTTPHandle is a wrapper of ServeHTTP. It create HTTP server by provided http.Handler.
@@ -76,7 +76,7 @@ func (s *Server) ServeGRPC(ctx context.Context, srv *grpc.Server) error {
 
 	// Run the server. This will block until the provided context is closed.
 	if err := srv.Serve(s.listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-		return fmt.Errorf("failed to serve: %v", err)
+		return stackErr.Error(fmt.Errorf("failed to serve: %v", err))
 	}
 
 	return nil

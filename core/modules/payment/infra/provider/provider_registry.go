@@ -7,6 +7,7 @@ import (
 	"go-socket/core/modules/payment/domain/entity"
 	domainservice "go-socket/core/modules/payment/domain/service"
 	"go-socket/core/modules/payment/providers"
+	"go-socket/core/shared/pkg/stackErr"
 )
 
 type paymentProviderRegistry struct {
@@ -24,7 +25,7 @@ func NewPaymentProviderRegistry(registry *providers.ProviderRegistry) domainserv
 func (r *paymentProviderRegistry) Get(name string) (domainservice.PaymentProvider, error) {
 	provider, err := r.registry.Get(name)
 	if err != nil {
-		return nil, err
+		return nil, stackErr.Error(err)
 	}
 	return &paymentProviderAdapter{provider: provider}, nil
 }
@@ -47,7 +48,7 @@ func (a *paymentProviderAdapter) CreatePayment(
 		Metadata:        metadata,
 	})
 	if err != nil {
-		return nil, err
+		return nil, stackErr.Error(err)
 	}
 
 	return &domainservice.PaymentCreation{
@@ -68,12 +69,12 @@ func (a *paymentProviderAdapter) ParseWebhook(
 ) (*domainservice.PaymentWebhook, error) {
 	event, err := a.provider.VerifyWebhook(ctx, payload, signature)
 	if err != nil {
-		return nil, err
+		return nil, stackErr.Error(err)
 	}
 
 	result, err := a.provider.ParseEvent(ctx, event)
 	if err != nil {
-		return nil, err
+		return nil, stackErr.Error(err)
 	}
 
 	return &domainservice.PaymentWebhook{

@@ -20,6 +20,8 @@ var (
 	ErrRoomOwnerCannotLeave       = errors.New("owner cannot leave without transferring ownership")
 	ErrRoomMessageIDRequired      = errors.New("message_id is required")
 	ErrRoomMemberRequired         = errors.New("account is not a member of this room")
+	ErrRoomMentionsRequireGroup   = errors.New("mentions are only supported in group rooms")
+	ErrRoomMentionTargetNotMember = errors.New("mentioned account is not a member of this room")
 )
 
 func NewRoom(id, name, description, ownerID string, roomType roomtypes.RoomType, directKey string, now time.Time) (*Room, error) {

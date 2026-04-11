@@ -31,7 +31,7 @@ func (h *rebuildProjectionHandler) Handle(ctx context.Context, req *in.RebuildPr
 	if err := h.baseRepo.WithTransaction(ctx, func(txRepos paymentrepos.Repos) error {
 		rebuildResult, err := txRepos.PaymentProjectionRepository().RebuildProjection(ctx, req.AccountID, mode)
 		if err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		result = rebuildResult
 		return nil

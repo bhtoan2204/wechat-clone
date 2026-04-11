@@ -7,6 +7,7 @@ import (
 	"go-socket/core/modules/room/domain/aggregate"
 	"go-socket/core/modules/room/domain/repos"
 	roomtypes "go-socket/core/modules/room/types"
+	sharedevents "go-socket/core/shared/contracts/events"
 	eventpkg "go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/stackErr"
 )
@@ -50,12 +51,53 @@ func (s *RoomAggregateService) PublishMemberRemoved(ctx context.Context, outboxR
 	return eventpkg.NewPublisher(outboxRepo).PublishAggregate(ctx, roomAggregate)
 }
 
-func (s *RoomAggregateService) PublishMessageCreated(ctx context.Context, outboxRepo repos.RoomOutboxEventsRepository, roomID, messageID, senderID, senderName, senderEmail, content string, sentAt time.Time) error {
+func (s *RoomAggregateService) PublishMessageCreated(
+	ctx context.Context,
+	outboxRepo repos.RoomOutboxEventsRepository,
+	roomID,
+	roomName,
+	roomType,
+	messageID,
+	senderID,
+	senderName,
+	senderEmail,
+	content,
+	messageType,
+	replyToMessageID,
+	forwardedFromMessageID,
+	fileName,
+	mimeType,
+	objectKey string,
+	fileSize int64,
+	sentAt time.Time,
+	mentions []sharedevents.RoomMessageMention,
+	mentionAll bool,
+	mentionedAccountIDs []string,
+) error {
 	roomAggregate, err := aggregate.NewRoomAggregate(roomID)
 	if err != nil {
 		return stackErr.Error(err)
 	}
-	if err := roomAggregate.RecordMessageCreated(messageID, senderID, senderName, senderEmail, content, sentAt); err != nil {
+	if err := roomAggregate.RecordMessageCreated(
+		roomName,
+		roomType,
+		messageID,
+		senderID,
+		senderName,
+		senderEmail,
+		content,
+		messageType,
+		replyToMessageID,
+		forwardedFromMessageID,
+		fileName,
+		mimeType,
+		objectKey,
+		fileSize,
+		sentAt,
+		mentions,
+		mentionAll,
+		mentionedAccountIDs,
+	); err != nil {
 		return stackErr.Error(err)
 	}
 	return eventpkg.NewPublisher(outboxRepo).PublishAggregate(ctx, roomAggregate)

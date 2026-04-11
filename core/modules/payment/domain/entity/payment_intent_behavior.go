@@ -8,6 +8,7 @@ import (
 
 	sharedevents "go-socket/core/shared/contracts/events"
 	eventpkg "go-socket/core/shared/pkg/event"
+	"go-socket/core/shared/pkg/stackErr"
 )
 
 var (
@@ -106,7 +107,7 @@ func (p *PaymentIntent) SetProviderState(externalRef, status string, updatedAt t
 
 func (p *PaymentIntent) ApplyProviderResult(result PaymentProviderResult, updatedAt time.Time) error {
 	if err := p.ValidateProviderResult(result.Amount, result.Currency); err != nil {
-		return err
+		return stackErr.Error(err)
 	}
 
 	return p.SetProviderState(result.ExternalRef, NormalizePaymentStatusOrPending(result.Status), updatedAt)

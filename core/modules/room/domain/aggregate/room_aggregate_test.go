@@ -5,6 +5,7 @@ import (
 	"time"
 
 	roomtypes "go-socket/core/modules/room/types"
+	sharedevents "go-socket/core/shared/contracts/events"
 )
 
 func TestRoomAggregateRecordMemberAddedBindsRoomID(t *testing.T) {
@@ -32,7 +33,26 @@ func TestRoomAggregateRecordMessageCreatedBindsRoomID(t *testing.T) {
 	}
 
 	sentAt := time.Now().UTC()
-	if err := agg.RecordMessageCreated("msg-1", "sender-1", "Alice", "alice@example.com", "hello", sentAt); err != nil {
+	if err := agg.RecordMessageCreated(
+		"Backend",
+		string(roomtypes.RoomTypeGroup),
+		"msg-1",
+		"sender-1",
+		"Alice",
+		"alice@example.com",
+		"hello",
+		"text",
+		"",
+		"",
+		"",
+		"",
+		"",
+		0,
+		sentAt,
+		[]sharedevents.RoomMessageMention{{AccountID: "member-2", DisplayName: "Bob"}},
+		false,
+		[]string{"member-2"},
+	); err != nil {
 		t.Fatalf("RecordMessageCreated() error = %v", err)
 	}
 
@@ -44,5 +64,17 @@ func TestRoomAggregateRecordMessageCreatedBindsRoomID(t *testing.T) {
 	}
 	if !agg.LastMessageAt.Equal(sentAt) {
 		t.Fatalf("LastMessageAt = %v, want %v", agg.LastMessageAt, sentAt)
+	}
+
+	events := agg.Events()
+	if len(events) != 1 {
+		t.Fatalf("expected 1 unsaved event, got %d", len(events))
+	}
+	data, ok := events[0].EventData.(*EventRoomMessageCreated)
+	if !ok {
+		t.Fatalf("expected EventRoomMessageCreated, got %T", events[0].EventData)
+	}
+	if len(data.MentionedAccountIDs) != 1 || data.MentionedAccountIDs[0] != "member-2" {
+		t.Fatalf("expected mentioned_account_ids to be propagated, got %+v", data.MentionedAccountIDs)
 	}
 }

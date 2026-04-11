@@ -48,7 +48,7 @@ func (p *paymentProjectionRepoImpl) RebuildProjection(ctx context.Context, accou
 	case repos.ProjectionRebuildModeSnapshot:
 		return p.rebuildProjectionFromSnapshot(ctx, accountID)
 	default:
-		return nil, fmt.Errorf("unsupported projection rebuild mode: %s", mode)
+		return nil, stackErr.Error(fmt.Errorf("unsupported projection rebuild mode: %s", mode))
 	}
 }
 
@@ -159,7 +159,7 @@ func (p *paymentProjectionRepoImpl) insertProjectedTransaction(ctx context.Conte
 		if isDuplicatePaymentProjectionError(err) {
 			return false, nil
 		}
-		return false, err
+		return false, stackErr.Error(err)
 	}
 
 	return true, nil
@@ -171,7 +171,7 @@ func (p *paymentProjectionRepoImpl) applyBalanceDelta(ctx context.Context, accou
 		Where("account_id = ?", accountID).
 		Update("amount", gorm.Expr("amount + ?", balanceDelta))
 	if result.Error != nil {
-		return result.Error
+		return stackErr.Error(result.Error)
 	}
 	if result.RowsAffected > 0 {
 		return nil
@@ -188,7 +188,7 @@ func (p *paymentProjectionRepoImpl) applyBalanceDelta(ctx context.Context, accou
 				Model(&model.BalanceModel{}).
 				Where("account_id = ?", accountID).
 				Update("amount", gorm.Expr("amount + ?", balanceDelta))
-			return retry.Error
+			return stackErr.Error(retry.Error)
 		}
 		return stackErr.Error(err)
 	}
@@ -202,7 +202,7 @@ func (p *paymentProjectionRepoImpl) setBalanceAmount(ctx context.Context, accoun
 		Where("account_id = ?", accountID).
 		Update("amount", amount)
 	if result.Error != nil {
-		return result.Error
+		return stackErr.Error(result.Error)
 	}
 	if result.RowsAffected > 0 {
 		return nil
@@ -219,7 +219,7 @@ func (p *paymentProjectionRepoImpl) setBalanceAmount(ctx context.Context, accoun
 				Model(&model.BalanceModel{}).
 				Where("account_id = ?", accountID).
 				Update("amount", amount)
-			return retry.Error
+			return stackErr.Error(retry.Error)
 		}
 		return stackErr.Error(err)
 	}
@@ -230,7 +230,7 @@ func (p *paymentProjectionRepoImpl) setBalanceAmount(ctx context.Context, accoun
 func (p *paymentProjectionRepoImpl) replayPaymentEvent(ctx context.Context, eventModel model.PaymentEventModel, projectTransactions bool) (bool, error) {
 	payload, err := p.decodePaymentEvent(eventModel)
 	if err != nil {
-		return false, err
+		return false, stackErr.Error(err)
 	}
 
 	switch eventData := payload.(type) {
@@ -255,22 +255,22 @@ func (p *paymentProjectionRepoImpl) replayPaymentEvent(ctx context.Context, even
 		}
 		return true, p.applyBalanceDelta(ctx, eventModel.AggregateID, eventData.PaymentTransactionAmount, eventData.PaymentTransactionCreatedAt)
 	default:
-		return false, fmt.Errorf("unsupported payment event for projection rebuild: %s", eventModel.EventName)
+		return false, stackErr.Error(fmt.Errorf("unsupported payment event for projection rebuild: %s", eventModel.EventName))
 	}
 }
 
 func (p *paymentProjectionRepoImpl) decodePaymentEvent(eventModel model.PaymentEventModel) (interface{}, error) {
 	payloadFactory, ok := p.serializer.Type(eventModel.AggregateType, eventModel.EventName)
 	if !ok {
-		return nil, fmt.Errorf("unsupported payment event: aggregate_type=%s event_name=%s", eventModel.AggregateType, eventModel.EventName)
+		return nil, stackErr.Error(fmt.Errorf("unsupported payment event: aggregate_type=%s event_name=%s", eventModel.AggregateType, eventModel.EventName))
 	}
 
 	payload := clonePaymentPayload(payloadFactory())
 	if payload == nil {
-		return nil, fmt.Errorf("payment event payload prototype is nil")
+		return nil, stackErr.Error(fmt.Errorf("payment event payload prototype is nil"))
 	}
 	if err := p.serializer.Unmarshal([]byte(eventModel.EventData), payload); err != nil {
-		return nil, fmt.Errorf("unmarshal payment event payload failed: %v", err)
+		return nil, stackErr.Error(fmt.Errorf("unmarshal payment event payload failed: %v", err))
 	}
 
 	return payload, nil
@@ -279,7 +279,7 @@ func (p *paymentProjectionRepoImpl) decodePaymentEvent(eventModel model.PaymentE
 func (p *paymentProjectionRepoImpl) restoreBalanceProjectionFromSnapshot(ctx context.Context, snapshot model.PaymentBalanceSnapshotModel) error {
 	var agg aggregate.PaymentBalanceAggregate
 	if err := p.serializer.Unmarshal([]byte(snapshot.State), &agg); err != nil {
-		return fmt.Errorf("unmarshal payment snapshot state failed: %v", err)
+		return stackErr.Error(fmt.Errorf("unmarshal payment snapshot state failed: %v", err))
 	}
 
 	createdAt := agg.CreatedAt
@@ -299,16 +299,16 @@ func (p *paymentProjectionRepoImpl) clearProjection(ctx context.Context, account
 				return stackErr.Error(err)
 			}
 		} else if err := txQuery.Where("account_id = ?", accountID).Delete(&model.PaymentTransactionModel{}).Error; err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 	}
 
 	balanceQuery := p.db.WithContext(ctx)
 	if accountID == "" {
 		balanceQuery = balanceQuery.Session(&gorm.Session{AllowGlobalUpdate: true})
-		return balanceQuery.Delete(&model.BalanceModel{}).Error
+		return stackErr.Error(balanceQuery.Delete(&model.BalanceModel{}).Error)
 	}
-	return balanceQuery.Where("account_id = ?", accountID).Delete(&model.BalanceModel{}).Error
+	return stackErr.Error(balanceQuery.Where("account_id = ?", accountID).Delete(&model.BalanceModel{}).Error)
 }
 
 func (p *paymentProjectionRepoImpl) listAggregateIDs(ctx context.Context, accountID string) ([]string, error) {

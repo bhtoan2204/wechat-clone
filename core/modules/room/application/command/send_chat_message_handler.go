@@ -30,6 +30,8 @@ func (h *sendChatMessageHandler) Handle(ctx context.Context, req *in.SendChatMes
 		RoomID:                 req.RoomID,
 		Message:                req.Message,
 		MessageType:            req.MessageType,
+		Mentions:               mapMentionCommands(req.Mentions),
+		MentionAll:             req.MentionAll,
 		ReplyToMessageID:       req.ReplyToMessageID,
 		ForwardedFromMessageID: req.ForwardedFromMessageID,
 		FileName:               req.FileName,
@@ -42,4 +44,18 @@ func (h *sendChatMessageHandler) Handle(ctx context.Context, req *in.SendChatMes
 	}
 
 	return roomsupport.ToMessageResponse(res), nil
+}
+
+func mapMentionCommands(items []in.SendChatMessageMentionRequest) []apptypes.SendMessageMentionCommand {
+	if len(items) == 0 {
+		return nil
+	}
+
+	results := make([]apptypes.SendMessageMentionCommand, 0, len(items))
+	for _, item := range items {
+		results = append(results, apptypes.SendMessageMentionCommand{
+			AccountID: item.AccountID,
+		})
+	}
+	return results
 }

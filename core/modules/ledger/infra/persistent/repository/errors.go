@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	ledgerrepos "go-socket/core/modules/ledger/domain/repos"
+	"go-socket/core/shared/pkg/stackErr"
 
 	"gorm.io/gorm"
 )
@@ -19,13 +20,13 @@ func mapError(err error) error {
 		return nil
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return ErrNotFound
+		return stackErr.Error(ErrNotFound)
 	}
 
 	if isOracleUniqueConstraintError(err) {
-		return ErrDuplicate
+		return stackErr.Error(ErrDuplicate)
 	}
-	return err
+	return stackErr.Error(err)
 }
 
 func isOracleUniqueConstraintError(err error) bool {

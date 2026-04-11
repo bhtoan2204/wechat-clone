@@ -7,6 +7,7 @@ import (
 	"fmt"
 	appCtx "go-socket/core/context"
 	"go-socket/core/shared/pkg/logging"
+	"go-socket/core/shared/pkg/stackErr"
 	"strings"
 	"sync"
 	"time"
@@ -120,17 +121,17 @@ func (h *Hub) Unregister(ctx context.Context, client IClient) {
 func (h *Hub) JoinRoom(ctx context.Context, client IClient, roomID string) error {
 	log := logging.FromContext(ctx)
 	if client == nil {
-		return errors.New("client is nil")
+		return stackErr.Error(errors.New("client is nil"))
 	}
 	roomID = strings.TrimSpace(roomID)
 	if roomID == "" {
-		return errors.New("room_id is required")
+		return stackErr.Error(errors.New("room_id is required"))
 	}
 
 	h.mu.Lock()
 	if h.isClosed {
 		h.mu.Unlock()
-		return errors.New("hub is closed")
+		return stackErr.Error(errors.New("hub is closed"))
 	}
 	if _, ok := h.clients[client.GetID()]; !ok {
 		h.clients[client.GetID()] = client
@@ -152,7 +153,7 @@ func (h *Hub) JoinRoom(ctx context.Context, client IClient, roomID string) error
 
 	if !hasSubscription {
 		if err := h.subscribeRoom(ctx, roomID); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 	}
 
@@ -163,11 +164,11 @@ func (h *Hub) JoinRoom(ctx context.Context, client IClient, roomID string) error
 func (h *Hub) LeaveRoom(ctx context.Context, client IClient, roomID string) error {
 	log := logging.FromContext(ctx)
 	if client == nil {
-		return errors.New("client is nil")
+		return stackErr.Error(errors.New("client is nil"))
 	}
 	roomID = strings.TrimSpace(roomID)
 	if roomID == "" {
-		return errors.New("room_id is required")
+		return stackErr.Error(errors.New("room_id is required"))
 	}
 
 	shouldUnsubscribe := false
@@ -200,7 +201,7 @@ func (h *Hub) LeaveRoom(ctx context.Context, client IClient, roomID string) erro
 
 func (h *Hub) HandleMessage(ctx context.Context, client IClient, msg Message) error {
 	if client == nil {
-		return errors.New("client is nil")
+		return stackErr.Error(errors.New("client is nil"))
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -216,10 +217,10 @@ func (h *Hub) HandleMessage(ctx context.Context, client IClient, msg Message) er
 	case ActionChatMessage, ActionTyping, ActionSeen:
 		roomID := strings.TrimSpace(msg.RoomID)
 		if roomID == "" {
-			return errors.New("room_id is required")
+			return stackErr.Error(errors.New("room_id is required"))
 		}
 		if h.redisClient == nil {
-			return errors.New("redis client is nil")
+			return stackErr.Error(errors.New("redis client is nil"))
 		}
 		if msg.SenderID == "" {
 			msg.SenderID = client.GetUserID()
@@ -230,10 +231,10 @@ func (h *Hub) HandleMessage(ctx context.Context, client IClient, msg Message) er
 
 		payload, err := json.Marshal(msg)
 		if err != nil {
-			return fmt.Errorf("marshal websocket message: %v", err)
+			return stackErr.Error(fmt.Errorf("marshal websocket message: %v", err))
 		}
 		if err := h.redisClient.Publish(ctx, roomChannelName(roomID), payload).Err(); err != nil {
-			return fmt.Errorf("publish redis message: %v", err)
+			return stackErr.Error(fmt.Errorf("publish redis message: %v", err))
 		}
 		return nil
 	case ActionPresence:
@@ -241,7 +242,7 @@ func (h *Hub) HandleMessage(ctx context.Context, client IClient, msg Message) er
 		return nil
 	}
 
-	return fmt.Errorf("unsupported websocket action: %s", msg.Action)
+	return stackErr.Error(fmt.Errorf("unsupported websocket action: %s", msg.Action))
 }
 
 func (h *Hub) Close(ctx context.Context) {
@@ -280,13 +281,13 @@ func (h *Hub) Close(ctx context.Context) {
 func (h *Hub) subscribeRoom(ctx context.Context, roomID string) error {
 	log := logging.FromContext(ctx)
 	if h.redisClient == nil {
-		return errors.New("redis client is nil")
+		return stackErr.Error(errors.New("redis client is nil"))
 	}
 
 	h.mu.Lock()
 	if h.isClosed {
 		h.mu.Unlock()
-		return errors.New("hub is closed")
+		return stackErr.Error(errors.New("hub is closed"))
 	}
 	if _, exists := h.subscriptions[roomID]; exists {
 		h.mu.Unlock()
@@ -304,7 +305,7 @@ func (h *Hub) subscribeRoom(ctx context.Context, roomID string) error {
 	if _, err := pubsub.Receive(subCtx); err != nil {
 		h.removeSubscription(subCtx, roomID, sub)
 		_ = sub.Close()
-		return fmt.Errorf("subscribe to redis room channel: %v", err)
+		return stackErr.Error(fmt.Errorf("subscribe to redis room channel: %v", err))
 	}
 
 	go h.consumeRoomMessages(subCtx, roomID, sub)

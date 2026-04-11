@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"go-socket/core/shared/pkg/logging"
+	"go-socket/core/shared/pkg/stackErr"
 	"math/rand"
 	"time"
 
@@ -42,7 +43,7 @@ func (l *lock) AcquireLock(ctx context.Context, key, value string, expiration, r
 		ok, err := l.client.SetNX(ctx, key, value, expiration).Result()
 		if err != nil {
 			log.Errorw("AcquireLock redis error", zap.String("key", key), zap.Error(err))
-			return false, err
+			return false, stackErr.Error(err)
 		}
 		if ok {
 			return true, nil
@@ -54,7 +55,7 @@ func (l *lock) AcquireLock(ctx context.Context, key, value string, expiration, r
 			// retry
 		case <-ctx.Done():
 			log.Warnw("AcquireLock timeout", zap.String("key", key))
-			return false, errors.New("timeout acquiring lock")
+			return false, stackErr.Error(errors.New("timeout acquiring lock"))
 		}
 	}
 }
@@ -65,7 +66,7 @@ func (l *lock) ReleaseLock(ctx context.Context, key, value string) (bool, error)
 	res, err := releaseLockScript.Run(ctx, l.client, []string{key}, value).Result()
 	if err != nil {
 		log.Errorw("ReleaseLock lua error", zap.String("key", key), zap.Error(err))
-		return false, err
+		return false, stackErr.Error(err)
 	}
 
 	hit, ok := res.(int64)

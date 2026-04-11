@@ -33,7 +33,7 @@ func newPaymentBalanceAggregateRepoImpl(db *gorm.DB) repos.PaymentBalanceAggrega
 
 func (p *paymentBalanceAggregateRepoImpl) Load(ctx context.Context, accountID string) (*aggregate.PaymentBalanceAggregate, error) {
 	if accountID == "" {
-		return nil, fmt.Errorf("account id is empty")
+		return nil, stackErr.Error(fmt.Errorf("account id is empty"))
 	}
 
 	agg, err := aggregate.NewPaymentBalanceAggregate(accountID)
@@ -71,10 +71,10 @@ func (p *paymentBalanceAggregateRepoImpl) Load(ctx context.Context, accountID st
 
 	if len(eventModels) == 0 {
 		if snapshotVersion == 0 {
-			return nil, fmt.Errorf("payment aggregate has no snapshot and no events: account_id=%s version=%d", accountID, aggregateModel.Version)
+			return nil, stackErr.Error(fmt.Errorf("payment aggregate has no snapshot and no events: account_id=%s version=%d", accountID, aggregateModel.Version))
 		}
 		if agg.Root().Version() != aggregateModel.Version {
-			return nil, fmt.Errorf("payment aggregate version mismatch: aggregate=%d snapshot=%d", aggregateModel.Version, agg.Root().Version())
+			return nil, stackErr.Error(fmt.Errorf("payment aggregate version mismatch: aggregate=%d snapshot=%d", aggregateModel.Version, agg.Root().Version()))
 		}
 		return agg, nil
 	}
@@ -92,7 +92,7 @@ func (p *paymentBalanceAggregateRepoImpl) Load(ctx context.Context, accountID st
 		return nil, stackErr.Error(err)
 	}
 	if agg.Root().Version() != aggregateModel.Version {
-		return nil, fmt.Errorf("payment aggregate version mismatch: aggregate=%d events=%d", aggregateModel.Version, agg.Root().Version())
+		return nil, stackErr.Error(fmt.Errorf("payment aggregate version mismatch: aggregate=%d events=%d", aggregateModel.Version, agg.Root().Version()))
 	}
 
 	return agg, nil
@@ -100,7 +100,7 @@ func (p *paymentBalanceAggregateRepoImpl) Load(ctx context.Context, accountID st
 
 func (p *paymentBalanceAggregateRepoImpl) Save(ctx context.Context, agg *aggregate.PaymentBalanceAggregate) error {
 	if agg == nil {
-		return fmt.Errorf("payment aggregate is nil")
+		return stackErr.Error(fmt.Errorf("payment aggregate is nil"))
 	}
 
 	events := agg.Root().CloneEvents()
@@ -171,7 +171,7 @@ func (p *paymentBalanceAggregateRepoImpl) persistAggregateVersion(ctx context.Co
 func (p *paymentBalanceAggregateRepoImpl) buildEventModel(evt eventpkg.Event) (model.PaymentEventModel, error) {
 	data, err := p.serializer.Marshal(evt.EventData)
 	if err != nil {
-		return model.PaymentEventModel{}, fmt.Errorf("marshal event data failed: %v", err)
+		return model.PaymentEventModel{}, stackErr.Error(fmt.Errorf("marshal event data failed: %v", err))
 	}
 
 	createdAt := time.Now().UTC()
@@ -203,11 +203,11 @@ func (p *paymentBalanceAggregateRepoImpl) loadSnapshot(ctx context.Context, agg 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, nil
 		}
-		return 0, fmt.Errorf("load payment snapshot failed: %v", err)
+		return 0, stackErr.Error(fmt.Errorf("load payment snapshot failed: %v", err))
 	}
 
 	if err := p.restoreSnapshot(agg, snapshot); err != nil {
-		return 0, err
+		return 0, stackErr.Error(err)
 	}
 
 	return snapshot.Version, nil
@@ -215,7 +215,7 @@ func (p *paymentBalanceAggregateRepoImpl) loadSnapshot(ctx context.Context, agg 
 
 func (p *paymentBalanceAggregateRepoImpl) restoreSnapshot(agg *aggregate.PaymentBalanceAggregate, snapshot model.PaymentBalanceSnapshotModel) error {
 	if err := p.serializer.Unmarshal([]byte(snapshot.State), agg); err != nil {
-		return fmt.Errorf("unmarshal payment snapshot failed: %v", err)
+		return stackErr.Error(fmt.Errorf("unmarshal payment snapshot failed: %v", err))
 	}
 
 	if agg.AccountID == "" {
@@ -228,7 +228,7 @@ func (p *paymentBalanceAggregateRepoImpl) restoreSnapshot(agg *aggregate.Payment
 func (p *paymentBalanceAggregateRepoImpl) createSnapshot(ctx context.Context, agg *aggregate.PaymentBalanceAggregate) error {
 	state, err := p.serializer.Marshal(agg)
 	if err != nil {
-		return fmt.Errorf("marshal payment snapshot failed: %v", err)
+		return stackErr.Error(fmt.Errorf("marshal payment snapshot failed: %v", err))
 	}
 
 	snapshot := model.PaymentBalanceSnapshotModel{
@@ -239,7 +239,7 @@ func (p *paymentBalanceAggregateRepoImpl) createSnapshot(ctx context.Context, ag
 		CreatedAt:   time.Now().UTC(),
 	}
 	if err := p.db.WithContext(ctx).Create(&snapshot).Error; err != nil {
-		return fmt.Errorf("create payment snapshot failed: %v", err)
+		return stackErr.Error(fmt.Errorf("create payment snapshot failed: %v", err))
 	}
 
 	return nil
@@ -248,14 +248,14 @@ func (p *paymentBalanceAggregateRepoImpl) createSnapshot(ctx context.Context, ag
 func (p *paymentBalanceAggregateRepoImpl) toDomainEvent(eventModel model.PaymentEventModel) (eventpkg.Event, error) {
 	payloadFactory, ok := p.serializer.Type(eventModel.AggregateType, eventModel.EventName)
 	if !ok {
-		return eventpkg.Event{}, fmt.Errorf("unsupported payment event: aggregate_type=%s event_name=%s", eventModel.AggregateType, eventModel.EventName)
+		return eventpkg.Event{}, stackErr.Error(fmt.Errorf("unsupported payment event: aggregate_type=%s event_name=%s", eventModel.AggregateType, eventModel.EventName))
 	}
 	payload := clonePaymentPayload(payloadFactory())
 	if payload == nil {
-		return eventpkg.Event{}, fmt.Errorf("payment event payload prototype is nil")
+		return eventpkg.Event{}, stackErr.Error(fmt.Errorf("payment event payload prototype is nil"))
 	}
 	if err := p.serializer.Unmarshal([]byte(eventModel.EventData), payload); err != nil {
-		return eventpkg.Event{}, err
+		return eventpkg.Event{}, stackErr.Error(err)
 	}
 
 	return eventpkg.Event{

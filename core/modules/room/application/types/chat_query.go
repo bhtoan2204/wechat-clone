@@ -17,6 +17,12 @@ type ListMessagesQuery struct {
 	Ascending bool
 }
 
+type SearchMentionCandidatesQuery struct {
+	RoomID string
+	Query  string
+	Limit  int
+}
+
 type GetPresenceQuery struct {
 	AccountID string
 }

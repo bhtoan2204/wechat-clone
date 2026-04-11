@@ -1,5 +1,7 @@
 package valueobject
 
+import "go-socket/core/shared/pkg/stackErr"
+
 type PlainPassword struct {
 	value string
 }
@@ -7,7 +9,7 @@ type PlainPassword struct {
 func NewPlainPassword(value string) (PlainPassword, error) {
 	normalized, err := normalizePasswordValue(value)
 	if err != nil {
-		return PlainPassword{}, err
+		return PlainPassword{}, stackErr.Error(err)
 	}
 	return PlainPassword{value: normalized}, nil
 }

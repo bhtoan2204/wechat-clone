@@ -166,10 +166,11 @@ func (s *paymentCommandService) applyProviderOutcome(
 	emitCheckoutEvent bool,
 ) (bool, error) {
 	if entity.NormalizePaymentStatus(result.Status) == entity.PaymentStatusSuccess {
-		return s.finalizeSuccessfulPayment(ctx, intent, result, checkoutURL, emitCheckoutEvent)
+		handled, err := s.finalizeSuccessfulPayment(ctx, intent, result, checkoutURL, emitCheckoutEvent)
+		return handled, stackErr.Error(err)
 	}
 
-	return false, s.baseRepo.WithTransaction(ctx, func(tx repos.Repos) error {
+	return false, stackErr.Error(s.baseRepo.WithTransaction(ctx, func(tx repos.Repos) error {
 		updatedAt := time.Now().UTC()
 		if err := intent.ApplyProviderResult(result, updatedAt); err != nil {
 			return stackErr.Error(err)
@@ -180,8 +181,8 @@ func (s *paymentCommandService) applyProviderOutcome(
 			outboxEvents = append(outboxEvents, intent.FailedEvent(intent.CurrentProviderResult(result), updatedAt))
 		}
 
-		return tx.ProviderPaymentRepository().SavePaymentIntent(ctx, intent, outboxEvents...)
-	})
+		return stackErr.Error(tx.ProviderPaymentRepository().SavePaymentIntent(ctx, intent, outboxEvents...))
+	}))
 }
 
 func (s *paymentCommandService) finalizeSuccessfulPayment(
@@ -195,16 +196,16 @@ func (s *paymentCommandService) finalizeSuccessfulPayment(
 	idempotencyKey := intent.PaymentIdempotencyKey(result.EventID, result.ExternalRef)
 	processed, err := store.IsProcessed(ctx, intent.Provider, idempotencyKey)
 	if err != nil {
-		return false, err
+		return false, stackErr.Error(err)
 	}
 
 	if processed {
 		updatedAt := time.Now().UTC()
 		if err := intent.ApplyProviderResult(result, updatedAt); err != nil {
-			return false, err
+			return false, stackErr.Error(err)
 		}
 		if err := store.SavePaymentIntent(ctx, intent, checkoutSessionEvents(intent, checkoutURL, updatedAt, emitCheckoutEvent)...); err != nil {
-			return false, err
+			return false, stackErr.Error(err)
 		}
 		return true, nil
 	}
@@ -228,7 +229,7 @@ func (s *paymentCommandService) finalizeSuccessfulPayment(
 			checkoutSessionEvents(intent, checkoutURL, updatedAt, emitCheckoutEvent)...,
 		); err != nil {
 			if errors.Is(err, repos.ErrProviderPaymentDuplicateProcessed) {
-				return err
+				return stackErr.Error(err)
 			}
 			return stackErr.Error(err)
 		}
@@ -238,7 +239,7 @@ func (s *paymentCommandService) finalizeSuccessfulPayment(
 		if errors.Is(err, repos.ErrProviderPaymentDuplicateProcessed) {
 			return true, nil
 		}
-		return false, err
+		return false, stackErr.Error(err)
 	}
 
 	return false, nil
@@ -271,27 +272,27 @@ func (s *paymentCommandService) findIntent(
 		}
 	}
 
-	return nil, fmt.Errorf(
+	return nil, stackErr.Error(fmt.Errorf(
 		"%v: transaction_id=%s external_ref=%s",
 		ErrPaymentIntentNotFound,
 		result.TransactionID,
 		result.ExternalRef,
-	)
+	))
 }
 
 func (s *paymentCommandService) markCreateFailed(ctx context.Context, intent *entity.PaymentIntent) error {
 	if err := intent.MarkCreateFailed(time.Now().UTC()); err != nil {
-		return err
+		return stackErr.Error(err)
 	}
 
 	failedResult := intent.CurrentProviderResult(entity.PaymentProviderResult{Status: entity.PaymentStatusFailed})
-	return s.baseRepo.WithTransaction(ctx, func(tx repos.Repos) error {
-		return tx.ProviderPaymentRepository().SavePaymentIntent(
+	return stackErr.Error(s.baseRepo.WithTransaction(ctx, func(tx repos.Repos) error {
+		return stackErr.Error(tx.ProviderPaymentRepository().SavePaymentIntent(
 			ctx,
 			intent,
 			intent.FailedEvent(failedResult, intent.UpdatedAt),
-		)
-	})
+		))
+	}))
 }
 
 func checkoutSessionEvents(

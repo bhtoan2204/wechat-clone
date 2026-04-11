@@ -4,6 +4,7 @@ import (
 	"errors"
 	"go-socket/core/modules/payment/domain/types"
 	"go-socket/core/shared/pkg/event"
+	"go-socket/core/shared/pkg/stackErr"
 	"time"
 )
 
@@ -40,7 +41,7 @@ func (p *PaymentTransactionAggregate) Transition(e event.Event) error {
 	case *EventPaymentTransactionRefunded:
 		return p.onPaymentTransactionRefunded(data)
 	default:
-		return errors.New("unsupported event type")
+		return stackErr.Error(errors.New("unsupported event type"))
 	}
 }
 

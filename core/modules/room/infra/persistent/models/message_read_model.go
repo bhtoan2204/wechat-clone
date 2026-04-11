@@ -8,6 +8,8 @@ type MessageReadModel struct {
 	SenderID               string  `gorm:"not null;index"`
 	Message                string  `gorm:"type:VARCHAR2(4000);not null"`
 	MessageType            string  `gorm:"type:VARCHAR2(50);default:'text';not null"`
+	MentionsJSON           string  `gorm:"type:CLOB;not null;default:'[]'"`
+	MentionAll             bool    `gorm:"type:number(1);default:0;not null"`
 	ReplyToMessageID       *string `gorm:"index"`
 	ForwardedFromMessageID *string `gorm:"index"`
 	FileName               *string `gorm:"type:VARCHAR2(1024)"`

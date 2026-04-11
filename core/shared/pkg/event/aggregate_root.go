@@ -3,6 +3,7 @@ package event
 import (
 	"errors"
 	"fmt"
+	"go-socket/core/shared/pkg/stackErr"
 	"reflect"
 	"time"
 )
@@ -24,11 +25,11 @@ type AggregateRoot struct {
 
 func (ar *AggregateRoot) SetID(id string) error {
 	if id == "" {
-		return ErrIDEmpty
+		return stackErr.Error(ErrIDEmpty)
 	}
 
 	if id == ar.aggregateID {
-		return ErrAggExisted
+		return stackErr.Error(ErrAggExisted)
 	}
 
 	ar.aggregateID = id
@@ -83,19 +84,19 @@ func (ar *AggregateRoot) ApplyChange(agg Aggregate, data interface{}) error {
 
 func (ar *AggregateRoot) ApplyChangeWithMetadata(agg Aggregate, data interface{}) error {
 	if ar.aggregateID == "" {
-		return fmt.Errorf("missing aggregate_id, aggregate_type=%s", ar.aggregateType)
+		return stackErr.Error(fmt.Errorf("missing aggregate_id, aggregate_type=%s", ar.aggregateType))
 	}
 
 	dataType := reflect.TypeOf(data)
 	if dataType == nil {
-		return errors.New("event data can not be nil")
+		return stackErr.Error(errors.New("event data can not be nil"))
 	}
 	if dataType.Kind() == reflect.Ptr {
 		dataType = dataType.Elem()
 	}
 	eventType := dataType.Name()
 	if eventType == "" {
-		return errors.New("event name can not be empty")
+		return stackErr.Error(errors.New("event name can not be empty"))
 	}
 	event := Event{
 		AggregateID:   ar.aggregateID,
@@ -107,13 +108,13 @@ func (ar *AggregateRoot) ApplyChangeWithMetadata(agg Aggregate, data interface{}
 	}
 
 	ar.events = append(ar.events, event)
-	return agg.Transition(event)
+	return stackErr.Error(agg.Transition(event))
 }
 
 func (ar *AggregateRoot) LoadFromHistory(agg Aggregate, events []Event) error {
 	for _, e := range events {
 		if err := agg.Transition(e); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		ar.aggregateID = e.AggregateID
 		ar.version = e.Version

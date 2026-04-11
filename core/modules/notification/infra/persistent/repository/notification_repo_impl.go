@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"go-socket/core/modules/notification/application/dto/out"
 	notificationquery "go-socket/core/modules/notification/application/query"
 	"go-socket/core/modules/notification/domain/entity"
@@ -9,6 +10,7 @@ import (
 	"go-socket/core/modules/notification/infra/persistent/models"
 	"go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/utils"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -31,7 +33,19 @@ func NewNotificationReadRepository(db *gorm.DB) notificationquery.NotificationRe
 
 func (r *notificationRepoImpl) CreateNotification(ctx context.Context, notification *entity.NotificationEntity) error {
 	m := r.toModel(notification)
+	var existing models.NotificationModel
+	err := r.db.WithContext(ctx).Select("id").Where("id = ?", notification.ID).Take(&existing).Error
+	switch {
+	case err == nil:
+		return nil
+	case err != nil && !errors.Is(err, gorm.ErrRecordNotFound):
+		return stackErr.Error(err)
+	}
+
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		if isDuplicateNotificationError(err) {
+			return nil
+		}
 		return stackErr.Error(err)
 	}
 	return nil
@@ -105,4 +119,12 @@ func (r *notificationRepoImpl) toModel(e *entity.NotificationEntity) *models.Not
 		ReadAt:    e.ReadAt,
 		CreatedAt: e.CreatedAt,
 	}
+}
+
+func isDuplicateNotificationError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToUpper(err.Error())
+	return strings.Contains(message, "ORA-00001") || strings.Contains(message, "UNIQUE")
 }

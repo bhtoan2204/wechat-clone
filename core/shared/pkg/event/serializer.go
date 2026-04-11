@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go-socket/core/shared/pkg/stackErr"
 	"reflect"
 )
 
@@ -44,7 +45,7 @@ func (s *serializer) ToEventsFunc(events ...interface{}) []eventFunc {
 func (s *serializer) RegisterAggregate(agg BaseAggregate) error {
 	typ := reflect.TypeOf(agg).Elem().Name()
 	if typ == "" {
-		return fmt.Errorf("not found aggregate")
+		return stackErr.Error(fmt.Errorf("not found aggregate"))
 	}
 
 	fu := func(events ...interface{}) error {
@@ -53,7 +54,7 @@ func (s *serializer) RegisterAggregate(agg BaseAggregate) error {
 			event := f()
 			eName := reflect.TypeOf(event).Elem().Name()
 			if eName == "" {
-				return errors.New("name of event is missing")
+				return stackErr.Error(errors.New("name of event is missing"))
 			}
 
 			s.eventRegister[typ+"_"+eName] = f
@@ -68,14 +69,14 @@ func (s *serializer) RegisterAggregate(agg BaseAggregate) error {
 func (s *serializer) Register(agg Aggregate, eventsFunc []eventFunc) error {
 	typ := reflect.TypeOf(agg).Elem().Name()
 	if typ == "" {
-		return errors.New("not found aggregate")
+		return stackErr.Error(errors.New("not found aggregate"))
 	}
 
 	for _, f := range eventsFunc {
 		event := f()
 		eName := reflect.TypeOf(event).Elem().Name()
 		if eName == "" {
-			return errors.New("event name is missing")
+			return stackErr.Error(errors.New("event name is missing"))
 		}
 		s.eventRegister[typ+"_"+eName] = f
 	}
@@ -93,11 +94,18 @@ func (s *serializer) Type(typ, name string) (eventFunc, bool) {
 }
 
 func (s *serializer) Marshal(v interface{}) ([]byte, error) {
-	return json.Marshal(v)
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return data, nil
 }
 
 func (s *serializer) Unmarshal(data []byte, v interface{}) error {
-	return json.Unmarshal(data, v)
+	if err := json.Unmarshal(data, v); err != nil {
+		return stackErr.Error(err)
+	}
+	return nil
 }
 
 func eventToFunc(e interface{}) eventFunc {

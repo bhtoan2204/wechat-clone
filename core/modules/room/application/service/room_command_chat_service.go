@@ -36,10 +36,10 @@ func (s *RoomCommandService) CreateDirectConversation(ctx context.Context, accou
 
 	if err := s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		if err := txRepos.RoomRepository().CreateRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		if err := txRepos.RoomReadRepository().UpsertRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		for _, member := range members {
 			if err := txRepos.RoomMemberRepository().CreateRoomMember(ctx, member); err != nil {
@@ -53,13 +53,13 @@ func (s *RoomCommandService) CreateDirectConversation(ctx context.Context, accou
 			}
 		}
 		if err := s.aggregateService.PublishRoomCreated(ctx, txRepos.RoomOutboxEventsRepository(), room.ID, room.RoomType, len(members)); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		message, err := createSystemMessageTx(ctx, txRepos, room.ID, accountID, fmt.Sprintf("%s started a direct conversation", accountID), now)
 		if err != nil {
-			return err
+			return stackErr.Error(err)
 		}
-		return txRepos.RoomReadRepository().UpdateRoomStats(ctx, room.ID, len(members), message, now)
+		return stackErr.Error(txRepos.RoomReadRepository().UpdateRoomStats(ctx, room.ID, len(members), message, now))
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -80,10 +80,10 @@ func (s *RoomCommandService) CreateGroup(ctx context.Context, accountID string, 
 
 	if err := s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		if err := txRepos.RoomRepository().CreateRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		if err := txRepos.RoomReadRepository().UpsertRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 
 		memberCount := 0
@@ -105,13 +105,13 @@ func (s *RoomCommandService) CreateGroup(ctx context.Context, accountID string, 
 		}
 
 		if err := s.aggregateService.PublishRoomCreated(ctx, txRepos.RoomOutboxEventsRepository(), room.ID, room.RoomType, memberCount); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		message, err := createSystemMessageTx(ctx, txRepos, room.ID, accountID, fmt.Sprintf("%s created the group", accountID), now)
 		if err != nil {
-			return err
+			return stackErr.Error(err)
 		}
-		return txRepos.RoomReadRepository().UpdateRoomStats(ctx, room.ID, memberCount, message, now)
+		return stackErr.Error(txRepos.RoomReadRepository().UpdateRoomStats(ctx, room.ID, memberCount, message, now))
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -140,21 +140,21 @@ func (s *RoomCommandService) UpdateGroup(ctx context.Context, accountID, roomID 
 	if err := s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		room.Touch(now)
 		if err := txRepos.RoomRepository().UpdateRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		if err := txRepos.RoomReadRepository().UpdateRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 
 		message, err := createSystemMessageTx(ctx, txRepos, room.ID, accountID, fmt.Sprintf("group renamed to %s", room.Name), now)
 		if err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		members, err := txRepos.RoomMemberReadRepository().ListRoomMembers(ctx, room.ID)
 		if err != nil {
-			return err
+			return stackErr.Error(err)
 		}
-		return txRepos.RoomReadRepository().UpdateRoomStats(ctx, room.ID, len(members), message, now)
+		return stackErr.Error(txRepos.RoomReadRepository().UpdateRoomStats(ctx, room.ID, len(members), message, now))
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -173,7 +173,7 @@ func (s *RoomCommandService) AddMember(ctx context.Context, actorID, roomID stri
 
 	accountID := strings.TrimSpace(command.AccountID)
 	if accountID == "" {
-		return nil, errors.New("account_id is required")
+		return nil, stackErr.Error(errors.New("account_id is required"))
 	}
 
 	if existing, err := s.repos.RoomMemberRepository().GetRoomMemberByAccount(ctx, roomID, accountID); err == nil && existing != nil {
@@ -187,32 +187,32 @@ func (s *RoomCommandService) AddMember(ctx context.Context, actorID, roomID stri
 	}
 	if err := s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		if err := txRepos.RoomMemberRepository().CreateRoomMember(ctx, newMember); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		if err := txRepos.RoomMemberReadRepository().UpsertRoomMember(ctx, newMember); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		if err := s.aggregateService.PublishMemberAdded(ctx, txRepos.RoomOutboxEventsRepository(), roomID, newMember.AccountID, newMember.Role, newMember.CreatedAt); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 
 		room.Touch(now)
 		if err := txRepos.RoomRepository().UpdateRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		if err := txRepos.RoomReadRepository().UpdateRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 
 		message, err := createSystemMessageTx(ctx, txRepos, roomID, actorID, fmt.Sprintf("%s joined", accountID), now)
 		if err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		members, err := txRepos.RoomMemberReadRepository().ListRoomMembers(ctx, roomID)
 		if err != nil {
-			return err
+			return stackErr.Error(err)
 		}
-		return txRepos.RoomReadRepository().UpdateRoomStats(ctx, roomID, len(members), message, now)
+		return stackErr.Error(txRepos.RoomReadRepository().UpdateRoomStats(ctx, roomID, len(members), message, now))
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -239,32 +239,32 @@ func (s *RoomCommandService) RemoveMember(ctx context.Context, actorID, roomID s
 	now := time.Now().UTC()
 	if err := s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		if err := txRepos.RoomMemberRepository().DeleteRoomMember(ctx, roomID, accountID); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		if err := txRepos.RoomMemberReadRepository().DeleteRoomMember(ctx, roomID, accountID); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		if err := s.aggregateService.PublishMemberRemoved(ctx, txRepos.RoomOutboxEventsRepository(), roomID, removedMember.AccountID, removedMember.Role, now); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 
 		room.Touch(now)
 		if err := txRepos.RoomRepository().UpdateRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		if err := txRepos.RoomReadRepository().UpdateRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 
 		message, err := createSystemMessageTx(ctx, txRepos, roomID, actorID, fmt.Sprintf("%s left", accountID), now)
 		if err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		members, err := txRepos.RoomMemberReadRepository().ListRoomMembers(ctx, roomID)
 		if err != nil {
-			return err
+			return stackErr.Error(err)
 		}
-		return txRepos.RoomReadRepository().UpdateRoomStats(ctx, roomID, len(members), message, now)
+		return stackErr.Error(txRepos.RoomReadRepository().UpdateRoomStats(ctx, roomID, len(members), message, now))
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -287,21 +287,21 @@ func (s *RoomCommandService) PinMessage(ctx context.Context, actorID, roomID str
 	}
 	if err := s.repos.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		if err := txRepos.RoomRepository().UpdateRoom(ctx, room); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		if err := txRepos.RoomReadRepository().UpdatePinnedMessage(ctx, roomID, room.PinnedMessageID, now); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 
 		message, err := createSystemMessageTx(ctx, txRepos, roomID, actorID, fmt.Sprintf("message %s pinned", room.PinnedMessageID), now)
 		if err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 		members, err := txRepos.RoomMemberReadRepository().ListRoomMembers(ctx, roomID)
 		if err != nil {
-			return err
+			return stackErr.Error(err)
 		}
-		return txRepos.RoomReadRepository().UpdateRoomStats(ctx, roomID, len(members), message, now)
+		return stackErr.Error(txRepos.RoomReadRepository().UpdateRoomStats(ctx, roomID, len(members), message, now))
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}

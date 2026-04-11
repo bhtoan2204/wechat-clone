@@ -41,6 +41,7 @@ func buildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 	listChatConversations := cqrs.NewDispatcher(roomquery.NewListChatConversationsHandler(chatQueryService))
 	getChatConversation := cqrs.NewDispatcher(roomquery.NewGetChatConversationHandler(chatQueryService))
 	listChatMessages := cqrs.NewDispatcher(roomquery.NewListChatMessagesHandler(chatQueryService))
+	searchChatMentions := cqrs.NewDispatcher(roomquery.NewSearchChatMentionsHandler(chatQueryService))
 	getChatPresence := cqrs.NewDispatcher(roomquery.NewGetChatPresenceHandler(chatQueryService))
 	server, err := roomserver.NewHTTPServer(
 		createRoom,
@@ -54,6 +55,7 @@ func buildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 		listChatConversations,
 		getChatConversation,
 		listChatMessages,
+		searchChatMentions,
 		sendChatMessage,
 		editChatMessage,
 		deleteChatMessage,
@@ -72,10 +74,15 @@ func buildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 }
 
 func buildProjectionRuntime(cfg *config.Config, appContext *appCtx.AppContext) (modruntime.Module, error) {
-	messageHandler, err := buildProjectionHandler(cfg, appContext)
+	accountProjection, err := buildProjectionHandler(cfg, appContext)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 
-	return messageHandler, nil
+	servingProjection, err := buildServingProjectionProcessor(cfg, appContext)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	return modruntime.NewComposite(accountProjection, servingProjection), nil
 }

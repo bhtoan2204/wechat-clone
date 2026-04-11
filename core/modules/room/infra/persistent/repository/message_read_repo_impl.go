@@ -11,7 +11,6 @@ import (
 	"go-socket/core/modules/room/infra/persistent/models"
 	"go-socket/core/shared/pkg/stackErr"
 
-	"github.com/samber/lo"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -25,7 +24,10 @@ func NewMessageReadRepoImpl(db *gorm.DB) repos.MessageReadRepository {
 }
 
 func (r *messageReadRepoImpl) UpsertMessage(ctx context.Context, message *entity.MessageEntity) error {
-	modelMessage := r.toModel(message)
+	modelMessage, err := r.toModel(message)
+	if err != nil {
+		return stackErr.Error(err)
+	}
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		UpdateAll: true,
@@ -37,7 +39,11 @@ func (r *messageReadRepoImpl) GetMessageByID(ctx context.Context, id string) (*e
 	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&message).Error; err != nil {
 		return nil, stackErr.Error(err)
 	}
-	return r.toEntity(&message), nil
+	entityMessage, err := r.toEntity(&message)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return entityMessage, nil
 }
 
 func (r *messageReadRepoImpl) GetLastMessage(ctx context.Context, roomID string) (*entity.MessageEntity, error) {
@@ -48,7 +54,11 @@ func (r *messageReadRepoImpl) GetLastMessage(ctx context.Context, roomID string)
 		First(&message).Error; err != nil {
 		return nil, stackErr.Error(err)
 	}
-	return r.toEntity(&message), nil
+	entityMessage, err := r.toEntity(&message)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return entityMessage, nil
 }
 
 func (r *messageReadRepoImpl) ListMessages(ctx context.Context, accountID, roomID string, options repos.MessageListOptions) ([]*entity.MessageEntity, error) {
@@ -81,9 +91,16 @@ func (r *messageReadRepoImpl) ListMessages(ctx context.Context, accountID, roomI
 		})
 	}
 
-	return lo.Map(messages, func(message *models.MessageReadModel, _ int) *entity.MessageEntity {
-		return r.toEntity(message)
-	}), nil
+	results := make([]*entity.MessageEntity, 0, len(messages))
+	for _, message := range messages {
+		entityMessage, err := r.toEntity(message)
+		if err != nil {
+			return nil, stackErr.Error(err)
+		}
+		results = append(results, entityMessage)
+	}
+
+	return results, nil
 }
 
 func (r *messageReadRepoImpl) UpsertMessageReceipt(ctx context.Context, messageID, accountID, status string, deliveredAt, seenAt *time.Time, createdAt, updatedAt time.Time) error {
@@ -107,7 +124,7 @@ func (r *messageReadRepoImpl) GetMessageReceipt(ctx context.Context, messageID, 
 	if err := r.db.WithContext(ctx).
 		Where("message_id = ? AND account_id = ?", messageID, accountID).
 		First(&receipt).Error; err != nil {
-		return "", nil, nil, err
+		return "", nil, nil, stackErr.Error(err)
 	}
 	return receipt.Status, receipt.DeliveredAt, receipt.SeenAt, nil
 }
@@ -117,7 +134,7 @@ func (r *messageReadRepoImpl) CountMessageReceiptsByStatus(ctx context.Context, 
 	if err := r.db.WithContext(ctx).Model(&models.MessageReceiptReadModel{}).
 		Where("message_id = ? AND status = ?", messageID, status).
 		Count(&count).Error; err != nil {
-		return 0, err
+		return 0, stackErr.Error(err)
 	}
 	return count, nil
 }
@@ -145,18 +162,25 @@ func (r *messageReadRepoImpl) CountUnreadMessages(ctx context.Context, roomID, a
 		tx = tx.Where("created_at > ?", *lastReadAt)
 	}
 	if err := tx.Count(&count).Error; err != nil {
-		return 0, err
+		return 0, stackErr.Error(err)
 	}
 	return count, nil
 }
 
-func (r *messageReadRepoImpl) toModel(e *entity.MessageEntity) *models.MessageReadModel {
+func (r *messageReadRepoImpl) toModel(e *entity.MessageEntity) (*models.MessageReadModel, error) {
+	mentionsJSON, err := marshalMessageMentions(e.Mentions)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
 	return &models.MessageReadModel{
 		ID:                     e.ID,
 		RoomID:                 e.RoomID,
 		SenderID:               e.SenderID,
 		Message:                e.Message,
 		MessageType:            e.MessageType,
+		MentionsJSON:           mentionsJSON,
+		MentionAll:             e.MentionAll,
 		ReplyToMessageID:       nullableString(e.ReplyToMessageID),
 		ForwardedFromMessageID: nullableString(e.ForwardedFromMessageID),
 		FileName:               nullableString(e.FileName),
@@ -166,16 +190,23 @@ func (r *messageReadRepoImpl) toModel(e *entity.MessageEntity) *models.MessageRe
 		EditedAt:               e.EditedAt,
 		DeletedForEveryoneAt:   e.DeletedForEveryoneAt,
 		CreatedAt:              e.CreatedAt,
-	}
+	}, nil
 }
 
-func (r *messageReadRepoImpl) toEntity(m *models.MessageReadModel) *entity.MessageEntity {
+func (r *messageReadRepoImpl) toEntity(m *models.MessageReadModel) (*entity.MessageEntity, error) {
+	mentions, err := unmarshalMessageMentions(m.MentionsJSON)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
 	return &entity.MessageEntity{
 		ID:                     m.ID,
 		RoomID:                 m.RoomID,
 		SenderID:               m.SenderID,
 		Message:                m.Message,
 		MessageType:            m.MessageType,
+		Mentions:               mentions,
+		MentionAll:             m.MentionAll,
 		ReplyToMessageID:       derefString(m.ReplyToMessageID),
 		ForwardedFromMessageID: derefString(m.ForwardedFromMessageID),
 		FileName:               derefString(m.FileName),
@@ -185,5 +216,5 @@ func (r *messageReadRepoImpl) toEntity(m *models.MessageReadModel) *entity.Messa
 		EditedAt:               m.EditedAt,
 		DeletedForEveryoneAt:   m.DeletedForEveryoneAt,
 		CreatedAt:              m.CreatedAt,
-	}
+	}, nil
 }

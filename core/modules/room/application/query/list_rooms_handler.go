@@ -10,6 +10,7 @@ import (
 	"go-socket/core/modules/room/application/service"
 	repos "go-socket/core/modules/room/domain/repos"
 	"go-socket/core/shared/pkg/cqrs"
+	"go-socket/core/shared/pkg/stackErr"
 )
 
 type listRoomsHandler struct {
@@ -24,5 +25,5 @@ func NewListRooms(
 }
 
 func (u *listRoomsHandler) Handle(ctx context.Context, req *in.ListRoomsRequest) (*out.ListRoomsResponse, error) {
-	return nil, fmt.Errorf("not implemented yet")
+	return nil, stackErr.Error(fmt.Errorf("not implemented yet"))
 }

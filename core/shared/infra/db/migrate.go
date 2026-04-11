@@ -45,7 +45,7 @@ func (mgt *migrateTool) Migrate(source, connStr string) error {
 
 	db, err := sql.Open("oracle", connStr)
 	if err != nil {
-		return fmt.Errorf("open oracle failed: %v", err)
+		return stackErr.Error(fmt.Errorf("open oracle failed: %v", err))
 	}
 	defer db.Close()
 
@@ -68,7 +68,7 @@ func (mgt *migrateTool) Migrate(source, connStr string) error {
 			continue
 		}
 		if err := applyMigrationFile(db, file.Path, file.Version); err != nil {
-			return err
+			return stackErr.Error(err)
 		}
 	}
 
@@ -83,12 +83,12 @@ type migrationFile struct {
 func normalizeFileSource(source string) (string, error) {
 	path := strings.TrimPrefix(source, "file://")
 	if path == "" {
-		return "", fmt.Errorf("migration source path is empty")
+		return "", stackErr.Error(fmt.Errorf("migration source path is empty"))
 	}
 	if !filepath.IsAbs(path) {
 		cwd, err := os.Getwd()
 		if err != nil {
-			return "", fmt.Errorf("get cwd failed: %v", err)
+			return "", stackErr.Error(fmt.Errorf("get cwd failed: %v", err))
 		}
 		path = filepath.Join(cwd, path)
 	}
@@ -127,11 +127,11 @@ func listMigrationFiles(dir string) ([]migrationFile, error) {
 func parseVersion(name string) (int, error) {
 	parts := strings.SplitN(name, "_", 2)
 	if len(parts) < 2 {
-		return 0, fmt.Errorf("invalid migration filename: %s", name)
+		return 0, stackErr.Error(fmt.Errorf("invalid migration filename: %s", name))
 	}
 	version, err := strconv.Atoi(parts[0])
 	if err != nil {
-		return 0, fmt.Errorf("invalid migration version in %s: %v", name, err)
+		return 0, stackErr.Error(fmt.Errorf("invalid migration version in %s: %v", name, err))
 	}
 	return version, nil
 }
@@ -141,9 +141,9 @@ func ensureSchemaMigrations(db *sql.DB) error {
 CREATE TABLE schema_migrations (
 	version NUMBER(10) PRIMARY KEY,
 	applied_at TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL
-)`
+	)`
 	if _, err := db.Exec(stmt); err != nil && !isObjectExistsError(err) {
-		return fmt.Errorf("create schema_migrations failed: %v", err)
+		return stackErr.Error(fmt.Errorf("create schema_migrations failed: %v", err))
 	}
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	valueobject "go-socket/core/modules/account/domain/value_object"
+	"go-socket/core/shared/pkg/stackErr"
 )
 
 var ErrAccountEmailAlreadyExists = errors.New("account email already exists")
@@ -16,10 +17,10 @@ type EmailUniquenessChecker interface {
 func EnsureEmailAvailable(ctx context.Context, checker EmailUniquenessChecker, email valueobject.Email) error {
 	exists, err := checker.IsEmailExists(ctx, email.Value())
 	if err != nil {
-		return err
+		return stackErr.Error(err)
 	}
 	if exists {
-		return ErrAccountEmailAlreadyExists
+		return stackErr.Error(ErrAccountEmailAlreadyExists)
 	}
 	return nil
 }

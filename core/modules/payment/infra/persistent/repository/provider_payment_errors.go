@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	paymentrepos "go-socket/core/modules/payment/domain/repos"
+	"go-socket/core/shared/pkg/stackErr"
 
 	"gorm.io/gorm"
 )
@@ -14,12 +15,12 @@ func mapError(err error) error {
 		return nil
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return paymentrepos.ErrProviderPaymentNotFound
+		return stackErr.Error(paymentrepos.ErrProviderPaymentNotFound)
 	}
 	if isOracleUniqueConstraintError(err) {
-		return paymentrepos.ErrProviderPaymentDuplicateIntent
+		return stackErr.Error(paymentrepos.ErrProviderPaymentDuplicateIntent)
 	}
-	return err
+	return stackErr.Error(err)
 }
 
 func isOracleUniqueConstraintError(err error) bool {
