@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"go-socket/core/modules/room/application/projection"
-	"go-socket/core/modules/room/domain/entity"
-	roomrepos "go-socket/core/modules/room/domain/repos"
 	"go-socket/core/modules/room/infra/projection/cassandra/views"
 	"go-socket/core/shared/config"
 	"go-socket/core/shared/pkg/stackErr"
@@ -32,20 +30,9 @@ func NewQueryRepoImpl(
 		return nil, stackErr.Error(err)
 	}
 
-	var (
-		roomRepo    roomrepos.RoomRepository
-		messageRepo roomrepos.MessageRepository
-	)
-
 	return &queryRepoImpl{
-		roomReadRepo: &roomQueryRepo{
-			store:    store,
-			roomRepo: roomRepo,
-		},
-		messageReadRepo: &messageQueryRepo{
-			store:       store,
-			messageRepo: messageRepo,
-		},
+		roomReadRepo:       &roomQueryRepo{store: store},
+		messageReadRepo:    &messageQueryRepo{store: store},
 		roomMemberReadRepo: &roomMemberQueryRepo{store: store},
 	}, nil
 }
@@ -63,25 +50,11 @@ func (r *queryRepoImpl) RoomMemberReadRepository() projection.RoomMemberReadRepo
 }
 
 type roomQueryRepo struct {
-	store    *cassandraProjectionStore
-	roomRepo roomrepos.RoomRepository
+	store *cassandraProjectionStore
 }
 
 func (r *roomQueryRepo) ListRooms(ctx context.Context, options utils.QueryOptions) ([]*views.RoomView, error) {
-	if r.roomRepo == nil {
-		return r.store.ListRooms(ctx, options)
-	}
-
-	rooms, err := r.roomRepo.ListRooms(ctx, options)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-
-	results := make([]*views.RoomView, 0, len(rooms))
-	for _, room := range rooms {
-		results = append(results, roomEntityToView(room))
-	}
-	return results, nil
+	return r.store.ListRooms(ctx, options)
 }
 
 func (r *roomQueryRepo) ListRoomsByAccount(ctx context.Context, accountID string, options utils.QueryOptions) ([]*views.RoomView, error) {
@@ -89,32 +62,15 @@ func (r *roomQueryRepo) ListRoomsByAccount(ctx context.Context, accountID string
 }
 
 func (r *roomQueryRepo) GetRoomByID(ctx context.Context, id string) (*views.RoomView, error) {
-	if r.roomRepo == nil {
-		return r.store.GetRoomByID(ctx, id)
-	}
-
-	room, err := r.roomRepo.GetRoomByID(ctx, strings.TrimSpace(id))
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-	return roomEntityToView(room), nil
+	return r.store.GetRoomByID(ctx, id)
 }
 
 type messageQueryRepo struct {
-	store       *cassandraProjectionStore
-	messageRepo roomrepos.MessageRepository
+	store *cassandraProjectionStore
 }
 
 func (r *messageQueryRepo) GetMessageByID(ctx context.Context, id string) (*views.MessageView, error) {
-	if r.messageRepo == nil {
-		return r.store.GetMessageByID(ctx, id)
-	}
-
-	message, err := r.messageRepo.GetMessageByID(ctx, strings.TrimSpace(id))
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-	return messageEntityToView(message), nil
+	return r.store.GetMessageByID(ctx, id)
 }
 
 func (r *messageQueryRepo) GetLastMessage(ctx context.Context, roomID string) (*views.MessageView, error) {
@@ -127,8 +83,8 @@ func (r *messageQueryRepo) ListMessages(
 	roomID string,
 	options projection.MessageListOptions,
 ) ([]*views.MessageView, error) {
-	if r.messageRepo != nil && options.BeforeAt == nil && strings.TrimSpace(options.BeforeID) != "" {
-		message, err := r.messageRepo.GetMessageByID(ctx, strings.TrimSpace(options.BeforeID))
+	if options.BeforeAt == nil && strings.TrimSpace(options.BeforeID) != "" {
+		message, err := r.store.GetMessageByID(ctx, strings.TrimSpace(options.BeforeID))
 		if err != nil {
 			return nil, stackErr.Error(err)
 		}
@@ -138,7 +94,6 @@ func (r *messageQueryRepo) ListMessages(
 		}
 	}
 
-	// Resolve cursor from canonical storage so Cassandra only keeps timeline-optimized tables.
 	options.BeforeID = ""
 	return r.store.ListMessages(ctx, accountID, roomID, options)
 }
@@ -272,64 +227,4 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
-}
-
-func roomEntityToView(room *entity.Room) *views.RoomView {
-	if room == nil {
-		return nil
-	}
-
-	return &views.RoomView{
-		ID:              strings.TrimSpace(room.ID),
-		Name:            strings.TrimSpace(room.Name),
-		Description:     strings.TrimSpace(room.Description),
-		RoomType:        strings.TrimSpace(string(room.RoomType)),
-		OwnerID:         strings.TrimSpace(room.OwnerID),
-		DirectKey:       stringPtr(room.DirectKey),
-		PinnedMessageID: stringPtr(room.PinnedMessageID),
-		CreatedAt:       room.CreatedAt.UTC(),
-		UpdatedAt:       room.UpdatedAt.UTC(),
-	}
-}
-
-func messageEntityToView(message *entity.MessageEntity) *views.MessageView {
-	if message == nil {
-		return nil
-	}
-
-	mentions := make([]views.MessageMentionView, 0, len(message.Mentions))
-	for _, mention := range message.Mentions {
-		mentions = append(mentions, views.MessageMentionView{
-			AccountID:   strings.TrimSpace(mention.AccountID),
-			DisplayName: strings.TrimSpace(mention.DisplayName),
-			Username:    strings.TrimSpace(mention.Username),
-		})
-	}
-
-	return &views.MessageView{
-		ID:                     strings.TrimSpace(message.ID),
-		RoomID:                 strings.TrimSpace(message.RoomID),
-		SenderID:               strings.TrimSpace(message.SenderID),
-		Message:                message.Message,
-		MessageType:            strings.TrimSpace(message.MessageType),
-		Mentions:               mentions,
-		MentionAll:             message.MentionAll,
-		ReplyToMessageID:       strings.TrimSpace(message.ReplyToMessageID),
-		ForwardedFromMessageID: strings.TrimSpace(message.ForwardedFromMessageID),
-		FileName:               strings.TrimSpace(message.FileName),
-		FileSize:               message.FileSize,
-		MimeType:               strings.TrimSpace(message.MimeType),
-		ObjectKey:              strings.TrimSpace(message.ObjectKey),
-		EditedAt:               cloneTime(message.EditedAt),
-		DeletedForEveryoneAt:   cloneTime(message.DeletedForEveryoneAt),
-		CreatedAt:              message.CreatedAt.UTC(),
-	}
-}
-
-func stringPtr(value string) *string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return nil
-	}
-	return &value
 }

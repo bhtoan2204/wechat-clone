@@ -12,12 +12,10 @@ import (
 	roomprojection "go-socket/core/modules/room/application/projection"
 	"go-socket/core/modules/room/infra/projection/cassandra/views"
 	"go-socket/core/shared/config"
-	"go-socket/core/shared/contracts/events"
 	"go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/utils"
 
 	"github.com/gocql/gocql"
-	"github.com/samber/lo"
 )
 
 const (
@@ -38,6 +36,7 @@ type cassandraProjectionStore struct {
 	roomsByAccountTable  string
 	roomMembersTable     string
 	roomTimelineTable    string
+	messageByIDTable     string
 	messageReceiptsTable string
 	messageDeletesTable  string
 }
@@ -62,6 +61,9 @@ type roomMemberProjectionRow struct {
 	RoomID          string
 	MemberID        string
 	AccountID       string
+	DisplayName     string
+	Username        string
+	AvatarObjectKey string
 	Role            string
 	LastDeliveredAt *time.Time
 	LastReadAt      *time.Time
@@ -104,6 +106,7 @@ func NewCassandraProjectionStore(cfg config.CassandraConfig, session *gocql.Sess
 		roomsByAccountTable:  normalizeProjectionTable(defaultRoomProjectionByAccount),
 		roomMembersTable:     normalizeProjectionTable(defaultRoomMemberProjectionTable),
 		roomTimelineTable:    normalizeTimelineTable(cfg.RoomTimelineTable),
+		messageByIDTable:     normalizeProjectionTable(defaultRoomMessageByIDTable),
 		messageReceiptsTable: normalizeProjectionTable(defaultRoomMessageReceiptTable),
 		messageDeletesTable:  normalizeProjectionTable(defaultRoomMessageDeletionTable),
 	}
@@ -158,6 +161,9 @@ func (s *cassandraProjectionStore) ensureSchema(ctx context.Context) error {
 				room_id text,
 				account_id text,
 				member_id text,
+				display_name text,
+				username text,
+				avatar_object_key text,
 				role text,
 				last_delivered_at timestamp,
 				last_read_at timestamp,
@@ -194,6 +200,31 @@ func (s *cassandraProjectionStore) ensureSchema(ctx context.Context) error {
 		`, s.roomTimelineTable),
 		fmt.Sprintf(`
 			CREATE TABLE IF NOT EXISTS %s (
+				message_id text PRIMARY KEY,
+				room_id text,
+				room_name text,
+				room_type text,
+				message_content text,
+				message_type text,
+				reply_to_message_id text,
+				forwarded_from_message_id text,
+				file_name text,
+				file_size bigint,
+				mime_type text,
+				object_key text,
+				message_sender_id text,
+				message_sender_name text,
+				message_sender_email text,
+				message_sent_at timestamp,
+				mentions_json text,
+				mention_all boolean,
+				mentioned_account_ids list<text>,
+				edited_at timestamp,
+				deleted_for_everyone_at timestamp
+			)
+		`, s.messageByIDTable),
+		fmt.Sprintf(`
+			CREATE TABLE IF NOT EXISTS %s (
 				message_id text,
 				account_id text,
 				room_id text,
@@ -223,51 +254,105 @@ func (s *cassandraProjectionStore) ensureSchema(ctx context.Context) error {
 		}
 	}
 
+	if err := s.ensureRoomMemberProjectionColumns(ctx); err != nil {
+		return stackErr.Error(err)
+	}
+
 	return nil
 }
 
-func (s *cassandraProjectionStore) ProjectRoom(ctx context.Context, projection *events.RoomProjection) error {
-	if s == nil || s.session == nil || projection == nil {
+func (s *cassandraProjectionStore) ensureRoomMemberProjectionColumns(ctx context.Context) error {
+	statements := []string{
+		fmt.Sprintf(`ALTER TABLE %s ADD display_name text`, s.roomMembersTable),
+		fmt.Sprintf(`ALTER TABLE %s ADD username text`, s.roomMembersTable),
+		fmt.Sprintf(`ALTER TABLE %s ADD avatar_object_key text`, s.roomMembersTable),
+	}
+
+	for _, statement := range statements {
+		if err := s.session.Query(statement).WithContext(ctx).Exec(); err != nil {
+			if isCassandraExistingColumnError(err) {
+				continue
+			}
+			return stackErr.Error(fmt.Errorf("ensure cassandra room member projection columns failed: %v", err))
+		}
+	}
+
+	return nil
+}
+
+func isCassandraExistingColumnError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "already exists")
+}
+
+func (s *cassandraProjectionStore) SyncRoomAggregate(ctx context.Context, projection *roomprojection.RoomAggregateSync) error {
+	if s == nil || s.session == nil || projection == nil || projection.Room == nil {
 		return nil
 	}
 
-	existing, err := s.getRoomRow(ctx, projection.RoomID)
+	roomID := strings.TrimSpace(projection.Room.RoomID)
+	previousRoom, err := s.getRoomRow(ctx, roomID)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+	previousMembers, err := s.listRoomMemberRows(ctx, roomID)
 	if err != nil {
 		return stackErr.Error(err)
 	}
 
-	nextRow := mergeRoomProjection(existing, projection)
-	if err := s.upsertRoomRow(ctx, nextRow); err != nil {
+	nextRoom := roomProjectionToRow(projection.Room)
+	if err := s.upsertRoomRow(ctx, nextRoom); err != nil {
 		return stackErr.Error(err)
 	}
-	return stackErr.Error(s.syncRoomIndexes(ctx, existing, nextRow))
-}
 
-func (s *cassandraProjectionStore) DeleteProjectedRoom(ctx context.Context, roomID string) error {
+	currentMembers := make(map[string]*roomMemberProjectionRow, len(projection.Members))
+	for idx := range projection.Members {
+		member := projection.Members[idx]
+		memberRow := roomMemberProjectionToRow(&member)
+		if memberRow == nil {
+			continue
+		}
+		currentMembers[strings.TrimSpace(memberRow.AccountID)] = memberRow
+		if err := s.upsertRoomMemberRow(ctx, &member); err != nil {
+			return stackErr.Error(err)
+		}
+	}
+
+	for _, member := range previousMembers {
+		if member == nil {
+			continue
+		}
+		accountID := strings.TrimSpace(member.AccountID)
+		if previousRoom != nil {
+			if err := s.deleteAccountRoomIndex(ctx, accountID, previousRoom); err != nil {
+				return stackErr.Error(err)
+			}
+		}
+		if _, exists := currentMembers[accountID]; !exists {
+			if err := s.deleteRoomMemberRow(ctx, roomID, accountID); err != nil {
+				return stackErr.Error(err)
+			}
+		}
+	}
+
+	for accountID := range currentMembers {
+		if err := s.upsertAccountRoomIndex(ctx, accountID, nextRoom); err != nil {
+			return stackErr.Error(err)
+		}
+	}
+
 	return nil
 }
 
-func (s *cassandraProjectionStore) ProjectRoomMember(ctx context.Context, projection *events.RoomMemberProjection) error {
-	if s == nil || s.session == nil || projection == nil {
-		return nil
-	}
-
-	if err := s.upsertRoomMemberRow(ctx, projection); err != nil {
-		return stackErr.Error(err)
-	}
-
-	roomRow, err := s.getRoomRow(ctx, projection.RoomID)
-	if err != nil {
-		return stackErr.Error(err)
-	}
-	if roomRow == nil {
-		return nil
-	}
-	return stackErr.Error(s.upsertAccountRoomIndex(ctx, strings.TrimSpace(projection.AccountID), roomRow))
-}
-
-func (s *cassandraProjectionStore) DeleteProjectedRoomMember(ctx context.Context, roomID, accountID string) error {
+func (s *cassandraProjectionStore) DeleteRoomAggregate(ctx context.Context, roomID string) error {
 	if s == nil || s.session == nil {
+		return nil
+	}
+
+	roomID = strings.TrimSpace(roomID)
+	if roomID == "" {
 		return nil
 	}
 
@@ -275,82 +360,83 @@ func (s *cassandraProjectionStore) DeleteProjectedRoomMember(ctx context.Context
 	if err != nil {
 		return stackErr.Error(err)
 	}
-	if err := s.deleteRoomMemberRow(ctx, roomID, accountID); err != nil {
+	members, err := s.listRoomMemberRows(ctx, roomID)
+	if err != nil {
 		return stackErr.Error(err)
 	}
-	if roomRow != nil {
-		return stackErr.Error(s.deleteAccountRoomIndex(ctx, strings.TrimSpace(accountID), roomRow))
+
+	for _, member := range members {
+		if member == nil {
+			continue
+		}
+		accountID := strings.TrimSpace(member.AccountID)
+		if roomRow != nil {
+			if err := s.deleteAccountRoomIndex(ctx, accountID, roomRow); err != nil {
+				return stackErr.Error(err)
+			}
+		}
+		if err := s.deleteRoomMemberRow(ctx, roomID, accountID); err != nil {
+			return stackErr.Error(err)
+		}
+		if err := s.deleteMessageDeletePartition(ctx, accountID, roomID); err != nil {
+			return stackErr.Error(err)
+		}
+	}
+
+	if err := s.deleteRoomTimelinePartition(ctx, roomID); err != nil {
+		return stackErr.Error(err)
+	}
+	if err := s.deleteRoomRow(ctx, roomID); err != nil {
+		return stackErr.Error(err)
 	}
 	return nil
 }
 
-func (s *cassandraProjectionStore) ProjectMessage(ctx context.Context, projection *events.TimelineMessageProjection) error {
+func (s *cassandraProjectionStore) SyncMessageAggregate(ctx context.Context, projection *roomprojection.MessageAggregateSync) error {
 	if s == nil || s.session == nil || projection == nil {
 		return nil
 	}
 
-	return stackErr.Error(s.upsertTimelineMessageRow(ctx, projection))
-}
-
-func (s *cassandraProjectionStore) ProjectMessageReceipt(ctx context.Context, projection *events.MessageReceiptProjection) error {
-	if s == nil || s.session == nil || projection == nil {
-		return nil
+	if projection.Message != nil {
+		if err := s.upsertTimelineMessageRow(ctx, projection.Message); err != nil {
+			return stackErr.Error(err)
+		}
+		if err := s.upsertMessageByIDRow(ctx, projection.Message); err != nil {
+			return stackErr.Error(err)
+		}
 	}
 
-	statement := fmt.Sprintf(`
-		INSERT INTO %s (
-			message_id,
-			account_id,
-			room_id,
-			status,
-			delivered_at,
-			seen_at,
-			created_at,
-			updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, s.messageReceiptsTable)
-
-	if err := s.session.Query(
-		statement,
-		projection.MessageID,
-		projection.AccountID,
-		projection.RoomID,
-		projection.Status,
-		projection.DeliveredAt,
-		projection.SeenAt,
-		projection.CreatedAt.UTC(),
-		projection.UpdatedAt.UTC(),
-	).WithContext(ctx).Exec(); err != nil {
-		return stackErr.Error(fmt.Errorf("upsert cassandra message receipt projection failed: %v", err))
+	var roomRow *roomProjectionRow
+	roomID := projectionRoomID(projection)
+	if len(projection.Members) > 0 && roomID != "" {
+		var err error
+		roomRow, err = s.getRoomRow(ctx, roomID)
+		if err != nil {
+			return stackErr.Error(err)
+		}
 	}
 
-	return nil
-}
-
-func (s *cassandraProjectionStore) ProjectMessageDeletion(ctx context.Context, projection *events.MessageDeletionProjection) error {
-	if s == nil || s.session == nil || projection == nil {
-		return nil
+	for idx := range projection.Members {
+		member := projection.Members[idx]
+		if err := s.upsertRoomMemberRow(ctx, &member); err != nil {
+			return stackErr.Error(err)
+		}
+		if roomRow != nil {
+			if err := s.upsertAccountRoomIndex(ctx, strings.TrimSpace(member.AccountID), roomRow); err != nil {
+				return stackErr.Error(err)
+			}
+		}
 	}
 
-	statement := fmt.Sprintf(`
-		INSERT INTO %s (
-			account_id,
-			room_id,
-			message_sent_at,
-			message_id,
-			created_at
-		) VALUES (?, ?, ?, ?, ?)
-	`, s.messageDeletesTable)
-
-	if err := s.session.Query(
-		statement,
-		projection.AccountID,
-		projection.RoomID,
-		projection.MessageSentAt.UTC(),
-		projection.MessageID,
-		projection.CreatedAt.UTC(),
-	).WithContext(ctx).Exec(); err != nil {
-		return stackErr.Error(fmt.Errorf("upsert cassandra message deletion projection failed: %v", err))
+	for idx := range projection.Receipts {
+		if err := s.upsertMessageReceiptRow(ctx, &projection.Receipts[idx]); err != nil {
+			return stackErr.Error(err)
+		}
+	}
+	for idx := range projection.Deletions {
+		if err := s.upsertMessageDeletionRow(ctx, &projection.Deletions[idx]); err != nil {
+			return stackErr.Error(err)
+		}
 	}
 
 	return nil
@@ -360,16 +446,19 @@ func (s *cassandraProjectionStore) UpsertRoom(ctx context.Context, room *views.R
 	if room == nil {
 		return nil
 	}
-	return stackErr.Error(s.ProjectRoom(ctx, &events.RoomProjection{
-		RoomID:                 room.ID,
-		Name:                   room.Name,
-		Description:            room.Description,
-		RoomType:               string(room.RoomType),
-		OwnerID:                room.OwnerID,
-		PinnedMessageID:        *room.PinnedMessageID,
-		HasLastMessageSnapshot: false,
-		CreatedAt:              room.CreatedAt,
-		UpdatedAt:              room.UpdatedAt,
+	return stackErr.Error(s.SyncRoomAggregate(ctx, &roomprojection.RoomAggregateSync{
+		Room: &roomprojection.RoomProjection{
+			RoomID:          room.ID,
+			Name:            room.Name,
+			Description:     room.Description,
+			RoomType:        string(room.RoomType),
+			OwnerID:         room.OwnerID,
+			PinnedMessageID: derefProjectionString(room.PinnedMessageID),
+			MemberCount:     room.MemberCount,
+			LastMessage:     roomLastMessageFromView(room),
+			CreatedAt:       room.CreatedAt,
+			UpdatedAt:       room.UpdatedAt,
+		},
 	}))
 }
 
@@ -378,11 +467,11 @@ func (s *cassandraProjectionStore) UpdateRoom(ctx context.Context, room *views.R
 }
 
 func (s *cassandraProjectionStore) DeleteRoom(ctx context.Context, id string) error {
-	return stackErr.Error(s.DeleteProjectedRoom(ctx, id))
+	return stackErr.Error(s.DeleteRoomAggregate(ctx, id))
 }
 
 func (s *cassandraProjectionStore) ListRooms(ctx context.Context, options utils.QueryOptions) ([]*views.RoomView, error) {
-	return nil, nil
+	return s.listRoomsFromBaseProjection(ctx, options)
 }
 
 func (s *cassandraProjectionStore) ListRoomsByAccount(ctx context.Context, accountID string, options utils.QueryOptions) ([]*views.RoomView, error) {
@@ -536,11 +625,74 @@ func (s *cassandraProjectionStore) UpsertMessage(ctx context.Context, message *v
 	if message == nil {
 		return nil
 	}
-	return stackErr.Error(s.ProjectMessage(ctx, entityMessageToTimelineProjection(message)))
+	return stackErr.Error(s.SyncMessageAggregate(ctx, &roomprojection.MessageAggregateSync{
+		Message: messageViewToProjection(message),
+	}))
 }
 
 func (s *cassandraProjectionStore) GetMessageByID(ctx context.Context, id string) (*views.MessageView, error) {
-	return nil, nil
+	statement := fmt.Sprintf(`
+		SELECT
+			room_id,
+			room_name,
+			room_type,
+			message_id,
+			message_content,
+			message_type,
+			reply_to_message_id,
+			forwarded_from_message_id,
+			file_name,
+			file_size,
+			mime_type,
+			object_key,
+			message_sender_id,
+			message_sender_name,
+			message_sender_email,
+			message_sent_at,
+			mentions_json,
+			mention_all,
+			mentioned_account_ids,
+			edited_at,
+			deleted_for_everyone_at
+		FROM %s
+		WHERE message_id = ?
+	`, s.messageByIDTable)
+
+	row := &messageProjectionRow{}
+	if err := s.session.Query(statement, strings.TrimSpace(id)).WithContext(ctx).Scan(
+		&row.RoomID,
+		&row.RoomName,
+		&row.RoomType,
+		&row.MessageID,
+		&row.MessageContent,
+		&row.MessageType,
+		&row.ReplyToMessageID,
+		&row.ForwardedFromMessageID,
+		&row.FileName,
+		&row.FileSize,
+		&row.MimeType,
+		&row.ObjectKey,
+		&row.MessageSenderID,
+		&row.MessageSenderName,
+		&row.MessageSenderEmail,
+		&row.MessageSentAt,
+		&row.MentionsJSON,
+		&row.MentionAll,
+		&row.MentionedAccountIDs,
+		&row.EditedAt,
+		&row.DeletedForEveryoneAt,
+	); err != nil {
+		if errors.Is(err, gocql.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, stackErr.Error(err)
+	}
+
+	entityMessage, err := messageRowToEntity(row)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return entityMessage, nil
 }
 
 func (s *cassandraProjectionStore) GetLastMessage(ctx context.Context, roomID string) (*views.MessageView, error) {
@@ -596,6 +748,9 @@ func (s *cassandraProjectionStore) GetLastMessage(ctx context.Context, roomID st
 		&row.EditedAt,
 		&row.DeletedForEveryoneAt,
 	); err != nil {
+		if errors.Is(err, gocql.ErrNotFound) {
+			return nil, nil
+		}
 		return nil, stackErr.Error(err)
 	}
 
@@ -675,7 +830,23 @@ func (s *cassandraProjectionStore) UpsertMessageReceipt(
 	createdAt,
 	updatedAt time.Time,
 ) error {
-	return nil
+	message, err := s.GetMessageByID(ctx, messageID)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+	if message == nil {
+		return nil
+	}
+	return stackErr.Error(s.upsertMessageReceiptRow(ctx, &roomprojection.MessageReceiptProjection{
+		RoomID:      roomIDFromMessageView(message),
+		MessageID:   messageID,
+		AccountID:   accountID,
+		Status:      status,
+		DeliveredAt: deliveredAt,
+		SeenAt:      seenAt,
+		CreatedAt:   createdAt,
+		UpdatedAt:   updatedAt,
+	}))
 }
 
 func (s *cassandraProjectionStore) GetMessageReceipt(ctx context.Context, messageID, accountID string) (string, *time.Time, *time.Time, error) {
@@ -695,6 +866,9 @@ func (s *cassandraProjectionStore) GetMessageReceipt(ctx context.Context, messag
 		&deliveredAt,
 		&seenAt,
 	); err != nil {
+		if errors.Is(err, gocql.ErrNotFound) {
+			return "", nil, nil, nil
+		}
 		return "", nil, nil, stackErr.Error(err)
 	}
 	return status, cloneTime(deliveredAt), cloneTime(seenAt), nil
@@ -733,7 +907,20 @@ func (s *cassandraProjectionStore) CountMessageReceiptsByStatus(ctx context.Cont
 }
 
 func (s *cassandraProjectionStore) UpsertMessageDeletion(ctx context.Context, messageID, accountID string, createdAt time.Time) error {
-	return nil
+	message, err := s.GetMessageByID(ctx, messageID)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+	if message == nil {
+		return nil
+	}
+	return stackErr.Error(s.upsertMessageDeletionRow(ctx, &roomprojection.MessageDeletionProjection{
+		RoomID:        message.RoomID,
+		MessageID:     messageID,
+		AccountID:     accountID,
+		MessageSentAt: message.CreatedAt,
+		CreatedAt:     createdAt,
+	}))
 }
 
 func (s *cassandraProjectionStore) CountUnreadMessages(ctx context.Context, roomID, accountID string, lastReadAt *time.Time) (int64, error) {
@@ -796,20 +983,38 @@ func (s *cassandraProjectionStore) UpsertRoomMember(ctx context.Context, roomMem
 	if roomMember == nil {
 		return nil
 	}
-	return stackErr.Error(s.ProjectRoomMember(ctx, &events.RoomMemberProjection{
-		RoomID:          roomMember.RoomID,
-		MemberID:        roomMember.ID,
-		AccountID:       roomMember.AccountID,
-		Role:            string(roomMember.Role),
-		LastDeliveredAt: cloneTime(roomMember.LastDeliveredAt),
-		LastReadAt:      cloneTime(roomMember.LastReadAt),
-		CreatedAt:       roomMember.CreatedAt,
-		UpdatedAt:       roomMember.UpdatedAt,
+	return stackErr.Error(s.SyncMessageAggregate(ctx, &roomprojection.MessageAggregateSync{
+		Members: []roomprojection.RoomMemberProjection{
+			{
+				RoomID:          roomMember.RoomID,
+				MemberID:        roomMember.ID,
+				AccountID:       roomMember.AccountID,
+				DisplayName:     roomMember.DisplayName,
+				Username:        roomMember.Username,
+				AvatarObjectKey: roomMember.AvatarObjectKey,
+				Role:            string(roomMember.Role),
+				LastDeliveredAt: cloneTime(roomMember.LastDeliveredAt),
+				LastReadAt:      cloneTime(roomMember.LastReadAt),
+				CreatedAt:       roomMember.CreatedAt,
+				UpdatedAt:       roomMember.UpdatedAt,
+			},
+		},
 	}))
 }
 
 func (s *cassandraProjectionStore) DeleteRoomMember(ctx context.Context, roomID, accountID string) error {
-	return stackErr.Error(s.DeleteProjectedRoomMember(ctx, roomID, accountID))
+	if err := s.deleteRoomMemberRow(ctx, roomID, accountID); err != nil {
+		return stackErr.Error(err)
+	}
+
+	roomRow, err := s.getRoomRow(ctx, roomID)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+	if roomRow == nil {
+		return nil
+	}
+	return stackErr.Error(s.deleteAccountRoomIndex(ctx, strings.TrimSpace(accountID), roomRow))
 }
 
 func (s *cassandraProjectionStore) ListRoomMembers(ctx context.Context, roomID string) ([]*views.RoomMemberView, error) {
@@ -834,6 +1039,9 @@ func (s *cassandraProjectionStore) GetRoomMemberByAccount(ctx context.Context, r
 			room_id,
 			account_id,
 			member_id,
+			display_name,
+			username,
+			avatar_object_key,
 			role,
 			last_delivered_at,
 			last_read_at,
@@ -848,12 +1056,18 @@ func (s *cassandraProjectionStore) GetRoomMemberByAccount(ctx context.Context, r
 		&row.RoomID,
 		&row.AccountID,
 		&row.MemberID,
+		&row.DisplayName,
+		&row.Username,
+		&row.AvatarObjectKey,
 		&row.Role,
 		&row.LastDeliveredAt,
 		&row.LastReadAt,
 		&row.CreatedAt,
 		&row.UpdatedAt,
 	); err != nil {
+		if errors.Is(err, gocql.ErrNotFound) {
+			return nil, nil
+		}
 		return nil, stackErr.Error(err)
 	}
 
@@ -870,6 +1084,9 @@ func (s *cassandraProjectionStore) listRoomMemberRows(ctx context.Context, roomI
 			room_id,
 			account_id,
 			member_id,
+			display_name,
+			username,
+			avatar_object_key,
 			role,
 			last_delivered_at,
 			last_read_at,
@@ -884,19 +1101,21 @@ func (s *cassandraProjectionStore) listRoomMemberRows(ctx context.Context, roomI
 	defer iter.Close()
 
 	var (
-		row             roomMemberProjectionRow
 		lastDeliveredAt *time.Time
 		lastReadAt      *time.Time
 	)
 	scanner := iter.Scanner()
 	for scanner.Next() {
-		row = roomMemberProjectionRow{}
+		row := &roomMemberProjectionRow{}
 		lastDeliveredAt = nil
 		lastReadAt = nil
 		if err := scanner.Scan(
 			&row.RoomID,
 			&row.AccountID,
 			&row.MemberID,
+			&row.DisplayName,
+			&row.Username,
+			&row.AvatarObjectKey,
 			&row.Role,
 			&lastDeliveredAt,
 			&lastReadAt,
@@ -909,7 +1128,7 @@ func (s *cassandraProjectionStore) listRoomMemberRows(ctx context.Context, roomI
 		row.LastReadAt = cloneTime(lastReadAt)
 		row.CreatedAt = row.CreatedAt.UTC()
 		row.UpdatedAt = row.UpdatedAt.UTC()
-		rows = append(rows, &row)
+		rows = append(rows, row)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, stackErr.Error(fmt.Errorf("iterate cassandra room member projections failed: %v", err))
@@ -920,18 +1139,21 @@ func (s *cassandraProjectionStore) listRoomMemberRows(ctx context.Context, roomI
 	return rows, nil
 }
 
-func (s *cassandraProjectionStore) upsertRoomMemberRow(ctx context.Context, projection *events.RoomMemberProjection) error {
+func (s *cassandraProjectionStore) upsertRoomMemberRow(ctx context.Context, projection *roomprojection.RoomMemberProjection) error {
 	statement := fmt.Sprintf(`
 		INSERT INTO %s (
 			room_id,
 			account_id,
 			member_id,
+			display_name,
+			username,
+			avatar_object_key,
 			role,
 			last_delivered_at,
 			last_read_at,
 			created_at,
 			updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, s.roomMembersTable)
 
 	if err := s.session.Query(
@@ -939,6 +1161,9 @@ func (s *cassandraProjectionStore) upsertRoomMemberRow(ctx context.Context, proj
 		projection.RoomID,
 		projection.AccountID,
 		projection.MemberID,
+		nullableProjectionString(projection.DisplayName),
+		nullableProjectionString(projection.Username),
+		nullableProjectionString(projection.AvatarObjectKey),
 		projection.Role,
 		projection.LastDeliveredAt,
 		projection.LastReadAt,
@@ -950,6 +1175,68 @@ func (s *cassandraProjectionStore) upsertRoomMemberRow(ctx context.Context, proj
 	return nil
 }
 
+func (s *cassandraProjectionStore) upsertMessageReceiptRow(ctx context.Context, projection *roomprojection.MessageReceiptProjection) error {
+	if projection == nil {
+		return nil
+	}
+
+	statement := fmt.Sprintf(`
+		INSERT INTO %s (
+			message_id,
+			account_id,
+			room_id,
+			status,
+			delivered_at,
+			seen_at,
+			created_at,
+			updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, s.messageReceiptsTable)
+
+	if err := s.session.Query(
+		statement,
+		projection.MessageID,
+		projection.AccountID,
+		projection.RoomID,
+		projection.Status,
+		projection.DeliveredAt,
+		projection.SeenAt,
+		projection.CreatedAt.UTC(),
+		projection.UpdatedAt.UTC(),
+	).WithContext(ctx).Exec(); err != nil {
+		return stackErr.Error(fmt.Errorf("upsert cassandra message receipt projection failed: %v", err))
+	}
+	return nil
+}
+
+func (s *cassandraProjectionStore) upsertMessageDeletionRow(ctx context.Context, projection *roomprojection.MessageDeletionProjection) error {
+	if projection == nil {
+		return nil
+	}
+
+	statement := fmt.Sprintf(`
+		INSERT INTO %s (
+			account_id,
+			room_id,
+			message_sent_at,
+			message_id,
+			created_at
+		) VALUES (?, ?, ?, ?, ?)
+	`, s.messageDeletesTable)
+
+	if err := s.session.Query(
+		statement,
+		projection.AccountID,
+		projection.RoomID,
+		projection.MessageSentAt.UTC(),
+		projection.MessageID,
+		projection.CreatedAt.UTC(),
+	).WithContext(ctx).Exec(); err != nil {
+		return stackErr.Error(fmt.Errorf("upsert cassandra message deletion projection failed: %v", err))
+	}
+	return nil
+}
+
 func (s *cassandraProjectionStore) deleteRoomMemberRow(ctx context.Context, roomID, accountID string) error {
 	if err := s.session.Query(
 		fmt.Sprintf(`DELETE FROM %s WHERE room_id = ? AND account_id = ?`, s.roomMembersTable),
@@ -957,6 +1244,37 @@ func (s *cassandraProjectionStore) deleteRoomMemberRow(ctx context.Context, room
 		strings.TrimSpace(accountID),
 	).WithContext(ctx).Exec(); err != nil {
 		return stackErr.Error(fmt.Errorf("delete cassandra room member projection failed: %v", err))
+	}
+	return nil
+}
+
+func (s *cassandraProjectionStore) deleteRoomRow(ctx context.Context, roomID string) error {
+	if err := s.session.Query(
+		fmt.Sprintf(`DELETE FROM %s WHERE room_id = ?`, s.roomTable),
+		strings.TrimSpace(roomID),
+	).WithContext(ctx).Exec(); err != nil {
+		return stackErr.Error(fmt.Errorf("delete cassandra room projection failed: %v", err))
+	}
+	return nil
+}
+
+func (s *cassandraProjectionStore) deleteRoomTimelinePartition(ctx context.Context, roomID string) error {
+	if err := s.session.Query(
+		fmt.Sprintf(`DELETE FROM %s WHERE room_id = ?`, s.roomTimelineTable),
+		strings.TrimSpace(roomID),
+	).WithContext(ctx).Exec(); err != nil {
+		return stackErr.Error(fmt.Errorf("delete cassandra room timeline projection failed: %v", err))
+	}
+	return nil
+}
+
+func (s *cassandraProjectionStore) deleteMessageDeletePartition(ctx context.Context, accountID, roomID string) error {
+	if err := s.session.Query(
+		fmt.Sprintf(`DELETE FROM %s WHERE account_id = ? AND room_id = ?`, s.messageDeletesTable),
+		strings.TrimSpace(accountID),
+		strings.TrimSpace(roomID),
+	).WithContext(ctx).Exec(); err != nil {
+		return stackErr.Error(fmt.Errorf("delete cassandra message deletion projection failed: %v", err))
 	}
 	return nil
 }
@@ -1132,7 +1450,7 @@ func (s *cassandraProjectionStore) deleteAccountRoomIndex(ctx context.Context, a
 	return nil
 }
 
-func (s *cassandraProjectionStore) upsertTimelineMessageRow(ctx context.Context, projection *events.TimelineMessageProjection) error {
+func (s *cassandraProjectionStore) upsertTimelineMessageRow(ctx context.Context, projection *roomprojection.MessageProjection) error {
 	mentionsJSON, err := json.Marshal(projection.Mentions)
 	if err != nil {
 		return stackErr.Error(fmt.Errorf("marshal cassandra timeline mentions failed: %v", err))
@@ -1189,6 +1507,67 @@ func (s *cassandraProjectionStore) upsertTimelineMessageRow(ctx context.Context,
 		projection.DeletedForEveryoneAt,
 	).WithContext(ctx).Exec(); err != nil {
 		return stackErr.Error(fmt.Errorf("upsert cassandra room timeline projection failed: %v", err))
+	}
+	return nil
+}
+
+func (s *cassandraProjectionStore) upsertMessageByIDRow(ctx context.Context, projection *roomprojection.MessageProjection) error {
+	mentionsJSON, err := json.Marshal(projection.Mentions)
+	if err != nil {
+		return stackErr.Error(fmt.Errorf("marshal cassandra message-by-id mentions failed: %v", err))
+	}
+
+	statement := fmt.Sprintf(`
+		INSERT INTO %s (
+			message_id,
+			room_id,
+			room_name,
+			room_type,
+			message_content,
+			message_type,
+			reply_to_message_id,
+			forwarded_from_message_id,
+			file_name,
+			file_size,
+			mime_type,
+			object_key,
+			message_sender_id,
+			message_sender_name,
+			message_sender_email,
+			message_sent_at,
+			mentions_json,
+			mention_all,
+			mentioned_account_ids,
+			edited_at,
+			deleted_for_everyone_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, s.messageByIDTable)
+
+	if err := s.session.Query(
+		statement,
+		projection.MessageID,
+		projection.RoomID,
+		projection.RoomName,
+		projection.RoomType,
+		projection.MessageContent,
+		projection.MessageType,
+		nullableProjectionString(projection.ReplyToMessageID),
+		nullableProjectionString(projection.ForwardedFromMessageID),
+		nullableProjectionString(projection.FileName),
+		projection.FileSize,
+		nullableProjectionString(projection.MimeType),
+		nullableProjectionString(projection.ObjectKey),
+		projection.MessageSenderID,
+		nullableProjectionString(projection.MessageSenderName),
+		nullableProjectionString(projection.MessageSenderEmail),
+		projection.MessageSentAt.UTC(),
+		string(mentionsJSON),
+		projection.MentionAll,
+		projection.MentionedAccountIDs,
+		projection.EditedAt,
+		projection.DeletedForEveryoneAt,
+	).WithContext(ctx).Exec(); err != nil {
+		return stackErr.Error(fmt.Errorf("upsert cassandra room message-by-id projection failed: %v", err))
 	}
 	return nil
 }
@@ -1357,68 +1736,30 @@ func (s *cassandraProjectionStore) listDeletedMessageIDs(ctx context.Context, ac
 	return results, nil
 }
 
-func mergeRoomProjection(existing *roomProjectionRow, projection *events.RoomProjection) *roomProjectionRow {
-	if existing == nil {
-		row := &roomProjectionRow{
-			RoomID:      strings.TrimSpace(projection.RoomID),
-			CreatedAt:   projection.CreatedAt.UTC(),
-			UpdatedAt:   projection.UpdatedAt.UTC(),
-			MemberCount: projection.MemberCount,
-		}
-		applyRoomProjection(row, projection)
-		return row
-	}
-
-	row := cloneRoomRow(existing)
-	applyRoomProjection(row, projection)
-	return row
-}
-
-func applyRoomProjection(target *roomProjectionRow, projection *events.RoomProjection) {
-	target.RoomID = strings.TrimSpace(projection.RoomID)
-	target.Name = projection.Name
-	target.Description = projection.Description
-	target.RoomType = projection.RoomType
-	target.OwnerID = projection.OwnerID
-	target.PinnedMessageID = strings.TrimSpace(projection.PinnedMessageID)
-	target.MemberCount = projection.MemberCount
-	target.CreatedAt = projection.CreatedAt.UTC()
-	target.UpdatedAt = projection.UpdatedAt.UTC()
-
-	if projection.HasLastMessageSnapshot {
-		target.LastMessageID = strings.TrimSpace(projection.LastMessageID)
-		target.LastMessageAt = cloneTime(projection.LastMessageAt)
-		target.LastMessageContent = projection.LastMessageContent
-		target.LastMessageSenderID = projection.LastMessageSenderID
-	}
-}
-
-func shouldPromoteLastMessage(room *roomProjectionRow, message *events.TimelineMessageProjection) bool {
-	if room == nil || message == nil {
-		return false
-	}
-	if strings.TrimSpace(room.LastMessageID) == strings.TrimSpace(message.MessageID) {
-		return true
-	}
-	if room.LastMessageAt == nil {
-		return true
-	}
-	return message.MessageSentAt.After(room.LastMessageAt.UTC())
-}
-
 func roomRowToEntity(row *roomProjectionRow) *views.RoomView {
 	if row == nil {
 		return nil
 	}
+
+	pinnedMessageID := stringPtr(row.PinnedMessageID)
+	lastMessageID := stringPtr(row.LastMessageID)
+	lastMessageContent := stringPtr(row.LastMessageContent)
+	lastMessageSenderID := stringPtr(row.LastMessageSenderID)
+
 	return &views.RoomView{
-		ID:              row.RoomID,
-		Name:            row.Name,
-		Description:     row.Description,
-		RoomType:        row.RoomType,
-		OwnerID:         row.OwnerID,
-		PinnedMessageID: &row.PinnedMessageID,
-		CreatedAt:       row.CreatedAt.UTC(),
-		UpdatedAt:       row.UpdatedAt.UTC(),
+		ID:                  row.RoomID,
+		Name:                row.Name,
+		Description:         row.Description,
+		RoomType:            row.RoomType,
+		OwnerID:             row.OwnerID,
+		PinnedMessageID:     pinnedMessageID,
+		MemberCount:         row.MemberCount,
+		LastMessageID:       lastMessageID,
+		LastMessageAt:       cloneTime(row.LastMessageAt),
+		LastMessageContent:  lastMessageContent,
+		LastMessageSenderID: lastMessageSenderID,
+		CreatedAt:           row.CreatedAt.UTC(),
+		UpdatedAt:           row.UpdatedAt.UTC(),
 	}
 }
 
@@ -1430,6 +1771,9 @@ func roomMemberRowToEntity(row *roomMemberProjectionRow) *views.RoomMemberView {
 		ID:              row.MemberID,
 		RoomID:          row.RoomID,
 		AccountID:       row.AccountID,
+		DisplayName:     strings.TrimSpace(row.DisplayName),
+		Username:        strings.TrimSpace(row.Username),
+		AvatarObjectKey: strings.TrimSpace(row.AvatarObjectKey),
 		Role:            row.Role,
 		LastDeliveredAt: cloneTime(row.LastDeliveredAt),
 		LastReadAt:      cloneTime(row.LastReadAt),
@@ -1468,11 +1812,68 @@ func messageRowToEntity(row *messageProjectionRow) (*views.MessageView, error) {
 	}, nil
 }
 
-func entityMessageToTimelineProjection(message *views.MessageView) *events.TimelineMessageProjection {
+func roomProjectionToRow(projection *roomprojection.RoomProjection) *roomProjectionRow {
+	if projection == nil {
+		return nil
+	}
+
+	row := &roomProjectionRow{
+		RoomID:          strings.TrimSpace(projection.RoomID),
+		Name:            projection.Name,
+		Description:     projection.Description,
+		RoomType:        projection.RoomType,
+		OwnerID:         projection.OwnerID,
+		PinnedMessageID: strings.TrimSpace(projection.PinnedMessageID),
+		MemberCount:     projection.MemberCount,
+		CreatedAt:       projection.CreatedAt.UTC(),
+		UpdatedAt:       projection.UpdatedAt.UTC(),
+	}
+	if projection.LastMessage != nil {
+		row.LastMessageID = strings.TrimSpace(projection.LastMessage.MessageID)
+		row.LastMessageAt = cloneTime(projection.LastMessage.MessageSentAt)
+		row.LastMessageContent = projection.LastMessage.MessageContent
+		row.LastMessageSenderID = projection.LastMessage.MessageSenderID
+	}
+	return row
+}
+
+func roomMemberProjectionToRow(projection *roomprojection.RoomMemberProjection) *roomMemberProjectionRow {
+	if projection == nil {
+		return nil
+	}
+
+	return &roomMemberProjectionRow{
+		RoomID:          strings.TrimSpace(projection.RoomID),
+		MemberID:        strings.TrimSpace(projection.MemberID),
+		AccountID:       strings.TrimSpace(projection.AccountID),
+		DisplayName:     strings.TrimSpace(projection.DisplayName),
+		Username:        strings.TrimSpace(projection.Username),
+		AvatarObjectKey: strings.TrimSpace(projection.AvatarObjectKey),
+		Role:            projection.Role,
+		LastDeliveredAt: cloneTime(projection.LastDeliveredAt),
+		LastReadAt:      cloneTime(projection.LastReadAt),
+		CreatedAt:       projection.CreatedAt.UTC(),
+		UpdatedAt:       projection.UpdatedAt.UTC(),
+	}
+}
+
+func messageViewToProjection(message *views.MessageView) *roomprojection.MessageProjection {
 	if message == nil {
 		return nil
 	}
-	return &events.TimelineMessageProjection{
+
+	mentions := make([]roomprojection.ProjectionMention, 0, len(message.Mentions))
+	mentionedAccountIDs := make([]string, 0, len(message.Mentions))
+	for _, mention := range message.Mentions {
+		mentions = append(mentions, roomprojection.ProjectionMention{
+			AccountID:   strings.TrimSpace(mention.AccountID),
+			DisplayName: strings.TrimSpace(mention.DisplayName),
+			Username:    strings.TrimSpace(mention.Username),
+		})
+		mentionedAccountIDs = append(mentionedAccountIDs, strings.TrimSpace(mention.AccountID))
+	}
+
+	return &roomprojection.MessageProjection{
 		RoomID:                 message.RoomID,
 		MessageID:              message.ID,
 		MessageContent:         message.Message,
@@ -1485,18 +1886,65 @@ func entityMessageToTimelineProjection(message *views.MessageView) *events.Timel
 		ObjectKey:              message.ObjectKey,
 		MessageSenderID:        message.SenderID,
 		MessageSentAt:          message.CreatedAt.UTC(),
-		Mentions: lo.Map(message.Mentions, func(item views.MessageMentionView, _ int) events.ProjectionMention {
-			return events.ProjectionMention{
-				AccountID:   item.AccountID,
-				DisplayName: item.DisplayName,
-				Username:    item.Username,
-			}
-		}),
-		MentionAll:           message.MentionAll,
-		MentionedAccountIDs:  lo.Map(message.Mentions, func(item views.MessageMentionView, _ int) string { return item.AccountID }),
-		EditedAt:             cloneTime(message.EditedAt),
-		DeletedForEveryoneAt: cloneTime(message.DeletedForEveryoneAt),
+		Mentions:               mentions,
+		MentionAll:             message.MentionAll,
+		MentionedAccountIDs:    mentionedAccountIDs,
+		EditedAt:               cloneTime(message.EditedAt),
+		DeletedForEveryoneAt:   cloneTime(message.DeletedForEveryoneAt),
 	}
+}
+
+func roomLastMessageFromView(room *views.RoomView) *roomprojection.RoomLastMessageProjection {
+	if room == nil || room.LastMessageID == nil {
+		return nil
+	}
+	return &roomprojection.RoomLastMessageProjection{
+		MessageID:       strings.TrimSpace(*room.LastMessageID),
+		MessageSentAt:   cloneTime(room.LastMessageAt),
+		MessageContent:  derefProjectionString(room.LastMessageContent),
+		MessageSenderID: derefProjectionString(room.LastMessageSenderID),
+	}
+}
+
+func projectionRoomID(projection *roomprojection.MessageAggregateSync) string {
+	if projection == nil {
+		return ""
+	}
+	if projection.Message != nil {
+		return strings.TrimSpace(projection.Message.RoomID)
+	}
+	if len(projection.Members) > 0 {
+		return strings.TrimSpace(projection.Members[0].RoomID)
+	}
+	if len(projection.Receipts) > 0 {
+		return strings.TrimSpace(projection.Receipts[0].RoomID)
+	}
+	if len(projection.Deletions) > 0 {
+		return strings.TrimSpace(projection.Deletions[0].RoomID)
+	}
+	return ""
+}
+
+func roomIDFromMessageView(message *views.MessageView) string {
+	if message == nil {
+		return ""
+	}
+	return strings.TrimSpace(message.RoomID)
+}
+
+func derefProjectionString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
+}
+
+func stringPtr(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func cloneRoomRow(row *roomProjectionRow) *roomProjectionRow {
@@ -1700,7 +2148,7 @@ func normalizeProjectionTable(value string) string {
 	return value
 }
 
-func marshalProjectionMentions(mentions []events.ProjectionMention) (string, error) {
+func marshalProjectionMentions(mentions []roomprojection.ProjectionMention) (string, error) {
 	if len(mentions) == 0 {
 		return "[]", nil
 	}
@@ -1715,7 +2163,7 @@ func unmarshalProjectionMentions(raw string) ([]views.MessageMentionView, error)
 	if strings.TrimSpace(raw) == "" {
 		return nil, nil
 	}
-	var items []events.ProjectionMention
+	var items []roomprojection.ProjectionMention
 	if err := json.Unmarshal([]byte(raw), &items); err != nil {
 		return nil, stackErr.Error(err)
 	}

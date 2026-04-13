@@ -10,10 +10,12 @@ import (
 	roomsupport "go-socket/core/modules/room/application/support"
 	apptypes "go-socket/core/modules/room/application/types"
 	"go-socket/core/modules/room/infra/projection/cassandra/views"
+	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/utils"
 
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 type ChatQueryService struct {
@@ -29,6 +31,8 @@ func NewChatQueryService(readRepos projection.QueryRepos, redis *redis.Client) *
 }
 
 func (s *ChatQueryService) ListConversations(ctx context.Context, accountID string, query apptypes.ListConversationsQuery) ([]apptypes.ConversationResult, error) {
+	log := logging.FromContext(ctx)
+
 	limit := query.Limit
 	if limit <= 0 || limit > 100 {
 		limit = 20
@@ -50,8 +54,21 @@ func (s *ChatQueryService) ListConversations(ctx context.Context, accountID stri
 
 	out := make([]apptypes.ConversationResult, 0, len(rooms))
 	for _, room := range rooms {
+		if room == nil {
+			continue
+		}
+
 		item, err := roomsupport.BuildConversationResult(ctx, s.readRepos, accountID, room, true)
 		if err != nil {
+			if errors.Is(err, roomsupport.ErrViewerNotMemberOfRoom) {
+				log.Warnw(
+					"skip inconsistent chat conversation projection",
+					zap.String("room_id", room.ID),
+					zap.String("account_id", accountID),
+					zap.Error(err),
+				)
+				continue
+			}
 			return nil, stackErr.Error(err)
 		}
 		out = append(out, *item)

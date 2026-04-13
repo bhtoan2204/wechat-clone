@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"go-socket/core/modules/room/domain/entity"
 	"go-socket/core/modules/room/domain/repos"
 	"go-socket/core/modules/room/infra/persistent/models"
@@ -59,6 +60,25 @@ func (r *messageRepoImpl) GetMessageByID(ctx context.Context, id string) (*entit
 	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
 		return nil, stackErr.Error(err)
 	}
+	entityMessage, err := r.toEntity(&m)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return entityMessage, nil
+}
+
+func (r *messageRepoImpl) GetLastMessageByRoomID(ctx context.Context, roomID string) (*entity.MessageEntity, error) {
+	var m models.MessageModel
+	if err := r.db.WithContext(ctx).
+		Where("room_id = ?", roomID).
+		Order("created_at DESC, id DESC").
+		First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, stackErr.Error(err)
+	}
+
 	entityMessage, err := r.toEntity(&m)
 	if err != nil {
 		return nil, stackErr.Error(err)

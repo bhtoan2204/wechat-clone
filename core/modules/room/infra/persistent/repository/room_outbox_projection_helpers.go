@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	roomprojectionevent "go-socket/core/modules/room/application/projection/projectionevent"
+	roomprojection "go-socket/core/modules/room/application/projection"
 	"go-socket/core/modules/room/domain/aggregate"
 	"go-socket/core/modules/room/domain/entity"
 	"go-socket/core/modules/room/domain/repos"
@@ -59,148 +59,138 @@ func appendRoomOutboxEvents(ctx context.Context, outboxRepo repos.RoomOutboxEven
 	return nextVersion, nil
 }
 
-func buildRoomProjectionUpsertEvent(room *entity.Room, memberCount int, lastMessage *entity.MessageEntity, hasLastMessageSnapshot bool) pendingRoomOutboxEvent {
-	var lastMessageAt *time.Time
-	lastMessageID := ""
-	lastMessageContent := ""
-	lastMessageSenderID := ""
-	if lastMessage != nil {
-		value := lastMessage.CreatedAt.UTC()
-		lastMessageAt = &value
-		lastMessageID = lastMessage.ID
-		lastMessageContent = lastMessage.Message
-		lastMessageSenderID = lastMessage.SenderID
-	}
-
+func buildRoomAggregateProjectionSyncEvent(room *entity.Room, members []*entity.RoomMemberEntity, lastMessage *entity.MessageEntity) pendingRoomOutboxEvent {
 	return pendingRoomOutboxEvent{
-		EventName: roomprojectionevent.EventRoomProjectionUpserted,
-		Payload: &roomprojectionevent.RoomUpserted{
-			RoomID:                 room.ID,
-			Name:                   room.Name,
-			Description:            room.Description,
-			RoomType:               string(room.RoomType),
-			OwnerID:                room.OwnerID,
-			PinnedMessageID:        room.PinnedMessageID,
-			MemberCount:            memberCount,
-			HasLastMessageSnapshot: hasLastMessageSnapshot,
-			LastMessageID:          lastMessageID,
-			LastMessageAt:          lastMessageAt,
-			LastMessageContent:     lastMessageContent,
-			LastMessageSenderID:    lastMessageSenderID,
-			CreatedAt:              room.CreatedAt.UTC(),
-			UpdatedAt:              room.UpdatedAt.UTC(),
+		EventName: roomprojection.EventRoomAggregateProjectionSynced,
+		Payload: &roomprojection.RoomAggregateSync{
+			Room: &roomprojection.RoomProjection{
+				RoomID:          room.ID,
+				Name:            room.Name,
+				Description:     room.Description,
+				RoomType:        string(room.RoomType),
+				OwnerID:         room.OwnerID,
+				PinnedMessageID: room.PinnedMessageID,
+				MemberCount:     len(members),
+				LastMessage:     buildRoomLastMessageProjection(lastMessage),
+				CreatedAt:       room.CreatedAt.UTC(),
+				UpdatedAt:       room.UpdatedAt.UTC(),
+			},
+			Members: mapRoomMemberProjections(members),
 		},
 		CreatedAt: room.UpdatedAt.UTC(),
 	}
 }
 
-func buildRoomProjectionDeleteEvent(roomID string, createdAt time.Time) pendingRoomOutboxEvent {
+func buildRoomAggregateProjectionDeleteEvent(roomID string, createdAt time.Time) pendingRoomOutboxEvent {
 	return pendingRoomOutboxEvent{
-		EventName: roomprojectionevent.EventRoomProjectionDeleted,
-		Payload: &roomprojectionevent.RoomDeleted{
+		EventName: roomprojection.EventRoomAggregateProjectionDeleted,
+		Payload: &roomprojection.RoomAggregateDeleted{
 			RoomID: strings.TrimSpace(roomID),
 		},
 		CreatedAt: createdAt.UTC(),
 	}
 }
 
-func buildRoomMemberProjectionUpsertEvent(member *entity.RoomMemberEntity) pendingRoomOutboxEvent {
+func buildMessageAggregateProjectionSyncEvent(
+	message *entity.MessageEntity,
+	room *entity.Room,
+	senderName,
+	senderEmail string,
+	members []*entity.RoomMemberEntity,
+	receipts []aggregate.PendingMessageReceipt,
+	deletions []*aggregate.PendingMessageDeletion,
+) pendingRoomOutboxEvent {
+	createdAt := message.CreatedAt.UTC()
+	if message.EditedAt != nil && message.EditedAt.UTC().After(createdAt) {
+		createdAt = message.EditedAt.UTC()
+	}
+	if message.DeletedForEveryoneAt != nil && message.DeletedForEveryoneAt.UTC().After(createdAt) {
+		createdAt = message.DeletedForEveryoneAt.UTC()
+	}
+	for _, member := range members {
+		if member != nil && member.UpdatedAt.UTC().After(createdAt) {
+			createdAt = member.UpdatedAt.UTC()
+		}
+	}
+	for _, receipt := range receipts {
+		if receipt.UpdatedAt.UTC().After(createdAt) {
+			createdAt = receipt.UpdatedAt.UTC()
+		}
+	}
+	for _, deletion := range deletions {
+		if deletion != nil && deletion.CreatedAt.UTC().After(createdAt) {
+			createdAt = deletion.CreatedAt.UTC()
+		}
+	}
+
 	return pendingRoomOutboxEvent{
-		EventName: roomprojectionevent.EventRoomMemberProjectionUpserted,
-		Payload: &roomprojectionevent.RoomMemberUpserted{
-			RoomID:          member.RoomID,
-			MemberID:        member.ID,
-			AccountID:       member.AccountID,
-			Role:            string(member.Role),
-			LastDeliveredAt: member.LastDeliveredAt,
-			LastReadAt:      member.LastReadAt,
-			CreatedAt:       member.CreatedAt.UTC(),
-			UpdatedAt:       member.UpdatedAt.UTC(),
+		EventName: roomprojection.EventMessageAggregateProjectionSynced,
+		Payload: &roomprojection.MessageAggregateSync{
+			Message:  buildMessageProjection(message, room, senderName, senderEmail),
+			Members:  mapRoomMemberProjections(members),
+			Receipts: mapMessageReceiptProjections(strings.TrimSpace(room.ID), receipts),
+			Deletions: mapMessageDeletionProjections(
+				strings.TrimSpace(room.ID),
+				message,
+				deletions,
+			),
 		},
-		CreatedAt: member.UpdatedAt.UTC(),
+		CreatedAt: createdAt,
 	}
 }
 
-func buildRoomMemberProjectionDeleteEvent(roomID, accountID string, createdAt time.Time) pendingRoomOutboxEvent {
-	return pendingRoomOutboxEvent{
-		EventName: roomprojectionevent.EventRoomMemberProjectionDeleted,
-		Payload: &roomprojectionevent.RoomMemberDeleted{
-			RoomID:    strings.TrimSpace(roomID),
-			AccountID: strings.TrimSpace(accountID),
-		},
-		CreatedAt: createdAt.UTC(),
+func buildRoomLastMessageProjection(message *entity.MessageEntity) *roomprojection.RoomLastMessageProjection {
+	if message == nil {
+		return nil
+	}
+
+	lastMessageAt := message.CreatedAt.UTC()
+	return &roomprojection.RoomLastMessageProjection{
+		MessageID:       message.ID,
+		MessageSentAt:   &lastMessageAt,
+		MessageContent:  message.Message,
+		MessageSenderID: message.SenderID,
 	}
 }
 
-func buildRoomMessageProjectionUpsertEvent(message *entity.MessageEntity, room *entity.Room, senderName, senderEmail string) pendingRoomOutboxEvent {
-	return pendingRoomOutboxEvent{
-		EventName: roomprojectionevent.EventRoomMessageProjectionUpserted,
-		Payload: &roomprojectionevent.RoomMessageUpserted{
-			RoomID:                 room.ID,
-			RoomName:               room.Name,
-			RoomType:               string(room.RoomType),
-			MessageID:              message.ID,
-			MessageContent:         message.Message,
-			MessageType:            message.MessageType,
-			ReplyToMessageID:       message.ReplyToMessageID,
-			ForwardedFromMessageID: message.ForwardedFromMessageID,
-			FileName:               message.FileName,
-			FileSize:               message.FileSize,
-			MimeType:               message.MimeType,
-			ObjectKey:              message.ObjectKey,
-			MessageSenderID:        message.SenderID,
-			MessageSenderName:      strings.TrimSpace(senderName),
-			MessageSenderEmail:     strings.TrimSpace(senderEmail),
-			MessageSentAt:          message.CreatedAt.UTC(),
-			Mentions:               mapProjectionMentions(message.Mentions),
-			MentionAll:             message.MentionAll,
-			MentionedAccountIDs:    mapMentionedAccountIDs(message.Mentions),
-			EditedAt:               cloneProjectionTime(message.EditedAt),
-			DeletedForEveryoneAt:   cloneProjectionTime(message.DeletedForEveryoneAt),
-		},
-		CreatedAt: message.CreatedAt.UTC(),
+func buildMessageProjection(message *entity.MessageEntity, room *entity.Room, senderName, senderEmail string) *roomprojection.MessageProjection {
+	if message == nil || room == nil {
+		return nil
+	}
+
+	return &roomprojection.MessageProjection{
+		RoomID:                 room.ID,
+		RoomName:               room.Name,
+		RoomType:               string(room.RoomType),
+		MessageID:              message.ID,
+		MessageContent:         message.Message,
+		MessageType:            message.MessageType,
+		ReplyToMessageID:       message.ReplyToMessageID,
+		ForwardedFromMessageID: message.ForwardedFromMessageID,
+		FileName:               message.FileName,
+		FileSize:               message.FileSize,
+		MimeType:               message.MimeType,
+		ObjectKey:              message.ObjectKey,
+		MessageSenderID:        message.SenderID,
+		MessageSenderName:      strings.TrimSpace(senderName),
+		MessageSenderEmail:     strings.TrimSpace(senderEmail),
+		MessageSentAt:          message.CreatedAt.UTC(),
+		Mentions:               mapProjectionMentions(message.Mentions),
+		MentionAll:             message.MentionAll,
+		MentionedAccountIDs:    mapMentionedAccountIDs(message.Mentions),
+		EditedAt:               cloneProjectionTime(message.EditedAt),
+		DeletedForEveryoneAt:   cloneProjectionTime(message.DeletedForEveryoneAt),
 	}
 }
 
-func buildRoomMessageReceiptProjectionEvent(roomID string, receipt aggregate.PendingMessageReceipt) pendingRoomOutboxEvent {
-	return pendingRoomOutboxEvent{
-		EventName: roomprojectionevent.EventRoomMessageReceiptProjectionUpserted,
-		Payload: &roomprojectionevent.RoomMessageReceiptUpserted{
-			RoomID:      strings.TrimSpace(roomID),
-			MessageID:   receipt.MessageID,
-			AccountID:   receipt.AccountID,
-			Status:      receipt.Status,
-			DeliveredAt: cloneProjectionTime(receipt.DeliveredAt),
-			SeenAt:      cloneProjectionTime(receipt.SeenAt),
-			CreatedAt:   receipt.CreatedAt.UTC(),
-			UpdatedAt:   receipt.UpdatedAt.UTC(),
-		},
-		CreatedAt: receipt.UpdatedAt.UTC(),
-	}
-}
-
-func buildRoomMessageDeletionProjectionEvent(roomID string, message *entity.MessageEntity, deletion *aggregate.PendingMessageDeletion) pendingRoomOutboxEvent {
-	return pendingRoomOutboxEvent{
-		EventName: roomprojectionevent.EventRoomMessageDeletionProjectionUpserted,
-		Payload: &roomprojectionevent.RoomMessageDeletionUpserted{
-			RoomID:        strings.TrimSpace(roomID),
-			MessageID:     deletion.MessageID,
-			AccountID:     deletion.AccountID,
-			MessageSentAt: message.CreatedAt.UTC(),
-			CreatedAt:     deletion.CreatedAt.UTC(),
-		},
-		CreatedAt: deletion.CreatedAt.UTC(),
-	}
-}
-
-func mapProjectionMentions(mentions []entity.MessageMention) []sharedevents.RoomMessageMention {
+func mapProjectionMentions(mentions []entity.MessageMention) []roomprojection.ProjectionMention {
 	if len(mentions) == 0 {
 		return nil
 	}
 
-	results := make([]sharedevents.RoomMessageMention, 0, len(mentions))
+	results := make([]roomprojection.ProjectionMention, 0, len(mentions))
 	for _, mention := range mentions {
-		results = append(results, sharedevents.RoomMessageMention{
+		results = append(results, roomprojection.ProjectionMention{
 			AccountID:   mention.AccountID,
 			DisplayName: mention.DisplayName,
 			Username:    mention.Username,
@@ -230,6 +220,77 @@ func mapMentionedAccountIDs(mentions []entity.MessageMention) []string {
 	return results
 }
 
+func mapRoomMemberProjections(members []*entity.RoomMemberEntity) []roomprojection.RoomMemberProjection {
+	if len(members) == 0 {
+		return nil
+	}
+
+	results := make([]roomprojection.RoomMemberProjection, 0, len(members))
+	for _, member := range members {
+		if member == nil {
+			continue
+		}
+
+		results = append(results, roomprojection.RoomMemberProjection{
+			RoomID:          member.RoomID,
+			MemberID:        member.ID,
+			AccountID:       member.AccountID,
+			DisplayName:     strings.TrimSpace(member.DisplayName),
+			Username:        strings.TrimSpace(member.Username),
+			AvatarObjectKey: strings.TrimSpace(member.AvatarObjectKey),
+			Role:            string(member.Role),
+			LastDeliveredAt: cloneProjectionTime(member.LastDeliveredAt),
+			LastReadAt:      cloneProjectionTime(member.LastReadAt),
+			CreatedAt:       member.CreatedAt.UTC(),
+			UpdatedAt:       member.UpdatedAt.UTC(),
+		})
+	}
+	return results
+}
+
+func mapMessageReceiptProjections(roomID string, receipts []aggregate.PendingMessageReceipt) []roomprojection.MessageReceiptProjection {
+	if len(receipts) == 0 {
+		return nil
+	}
+
+	results := make([]roomprojection.MessageReceiptProjection, 0, len(receipts))
+	for _, receipt := range receipts {
+		results = append(results, roomprojection.MessageReceiptProjection{
+			RoomID:      roomID,
+			MessageID:   receipt.MessageID,
+			AccountID:   receipt.AccountID,
+			Status:      receipt.Status,
+			DeliveredAt: cloneProjectionTime(receipt.DeliveredAt),
+			SeenAt:      cloneProjectionTime(receipt.SeenAt),
+			CreatedAt:   receipt.CreatedAt.UTC(),
+			UpdatedAt:   receipt.UpdatedAt.UTC(),
+		})
+	}
+	return results
+}
+
+func mapMessageDeletionProjections(roomID string, message *entity.MessageEntity, deletions []*aggregate.PendingMessageDeletion) []roomprojection.MessageDeletionProjection {
+	if len(deletions) == 0 || message == nil {
+		return nil
+	}
+
+	results := make([]roomprojection.MessageDeletionProjection, 0, len(deletions))
+	for _, deletion := range deletions {
+		if deletion == nil {
+			continue
+		}
+
+		results = append(results, roomprojection.MessageDeletionProjection{
+			RoomID:        roomID,
+			MessageID:     deletion.MessageID,
+			AccountID:     deletion.AccountID,
+			MessageSentAt: message.CreatedAt.UTC(),
+			CreatedAt:     deletion.CreatedAt.UTC(),
+		})
+	}
+	return results
+}
+
 func sortRoomMembersByAccount(members []*entity.RoomMemberEntity) []*entity.RoomMemberEntity {
 	results := append([]*entity.RoomMemberEntity(nil), members...)
 	sort.Slice(results, func(i, j int) bool {
@@ -239,6 +300,80 @@ func sortRoomMembersByAccount(members []*entity.RoomMemberEntity) []*entity.Room
 		return strings.TrimSpace(results[i].AccountID) < strings.TrimSpace(results[j].AccountID)
 	})
 	return results
+}
+
+func enrichRoomMembersWithAccountProjections(
+	ctx context.Context,
+	accountRepo repos.RoomAccountProjectionRepository,
+	members []*entity.RoomMemberEntity,
+) ([]*entity.RoomMemberEntity, error) {
+	if len(members) == 0 {
+		return nil, nil
+	}
+
+	results := make([]*entity.RoomMemberEntity, 0, len(members))
+	accountIDs := make([]string, 0, len(members))
+	seenAccountIDs := make(map[string]struct{}, len(members))
+
+	for _, member := range members {
+		if member == nil {
+			continue
+		}
+
+		copyMember := *member
+		results = append(results, &copyMember)
+
+		accountID := strings.TrimSpace(member.AccountID)
+		if accountID == "" {
+			continue
+		}
+		if _, exists := seenAccountIDs[accountID]; exists {
+			continue
+		}
+
+		seenAccountIDs[accountID] = struct{}{}
+		accountIDs = append(accountIDs, accountID)
+	}
+
+	if accountRepo == nil || len(accountIDs) == 0 {
+		return results, nil
+	}
+
+	accountProjections, err := accountRepo.ListByAccountIDs(ctx, accountIDs)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	accountMap := make(map[string]*entity.AccountEntity, len(accountProjections))
+	for _, account := range accountProjections {
+		if account == nil {
+			continue
+		}
+		accountMap[strings.TrimSpace(account.AccountID)] = account
+	}
+
+	for _, member := range results {
+		if member == nil {
+			continue
+		}
+
+		account, exists := accountMap[strings.TrimSpace(member.AccountID)]
+		if !exists || account == nil {
+			continue
+		}
+
+		if displayName := strings.TrimSpace(account.DisplayName); displayName != "" {
+			member.DisplayName = displayName
+		}
+		if username := strings.TrimSpace(account.Username); username != "" {
+			member.Username = username
+		}
+		if avatarObjectKey := strings.TrimSpace(account.AvatarObjectKey); avatarObjectKey != "" {
+			member.AvatarObjectKey = avatarObjectKey
+		}
+	}
+
+	return results, nil
 }
 
 func senderIdentityFromPendingEvents(messageID string, pendingEvents []aggregate.PendingRoomOutboxEvent) (string, string) {

@@ -8,7 +8,7 @@ type RoomMemberView struct {
 	AccountID       string     `db:"account_id"`
 	Role            string     `db:"role"`
 	DisplayName     string     `db:"display_name"`
-	Username        string     `db:"user_name"`
+	Username        string     `db:"username"`
 	AvatarObjectKey string     `db:"avatar_object_key"`
 	LastDeliveredAt *time.Time `db:"last_delivered_at"`
 	LastReadAt      *time.Time `db:"last_read_at"`

@@ -55,7 +55,7 @@ func BuildConversationResult(
 		}
 	}
 	if viewerMember == nil {
-		return nil, stackErr.Error(errors.New("viewer is not a member of this room"))
+		return nil, stackErr.Error(ErrViewerNotMemberOfRoom)
 	}
 
 	var (

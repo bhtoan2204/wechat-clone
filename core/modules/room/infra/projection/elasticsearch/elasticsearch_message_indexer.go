@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"strings"
 
+	roomprojection "go-socket/core/modules/room/application/projection"
 	"go-socket/core/shared/config"
-	"go-socket/core/shared/contracts/events"
 	"go-socket/core/shared/pkg/stackErr"
 
 	es8 "github.com/elastic/go-elasticsearch/v8"
@@ -22,7 +22,7 @@ type elasticsearchMessageIndexer struct {
 	index  string
 }
 
-func NewElasticsearchMessageIndexer(cfg config.ElasticsearchConfig, client *es8.Client) (events.MessageSearchIndexer, error) {
+func NewElasticsearchMessageIndexer(cfg config.ElasticsearchConfig, client *es8.Client) (roomprojection.MessageSearchIndexer, error) {
 	if !cfg.Enabled || client == nil {
 		return nil, nil
 	}
@@ -39,11 +39,12 @@ func NewElasticsearchMessageIndexer(cfg config.ElasticsearchConfig, client *es8.
 	return indexer, nil
 }
 
-func (i *elasticsearchMessageIndexer) UpsertMessage(ctx context.Context, document *events.SearchMessageDocument) error {
-	if i == nil || i.client == nil || document == nil {
+func (i *elasticsearchMessageIndexer) SyncMessage(ctx context.Context, message *roomprojection.MessageProjection) error {
+	if i == nil || i.client == nil || message == nil {
 		return nil
 	}
 
+	document := toSearchDocument(message)
 	body, err := json.Marshal(document)
 	if err != nil {
 		return stackErr.Error(fmt.Errorf("marshal elasticsearch room message failed: %v", err))
@@ -51,7 +52,7 @@ func (i *elasticsearchMessageIndexer) UpsertMessage(ctx context.Context, documen
 
 	req := esapi.IndexRequest{
 		Index:      i.index,
-		DocumentID: document.MessageID,
+		DocumentID: message.MessageID,
 		Body:       bytes.NewReader(body),
 		Refresh:    "false",
 	}
@@ -65,6 +66,74 @@ func (i *elasticsearchMessageIndexer) UpsertMessage(ctx context.Context, documen
 		return stackErr.Error(fmt.Errorf("index elasticsearch room message returned status %s: %s", res.Status(), readBody(res.Body)))
 	}
 	return nil
+}
+
+func (i *elasticsearchMessageIndexer) DeleteRoom(ctx context.Context, roomID string) error {
+	if i == nil || i.client == nil || strings.TrimSpace(roomID) == "" {
+		return nil
+	}
+
+	body, err := json.Marshal(map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"room_id": map[string]interface{}{
+					"value": strings.TrimSpace(roomID),
+				},
+			},
+		},
+	})
+	if err != nil {
+		return stackErr.Error(fmt.Errorf("marshal elasticsearch room delete query failed: %v", err))
+	}
+
+	req := esapi.DeleteByQueryRequest{
+		Index:     []string{i.index},
+		Body:      bytes.NewReader(body),
+		Conflicts: "proceed",
+	}
+	refresh := true
+	req.Refresh = &refresh
+	res, err := req.Do(ctx, i.client)
+	if err != nil {
+		return stackErr.Error(fmt.Errorf("delete elasticsearch room messages failed: %v", err))
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		return stackErr.Error(fmt.Errorf("delete elasticsearch room messages returned status %s: %s", res.Status(), readBody(res.Body)))
+	}
+	return nil
+}
+
+func toSearchDocument(message *roomprojection.MessageProjection) map[string]interface{} {
+	messageContent := message.MessageContent
+	if message.DeletedForEveryoneAt != nil {
+		messageContent = ""
+	}
+
+	return map[string]interface{}{
+		"room_id":                   message.RoomID,
+		"room_name":                 message.RoomName,
+		"room_type":                 message.RoomType,
+		"message_id":                message.MessageID,
+		"message_content":           messageContent,
+		"message_type":              message.MessageType,
+		"reply_to_message_id":       message.ReplyToMessageID,
+		"forwarded_from_message_id": message.ForwardedFromMessageID,
+		"file_name":                 message.FileName,
+		"file_size":                 message.FileSize,
+		"mime_type":                 message.MimeType,
+		"object_key":                message.ObjectKey,
+		"message_sender_id":         message.MessageSenderID,
+		"message_sender_name":       message.MessageSenderName,
+		"message_sender_email":      message.MessageSenderEmail,
+		"message_sent_at":           message.MessageSentAt,
+		"mention_all":               message.MentionAll,
+		"mentioned_account_ids":     message.MentionedAccountIDs,
+		"mentions":                  message.Mentions,
+		"edited_at":                 message.EditedAt,
+		"deleted_for_everyone_at":   message.DeletedForEveryoneAt,
+	}
 }
 
 func (i *elasticsearchMessageIndexer) ensureIndex(ctx context.Context) error {
@@ -162,10 +231,12 @@ func roomMessageIndexDefinition() map[string]interface{} {
 						"keyword": map[string]interface{}{"type": "keyword", "ignore_above": 256},
 					},
 				},
-				"message_sender_email":  map[string]interface{}{"type": "keyword"},
-				"message_sent_at":       map[string]interface{}{"type": "date"},
-				"mention_all":           map[string]interface{}{"type": "boolean"},
-				"mentioned_account_ids": map[string]interface{}{"type": "keyword"},
+				"message_sender_email":    map[string]interface{}{"type": "keyword"},
+				"message_sent_at":         map[string]interface{}{"type": "date"},
+				"mention_all":             map[string]interface{}{"type": "boolean"},
+				"mentioned_account_ids":   map[string]interface{}{"type": "keyword"},
+				"edited_at":               map[string]interface{}{"type": "date"},
+				"deleted_for_everyone_at": map[string]interface{}{"type": "date"},
 				"mentions": map[string]interface{}{
 					"type": "nested",
 					"properties": map[string]interface{}{

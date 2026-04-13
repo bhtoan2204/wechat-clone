@@ -158,19 +158,23 @@ func (r *roomAggregateRepoImpl) Save(ctx context.Context, agg *aggregate.RoomSta
 		}
 	}
 
-	pendingOutboxEvents := make([]pendingRoomOutboxEvent, 0, len(agg.RemovedMemberIDs())+len(pendingMemberUpserts)+len(pendingMessages)+len(agg.PendingReceipts())+len(agg.PendingOutboxEvents())+1)
-
-	for _, memberID := range agg.RemovedMemberIDs() {
-		pendingOutboxEvents = append(pendingOutboxEvents, buildRoomMemberProjectionDeleteEvent(room.ID, memberID, room.UpdatedAt))
-	}
-	for _, member := range pendingMemberUpserts {
-		if member == nil {
-			continue
-		}
-		pendingOutboxEvents = append(pendingOutboxEvents, buildRoomMemberProjectionUpsertEvent(member))
-	}
-
 	domainPendingEvents := agg.PendingOutboxEvents()
+	currentMembers, err := enrichRoomMembersWithAccountProjections(ctx, r.roomAccountRepo, sortRoomMembersByAccount(agg.Members()))
+	if err != nil {
+		return stackErr.Error(err)
+	}
+	lastMessage := latestRoomProjectionMessage(pendingMessages)
+	if lastMessage == nil {
+		canonicalLastMessage, err := r.messageRepo.GetLastMessageByRoomID(ctx, room.ID)
+		if err != nil {
+			return stackErr.Error(err)
+		}
+		lastMessage = canonicalLastMessage
+	}
+
+	pendingOutboxEvents := make([]pendingRoomOutboxEvent, 0, len(pendingMessages)+len(domainPendingEvents)+1)
+	pendingOutboxEvents = append(pendingOutboxEvents, buildRoomAggregateProjectionSyncEvent(room, currentMembers, lastMessage))
+
 	for _, message := range pendingMessages {
 		if message == nil {
 			continue
@@ -179,20 +183,16 @@ func (r *roomAggregateRepoImpl) Save(ctx context.Context, agg *aggregate.RoomSta
 		if senderName == "" {
 			senderName = message.SenderID
 		}
-		pendingOutboxEvents = append(pendingOutboxEvents, buildRoomMessageProjectionUpsertEvent(message, room, senderName, senderEmail))
+		pendingOutboxEvents = append(pendingOutboxEvents, buildMessageAggregateProjectionSyncEvent(
+			message,
+			room,
+			senderName,
+			senderEmail,
+			nil,
+			filterPendingReceiptsByMessage(message.ID, agg.PendingReceipts()),
+			nil,
+		))
 	}
-	for _, receipt := range agg.PendingReceipts() {
-		pendingOutboxEvents = append(pendingOutboxEvents, buildRoomMessageReceiptProjectionEvent(room.ID, receipt))
-	}
-
-	var lastPendingMessage *entity.MessageEntity
-	if len(pendingMessages) > 0 {
-		lastPendingMessage = pendingMessages[len(pendingMessages)-1]
-	}
-	pendingOutboxEvents = append(
-		pendingOutboxEvents,
-		buildRoomProjectionUpsertEvent(room, len(agg.Members()), lastPendingMessage, agg.IsNew() || len(pendingMessages) > 0),
-	)
 
 	for _, pendingEvent := range domainPendingEvents {
 		pendingOutboxEvents = append(pendingOutboxEvents, pendingRoomOutboxEvent{
@@ -222,11 +222,35 @@ func (r *roomAggregateRepoImpl) Delete(ctx context.Context, roomID string) error
 	}
 
 	_, err = appendRoomOutboxEvents(ctx, r.outboxRepo, roomID, baseVersion, []pendingRoomOutboxEvent{
-		buildRoomProjectionDeleteEvent(roomID, time.Now().UTC()),
+		buildRoomAggregateProjectionDeleteEvent(roomID, time.Now().UTC()),
 	})
 	return stackErr.Error(err)
 }
 
 func (r *roomAggregateRepoImpl) loadLatestOutboxVersion(ctx context.Context, roomID string) (int, error) {
 	return loadLatestRoomOutboxVersion(ctx, r.db, roomID)
+}
+
+func latestRoomProjectionMessage(messages []*entity.MessageEntity) *entity.MessageEntity {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	for idx := len(messages) - 1; idx >= 0; idx-- {
+		if messages[idx] != nil {
+			return messages[idx]
+		}
+	}
+	return nil
+}
+
+func filterPendingReceiptsByMessage(messageID string, receipts []aggregate.PendingMessageReceipt) []aggregate.PendingMessageReceipt {
+	results := make([]aggregate.PendingMessageReceipt, 0, len(receipts))
+	for _, receipt := range receipts {
+		if receipt.MessageID != messageID {
+			continue
+		}
+		results = append(results, receipt)
+	}
+	return results
 }

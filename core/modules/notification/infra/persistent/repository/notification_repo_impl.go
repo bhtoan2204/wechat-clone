@@ -38,7 +38,7 @@ func (r *notificationRepoImpl) CreateNotification(ctx context.Context, notificat
 	switch {
 	case err == nil:
 		return nil
-	case err != nil && !errors.Is(err, gorm.ErrRecordNotFound):
+	case !errors.Is(err, gorm.ErrRecordNotFound):
 		return stackErr.Error(err)
 	}
 

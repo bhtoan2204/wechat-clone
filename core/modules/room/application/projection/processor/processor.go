@@ -6,16 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	roomprojectionevent "go-socket/core/modules/room/application/projection/projectionevent"
+	roomprojection "go-socket/core/modules/room/application/projection"
 	"go-socket/core/shared/config"
 	"go-socket/core/shared/contracts"
-	"go-socket/core/shared/contracts/events"
-	sharedevents "go-socket/core/shared/contracts/events"
 	infraMessaging "go-socket/core/shared/infra/messaging"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
 
-	"github.com/samber/lo"
 	"go.uber.org/zap"
 )
 
@@ -25,20 +22,20 @@ type Processor interface {
 }
 
 type processor struct {
-	consumer          []infraMessaging.Consumer
-	timelineProjector events.TimelineProjector
-	searchIndexer     events.MessageSearchIndexer
+	consumer         []infraMessaging.Consumer
+	servingProjector roomprojection.ServingProjector
+	searchIndexer    roomprojection.MessageSearchIndexer
 }
 
-func NewProcessor(cfg *config.Config, timelineProjector events.TimelineProjector, searchIndexer events.MessageSearchIndexer) (Processor, error) {
+func NewProcessor(cfg *config.Config, servingProjector roomprojection.ServingProjector, searchIndexer roomprojection.MessageSearchIndexer) (Processor, error) {
 	instance := &processor{
-		consumer:          make([]infraMessaging.Consumer, 0, 1),
-		timelineProjector: timelineProjector,
-		searchIndexer:     searchIndexer,
+		consumer:         make([]infraMessaging.Consumer, 0, 1),
+		servingProjector: servingProjector,
+		searchIndexer:    searchIndexer,
 	}
 
 	topic := strings.TrimSpace(cfg.KafkaConfig.KafkaRoomConsumer.RoomOutboxTopic)
-	if topic == "" || (timelineProjector == nil && searchIndexer == nil) {
+	if topic == "" || (servingProjector == nil && searchIndexer == nil) {
 		return instance, nil
 	}
 
@@ -91,281 +88,88 @@ func (p *processor) handleRoomOutboxEvent(ctx context.Context, value []byte) err
 	)
 
 	switch event.EventName {
-	case roomprojectionevent.EventRoomProjectionUpserted:
-		return p.projectRoomUpserted(ctx, event.EventData)
-	case roomprojectionevent.EventRoomProjectionDeleted:
-		return p.projectRoomDeleted(ctx, event.EventData)
-	case roomprojectionevent.EventRoomMemberProjectionUpserted:
-		return p.projectRoomMemberUpserted(ctx, event.EventData)
-	case roomprojectionevent.EventRoomMemberProjectionDeleted:
-		return p.projectRoomMemberDeleted(ctx, event.EventData)
-	case roomprojectionevent.EventRoomMessageProjectionUpserted:
-		return p.projectRoomMessageUpserted(ctx, event.EventData)
-	case roomprojectionevent.EventRoomMessageReceiptProjectionUpserted:
-		return p.projectRoomMessageReceiptUpserted(ctx, event.EventData)
-	case roomprojectionevent.EventRoomMessageDeletionProjectionUpserted:
-		return p.projectRoomMessageDeletionUpserted(ctx, event.EventData)
+	case roomprojection.EventRoomAggregateProjectionSynced:
+		return p.projectRoomAggregateSynced(ctx, event.EventData)
+	case roomprojection.EventRoomAggregateProjectionDeleted:
+		return p.projectRoomAggregateDeleted(ctx, event.EventData)
+	case roomprojection.EventMessageAggregateProjectionSynced:
+		return p.projectMessageAggregateSynced(ctx, event.EventData)
 	default:
 		return nil
 	}
 }
 
-func (p *processor) projectRoomUpserted(ctx context.Context, raw json.RawMessage) error {
-	payloadAny, err := decodeEventPayload(ctx, roomprojectionevent.EventRoomProjectionUpserted, raw)
+func (p *processor) projectRoomAggregateSynced(ctx context.Context, raw json.RawMessage) error {
+	payloadAny, err := decodeEventPayload(ctx, roomprojection.EventRoomAggregateProjectionSynced, raw)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode room projection upsert payload failed: %v", err))
+		return stackErr.Error(fmt.Errorf("decode room aggregate projection payload failed: %v", err))
 	}
 	if payloadAny == nil {
 		return nil
 	}
 
-	payload, ok := payloadAny.(*roomprojectionevent.RoomUpserted)
+	payload, ok := payloadAny.(*roomprojection.RoomAggregateSync)
 	if !ok {
-		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", roomprojectionevent.EventRoomProjectionUpserted))
+		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", roomprojection.EventRoomAggregateProjectionSynced))
 	}
-
-	if p.timelineProjector == nil {
+	if p.servingProjector == nil {
 		return nil
 	}
-	return stackErr.Error(p.timelineProjector.ProjectRoom(ctx, &events.RoomProjection{
-		RoomID:                 payload.RoomID,
-		Name:                   payload.Name,
-		Description:            payload.Description,
-		RoomType:               payload.RoomType,
-		OwnerID:                payload.OwnerID,
-		PinnedMessageID:        payload.PinnedMessageID,
-		MemberCount:            payload.MemberCount,
-		HasLastMessageSnapshot: payload.HasLastMessageSnapshot,
-		LastMessageID:          payload.LastMessageID,
-		LastMessageAt:          payload.LastMessageAt,
-		LastMessageContent:     payload.LastMessageContent,
-		LastMessageSenderID:    payload.LastMessageSenderID,
-		CreatedAt:              payload.CreatedAt,
-		UpdatedAt:              payload.UpdatedAt,
-	}))
+	return stackErr.Error(p.servingProjector.SyncRoomAggregate(ctx, payload))
 }
 
-func (p *processor) projectRoomDeleted(ctx context.Context, raw json.RawMessage) error {
-	payloadAny, err := decodeEventPayload(ctx, roomprojectionevent.EventRoomProjectionDeleted, raw)
+func (p *processor) projectRoomAggregateDeleted(ctx context.Context, raw json.RawMessage) error {
+	payloadAny, err := decodeEventPayload(ctx, roomprojection.EventRoomAggregateProjectionDeleted, raw)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode room projection delete payload failed: %v", err))
+		return stackErr.Error(fmt.Errorf("decode room aggregate delete payload failed: %v", err))
 	}
 	if payloadAny == nil {
 		return nil
 	}
 
-	payload, ok := payloadAny.(*roomprojectionevent.RoomDeleted)
+	payload, ok := payloadAny.(*roomprojection.RoomAggregateDeleted)
 	if !ok {
-		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", roomprojectionevent.EventRoomProjectionDeleted))
+		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", roomprojection.EventRoomAggregateProjectionDeleted))
 	}
-
-	if p.timelineProjector == nil {
-		return nil
-	}
-	return stackErr.Error(p.timelineProjector.DeleteProjectedRoom(ctx, payload.RoomID))
-}
-
-func (p *processor) projectRoomMemberUpserted(ctx context.Context, raw json.RawMessage) error {
-	payloadAny, err := decodeEventPayload(ctx, roomprojectionevent.EventRoomMemberProjectionUpserted, raw)
-	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode room member projection upsert payload failed: %v", err))
-	}
-	if payloadAny == nil {
-		return nil
-	}
-
-	payload, ok := payloadAny.(*roomprojectionevent.RoomMemberUpserted)
-	if !ok {
-		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", roomprojectionevent.EventRoomMemberProjectionUpserted))
-	}
-
-	if p.timelineProjector != nil {
-		return stackErr.Error(p.timelineProjector.ProjectRoomMember(ctx, &events.RoomMemberProjection{
-			RoomID:          payload.RoomID,
-			MemberID:        payload.MemberID,
-			AccountID:       payload.AccountID,
-			Role:            payload.Role,
-			LastDeliveredAt: payload.LastDeliveredAt,
-			LastReadAt:      payload.LastReadAt,
-			CreatedAt:       payload.CreatedAt,
-			UpdatedAt:       payload.UpdatedAt,
-		}))
-	}
-	return nil
-}
-
-func (p *processor) projectRoomMemberDeleted(ctx context.Context, raw json.RawMessage) error {
-	payloadAny, err := decodeEventPayload(ctx, roomprojectionevent.EventRoomMemberProjectionDeleted, raw)
-	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode room member projection delete payload failed: %v", err))
-	}
-	if payloadAny == nil {
-		return nil
-	}
-
-	payload, ok := payloadAny.(*roomprojectionevent.RoomMemberDeleted)
-	if !ok {
-		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", roomprojectionevent.EventRoomMemberProjectionDeleted))
-	}
-
-	if p.timelineProjector == nil {
-		return nil
-	}
-	return stackErr.Error(p.timelineProjector.DeleteProjectedRoomMember(ctx, payload.RoomID, payload.AccountID))
-}
-
-func (p *processor) projectRoomMessageUpserted(ctx context.Context, raw json.RawMessage) error {
-	payloadAny, err := decodeEventPayload(ctx, roomprojectionevent.EventRoomMessageProjectionUpserted, raw)
-	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode room message projection upsert payload failed: %v", err))
-	}
-	if payloadAny == nil {
-		return nil
-	}
-
-	payload, ok := payloadAny.(*roomprojectionevent.RoomMessageUpserted)
-	if !ok {
-		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", roomprojectionevent.EventRoomMessageProjectionUpserted))
-	}
-
-	timelineProjection := buildTimelineProjection(payload)
-	searchDocument := buildSearchDocument(payload)
-
-	if p.timelineProjector != nil {
-		if err := p.timelineProjector.ProjectMessage(ctx, timelineProjection); err != nil {
-			return stackErr.Error(fmt.Errorf("project cassandra message failed: %v", err))
+	if p.servingProjector == nil {
+		if p.searchIndexer == nil {
+			return nil
 		}
+		return stackErr.Error(p.searchIndexer.DeleteRoom(ctx, payload.RoomID))
 	}
-
+	if err := p.servingProjector.DeleteRoomAggregate(ctx, payload.RoomID); err != nil {
+		return stackErr.Error(err)
+	}
 	if p.searchIndexer != nil {
-		if err := p.searchIndexer.UpsertMessage(ctx, searchDocument); err != nil {
-			return stackErr.Error(fmt.Errorf("index elasticsearch document failed: %v", err))
-		}
+		return stackErr.Error(p.searchIndexer.DeleteRoom(ctx, payload.RoomID))
 	}
 	return nil
 }
 
-func (p *processor) projectRoomMessageReceiptUpserted(ctx context.Context, raw json.RawMessage) error {
-	payloadAny, err := decodeEventPayload(ctx, roomprojectionevent.EventRoomMessageReceiptProjectionUpserted, raw)
+func (p *processor) projectMessageAggregateSynced(ctx context.Context, raw json.RawMessage) error {
+	payloadAny, err := decodeEventPayload(ctx, roomprojection.EventMessageAggregateProjectionSynced, raw)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode room message receipt projection payload failed: %v", err))
+		return stackErr.Error(fmt.Errorf("decode message aggregate projection payload failed: %v", err))
 	}
 	if payloadAny == nil {
 		return nil
 	}
 
-	payload, ok := payloadAny.(*roomprojectionevent.RoomMessageReceiptUpserted)
+	payload, ok := payloadAny.(*roomprojection.MessageAggregateSync)
 	if !ok {
-		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", roomprojectionevent.EventRoomMessageReceiptProjectionUpserted))
+		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", roomprojection.EventMessageAggregateProjectionSynced))
 	}
 
-	if p.timelineProjector == nil {
-		return nil
-	}
-	return stackErr.Error(p.timelineProjector.ProjectMessageReceipt(ctx, &events.MessageReceiptProjection{
-		RoomID:      payload.RoomID,
-		MessageID:   payload.MessageID,
-		AccountID:   payload.AccountID,
-		Status:      payload.Status,
-		DeliveredAt: payload.DeliveredAt,
-		SeenAt:      payload.SeenAt,
-		CreatedAt:   payload.CreatedAt,
-		UpdatedAt:   payload.UpdatedAt,
-	}))
-}
-
-func (p *processor) projectRoomMessageDeletionUpserted(ctx context.Context, raw json.RawMessage) error {
-	payloadAny, err := decodeEventPayload(ctx, roomprojectionevent.EventRoomMessageDeletionProjectionUpserted, raw)
-	if err != nil {
-		return stackErr.Error(fmt.Errorf("decode room message deletion projection payload failed: %v", err))
-	}
-	if payloadAny == nil {
-		return nil
+	if p.servingProjector != nil {
+		if err := p.servingProjector.SyncMessageAggregate(ctx, payload); err != nil {
+			return stackErr.Error(fmt.Errorf("sync cassandra message aggregate failed: %v", err))
+		}
 	}
 
-	payload, ok := payloadAny.(*roomprojectionevent.RoomMessageDeletionUpserted)
-	if !ok {
-		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", roomprojectionevent.EventRoomMessageDeletionProjectionUpserted))
+	if p.searchIndexer != nil && payload.Message != nil {
+		if err := p.searchIndexer.SyncMessage(ctx, payload.Message); err != nil {
+			return stackErr.Error(fmt.Errorf("sync elasticsearch message failed: %v", err))
+		}
 	}
-
-	if p.timelineProjector == nil {
-		return nil
-	}
-	return stackErr.Error(p.timelineProjector.ProjectMessageDeletion(ctx, &events.MessageDeletionProjection{
-		RoomID:        payload.RoomID,
-		MessageID:     payload.MessageID,
-		AccountID:     payload.AccountID,
-		MessageSentAt: payload.MessageSentAt,
-		CreatedAt:     payload.CreatedAt,
-	}))
-}
-
-func buildTimelineProjection(payload *roomprojectionevent.RoomMessageUpserted) *events.TimelineMessageProjection {
-	if payload == nil {
-		return nil
-	}
-
-	return &events.TimelineMessageProjection{
-		RoomID:                 payload.RoomID,
-		RoomName:               payload.RoomName,
-		RoomType:               payload.RoomType,
-		MessageID:              payload.MessageID,
-		MessageContent:         payload.MessageContent,
-		MessageType:            payload.MessageType,
-		ReplyToMessageID:       payload.ReplyToMessageID,
-		ForwardedFromMessageID: payload.ForwardedFromMessageID,
-		FileName:               payload.FileName,
-		FileSize:               payload.FileSize,
-		MimeType:               payload.MimeType,
-		ObjectKey:              payload.ObjectKey,
-		MessageSenderID:        payload.MessageSenderID,
-		MessageSenderName:      payload.MessageSenderName,
-		MessageSenderEmail:     payload.MessageSenderEmail,
-		MessageSentAt:          payload.MessageSentAt,
-		Mentions: lo.Map(payload.Mentions, func(item sharedevents.RoomMessageMention, _ int) events.ProjectionMention {
-			return events.ProjectionMention{
-				AccountID:   item.AccountID,
-				DisplayName: item.DisplayName,
-				Username:    item.Username,
-			}
-		}),
-		MentionAll:           payload.MentionAll,
-		MentionedAccountIDs:  lo.Uniq(payload.MentionedAccountIDs),
-		EditedAt:             payload.EditedAt,
-		DeletedForEveryoneAt: payload.DeletedForEveryoneAt,
-	}
-}
-
-func buildSearchDocument(payload *roomprojectionevent.RoomMessageUpserted) *events.SearchMessageDocument {
-	if payload == nil {
-		return nil
-	}
-
-	return &events.SearchMessageDocument{
-		RoomID:                 payload.RoomID,
-		RoomName:               payload.RoomName,
-		RoomType:               payload.RoomType,
-		MessageID:              payload.MessageID,
-		MessageContent:         payload.MessageContent,
-		MessageType:            payload.MessageType,
-		ReplyToMessageID:       payload.ReplyToMessageID,
-		ForwardedFromMessageID: payload.ForwardedFromMessageID,
-		FileName:               payload.FileName,
-		FileSize:               payload.FileSize,
-		MimeType:               payload.MimeType,
-		ObjectKey:              payload.ObjectKey,
-		MessageSenderID:        payload.MessageSenderID,
-		MessageSenderName:      payload.MessageSenderName,
-		MessageSenderEmail:     payload.MessageSenderEmail,
-		MessageSentAt:          payload.MessageSentAt,
-		Mentions: lo.Map(payload.Mentions, func(item sharedevents.RoomMessageMention, _ int) events.ProjectionMention {
-			return events.ProjectionMention{
-				AccountID:   item.AccountID,
-				DisplayName: item.DisplayName,
-				Username:    item.Username,
-			}
-		}),
-		MentionAll:          payload.MentionAll,
-		MentionedAccountIDs: lo.Uniq(payload.MentionedAccountIDs),
-	}
+	return nil
 }

@@ -38,7 +38,7 @@ func BuildConversationResultFromState(
 		}
 	}
 	if viewerMember == nil {
-		return nil, stackErr.Error(errors.New("viewer is not a member of this room"))
+		return nil, stackErr.Error(ErrViewerNotMemberOfRoom)
 	}
 
 	accountProjections, err := baseRepo.RoomAccountProjectionRepository().ListByAccountIDs(ctx, lo.Uniq(accountIDs))

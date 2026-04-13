@@ -11,7 +11,7 @@ import (
 )
 
 func buildServingProjectionProcessor(cfg *config.Config, appCtx *appCtx.AppContext) (modruntime.Module, error) {
-	timelineProjector, err := roomCassandra.NewCassandraTimelineProjector(cfg.CassandraConfig, appCtx.GetCassandraSession())
+	servingProjector, err := roomCassandra.NewCassandraTimelineProjector(cfg.CassandraConfig, appCtx.GetCassandraSession())
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -21,5 +21,5 @@ func buildServingProjectionProcessor(cfg *config.Config, appCtx *appCtx.AppConte
 		return nil, stackErr.Error(err)
 	}
 
-	return processor.NewProcessor(cfg, timelineProjector, searchIndexer)
+	return processor.NewProcessor(cfg, servingProjector, searchIndexer)
 }

@@ -3,87 +3,53 @@ package processor
 import (
 	"context"
 	"encoding/json"
-	"go-socket/core/shared/contracts/events"
+	roomprojection "go-socket/core/modules/room/application/projection"
 	"strings"
 	"testing"
 )
 
-type timelineProjectorStub struct {
-	projected *events.TimelineMessageProjection
+type servingProjectorStub struct {
+	roomSync    *roomprojection.RoomAggregateSync
+	messageSync *roomprojection.MessageAggregateSync
+	deletedRoom string
 }
 
-func (s *timelineProjectorStub) ProjectRoom(_ context.Context, _ *events.RoomProjection) error {
+func (s *servingProjectorStub) SyncRoomAggregate(_ context.Context, projection *roomprojection.RoomAggregateSync) error {
+	s.roomSync = projection
 	return nil
 }
 
-func (s *timelineProjectorStub) DeleteProjectedRoom(_ context.Context, _ string) error {
+func (s *servingProjectorStub) DeleteRoomAggregate(_ context.Context, roomID string) error {
+	s.deletedRoom = roomID
 	return nil
 }
 
-func (s *timelineProjectorStub) ProjectRoomMember(_ context.Context, _ *events.RoomMemberProjection) error {
-	return nil
-}
-
-func (s *timelineProjectorStub) DeleteProjectedRoomMember(_ context.Context, _, _ string) error {
-	return nil
-}
-
-func (s *timelineProjectorStub) ProjectMessage(_ context.Context, projection *events.TimelineMessageProjection) error {
-	s.projected = projection
-	return nil
-}
-
-func (s *timelineProjectorStub) ProjectMessageReceipt(_ context.Context, _ *events.MessageReceiptProjection) error {
-	return nil
-}
-
-func (s *timelineProjectorStub) ProjectMessageDeletion(_ context.Context, _ *events.MessageDeletionProjection) error {
+func (s *servingProjectorStub) SyncMessageAggregate(_ context.Context, projection *roomprojection.MessageAggregateSync) error {
+	s.messageSync = projection
 	return nil
 }
 
 type searchIndexerStub struct {
-	document *events.SearchMessageDocument
+	message *roomprojection.MessageProjection
+	roomID  string
 }
 
-func (s *searchIndexerStub) UpsertMessage(_ context.Context, document *events.SearchMessageDocument) error {
-	s.document = document
+func (s *searchIndexerStub) SyncMessage(_ context.Context, message *roomprojection.MessageProjection) error {
+	s.message = message
 	return nil
 }
 
-func (p *searchIndexerStub) DeleteProjectedRoom(ctx context.Context, roomID string) error {
-	panic("unimplemented")
+func (s *searchIndexerStub) DeleteRoom(_ context.Context, roomID string) error {
+	s.roomID = roomID
+	return nil
 }
 
-func (p *searchIndexerStub) DeleteProjectedRoomMember(ctx context.Context, roomID string, accountID string) error {
-	panic("unimplemented")
-}
-
-func (p *searchIndexerStub) ProjectMessage(ctx context.Context, projection *events.TimelineMessageProjection) error {
-	panic("unimplemented")
-}
-
-func (p *searchIndexerStub) ProjectMessageDeletion(ctx context.Context, projection *events.MessageDeletionProjection) error {
-	panic("unimplemented")
-}
-
-func (p *searchIndexerStub) ProjectMessageReceipt(ctx context.Context, projection *events.MessageReceiptProjection) error {
-	panic("unimplemented")
-}
-
-func (p *searchIndexerStub) ProjectRoom(ctx context.Context, projection *events.RoomProjection) error {
-	panic("unimplemented")
-}
-
-func (p *searchIndexerStub) ProjectRoomMember(ctx context.Context, projection *events.RoomMemberProjection) error {
-	panic("unimplemented")
-}
-
-func TestHandleRoomOutboxEventProjectsTimelineAndSearch(t *testing.T) {
-	timeline := &timelineProjectorStub{}
+func TestHandleRoomOutboxEventProjectsServingAndSearchSnapshots(t *testing.T) {
+	serving := &servingProjectorStub{}
 	search := &searchIndexerStub{}
 	processor := &processor{
-		timelineProjector: timeline,
-		searchIndexer:     search,
+		servingProjector: serving,
+		searchIndexer:    search,
 	}
 
 	raw := []byte(`{
@@ -91,25 +57,35 @@ func TestHandleRoomOutboxEventProjectsTimelineAndSearch(t *testing.T) {
 		"aggregate_id": "room-1",
 		"aggregate_type": "RoomAggregate",
 		"version": 4,
-		"event_name": "EventRoomMessageProjectionUpserted",
+		"event_name": "EventMessageAggregateProjectionSynced",
 		"event_data": {
-			"room_id": "room-1",
-			"room_name": "Backend",
-			"room_type": "group",
-			"message_id": "msg-1",
-			"message_content": "hello team",
-			"message_type": "text",
-			"reply_to_message_id": "msg-0",
-			"file_name": "",
-			"file_size": 0,
-			"mime_type": "",
-			"object_key": "",
-			"message_sender_id": "acc-1",
-			"message_sender_name": "Alice",
-			"message_sent_at": "2026-04-12T12:00:00Z",
-			"mentions": [{"account_id":"acc-2","display_name":"Bob","username":"bob"}],
-			"mention_all": true,
-			"mentioned_account_ids": ["acc-2", "acc-3", "acc-2"]
+			"message": {
+				"room_id": "room-1",
+				"room_name": "Backend",
+				"room_type": "group",
+				"message_id": "msg-1",
+				"message_content": "hello team",
+				"message_type": "text",
+				"reply_to_message_id": "msg-0",
+				"file_name": "",
+				"file_size": 0,
+				"mime_type": "",
+				"object_key": "",
+				"message_sender_id": "acc-1",
+				"message_sender_name": "Alice",
+				"message_sent_at": "2026-04-12T12:00:00Z",
+				"mentions": [{"account_id":"acc-2","display_name":"Bob","username":"bob"}],
+				"mention_all": true,
+				"mentioned_account_ids": ["acc-2", "acc-3", "acc-2"]
+			},
+			"receipts": [{
+				"room_id": "room-1",
+				"message_id": "msg-1",
+				"account_id": "acc-2",
+				"status": "sent",
+				"created_at": "2026-04-12T12:00:00Z",
+				"updated_at": "2026-04-12T12:00:00Z"
+			}]
 		},
 		"metadata": "{}",
 		"created_at": "2026-04-12T12:00:00Z"
@@ -119,37 +95,40 @@ func TestHandleRoomOutboxEventProjectsTimelineAndSearch(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if timeline.projected == nil {
-		t.Fatalf("expected timeline projection to be written")
+	if serving.messageSync == nil {
+		t.Fatalf("expected serving snapshot to be written")
 	}
-	if timeline.projected.RoomID != "room-1" || timeline.projected.MessageID != "msg-1" {
-		t.Fatalf("unexpected timeline projection %+v", timeline.projected)
+	if serving.messageSync.Message == nil || serving.messageSync.Message.RoomID != "room-1" || serving.messageSync.Message.MessageID != "msg-1" {
+		t.Fatalf("unexpected message projection %+v", serving.messageSync.Message)
 	}
-	if !timeline.projected.MentionAll {
+	if !serving.messageSync.Message.MentionAll {
 		t.Fatalf("expected mention_all to be projected")
 	}
-	if len(timeline.projected.MentionedAccountIDs) != 2 {
-		t.Fatalf("expected unique mentioned_account_ids, got %+v", timeline.projected.MentionedAccountIDs)
+	if len(serving.messageSync.Message.MentionedAccountIDs) != 3 {
+		t.Fatalf("expected mentioned_account_ids to be preserved, got %+v", serving.messageSync.Message.MentionedAccountIDs)
+	}
+	if len(serving.messageSync.Receipts) != 1 || serving.messageSync.Receipts[0].AccountID != "acc-2" {
+		t.Fatalf("expected receipt snapshot to be projected, got %+v", serving.messageSync.Receipts)
 	}
 
-	if search.document == nil {
-		t.Fatalf("expected search document to be indexed")
+	if search.message == nil {
+		t.Fatalf("expected search message to be indexed")
 	}
-	if search.document.RoomName != "Backend" {
-		t.Fatalf("expected room_name Backend, got %q", search.document.RoomName)
+	if search.message.RoomName != "Backend" {
+		t.Fatalf("expected room_name Backend, got %q", search.message.RoomName)
 	}
-	if search.document.ReplyToMessageID != "msg-0" {
-		t.Fatalf("expected reply_to_message_id msg-0, got %q", search.document.ReplyToMessageID)
+	if search.message.ReplyToMessageID != "msg-0" {
+		t.Fatalf("expected reply_to_message_id msg-0, got %q", search.message.ReplyToMessageID)
 	}
 }
 
-func TestSearchMessageDocumentJSONUsesSnakeCaseFields(t *testing.T) {
-	document := &events.SearchMessageDocument{
+func TestMessageProjectionJSONUsesSnakeCaseFields(t *testing.T) {
+	document := &roomprojection.MessageProjection{
 		RoomID:            "room-1",
 		MessageID:         "msg-1",
 		MessageSenderID:   "acc-1",
 		MessageSenderName: "Alice",
-		Mentions: []events.ProjectionMention{
+		Mentions: []roomprojection.ProjectionMention{
 			{
 				AccountID:   "acc-2",
 				DisplayName: "Bob",

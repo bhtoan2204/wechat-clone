@@ -52,14 +52,30 @@ func (r *messageAggregateRepoImpl) Save(ctx context.Context, agg *aggregate.Mess
 	}
 
 	roomID := agg.Message().RoomID
-	pendingOutboxEvents := make([]pendingRoomOutboxEvent, 0, 4)
+	pendingOutboxEvents := make([]pendingRoomOutboxEvent, 0, 2)
 
 	if agg.MessageDirty() {
 		if err := r.messageRepo.UpdateMessage(ctx, agg.Message()); err != nil {
 			return stackErr.Error(err)
 		}
+	}
 
+	var updatedMembers []*entity.RoomMemberEntity
+	if agg.MemberDirty() && agg.RecipientMember() != nil {
+		if err := r.roomMemberRepo.UpdateRoomMember(ctx, agg.RecipientMember()); err != nil {
+			return stackErr.Error(err)
+		}
+		updatedMembers = []*entity.RoomMemberEntity{agg.RecipientMember()}
+	}
+
+	hasProjectionChange := agg.MessageDirty() || len(updatedMembers) > 0 || agg.PendingReceipt() != nil || agg.PendingDeletion() != nil
+	if hasProjectionChange {
 		room, err := r.roomRepo.GetRoomByID(ctx, roomID)
+		if err != nil {
+			return stackErr.Error(err)
+		}
+
+		updatedMembers, err = enrichRoomMembersWithAccountProjections(ctx, r.accountRepo, updatedMembers)
 		if err != nil {
 			return stackErr.Error(err)
 		}
@@ -76,22 +92,48 @@ func (r *messageAggregateRepoImpl) Save(ctx context.Context, agg *aggregate.Mess
 		}
 
 		senderName, senderEmail := senderIdentityFromProjection(senderProjection, agg.Message().SenderID)
-		pendingOutboxEvents = append(pendingOutboxEvents, buildRoomMessageProjectionUpsertEvent(agg.Message(), room, senderName, senderEmail))
-	}
 
-	if agg.MemberDirty() && agg.RecipientMember() != nil {
-		if err := r.roomMemberRepo.UpdateRoomMember(ctx, agg.RecipientMember()); err != nil {
-			return stackErr.Error(err)
+		receipts := make([]aggregate.PendingMessageReceipt, 0, 1)
+		if receipt := agg.PendingReceipt(); receipt != nil {
+			receipts = append(receipts, *receipt)
 		}
-		pendingOutboxEvents = append(pendingOutboxEvents, buildRoomMemberProjectionUpsertEvent(agg.RecipientMember()))
-	}
 
-	if receipt := agg.PendingReceipt(); receipt != nil {
-		pendingOutboxEvents = append(pendingOutboxEvents, buildRoomMessageReceiptProjectionEvent(roomID, *receipt))
-	}
+		deletions := make([]*aggregate.PendingMessageDeletion, 0, 1)
+		if deletion := agg.PendingDeletion(); deletion != nil {
+			deletions = append(deletions, deletion)
+		}
 
-	if deletion := agg.PendingDeletion(); deletion != nil {
-		pendingOutboxEvents = append(pendingOutboxEvents, buildRoomMessageDeletionProjectionEvent(roomID, agg.Message(), deletion))
+		pendingOutboxEvents = append(pendingOutboxEvents, buildMessageAggregateProjectionSyncEvent(
+			agg.Message(),
+			room,
+			senderName,
+			senderEmail,
+			updatedMembers,
+			receipts,
+			deletions,
+		))
+
+		if agg.MessageDirty() {
+			members, err := r.roomMemberRepo.ListRoomMembers(ctx, roomID)
+			if err != nil {
+				return stackErr.Error(err)
+			}
+			members, err = enrichRoomMembersWithAccountProjections(ctx, r.accountRepo, members)
+			if err != nil {
+				return stackErr.Error(err)
+			}
+
+			lastMessage, err := r.messageRepo.GetLastMessageByRoomID(ctx, roomID)
+			if err != nil {
+				return stackErr.Error(err)
+			}
+
+			pendingOutboxEvents = append(pendingOutboxEvents, buildRoomAggregateProjectionSyncEvent(
+				room,
+				sortRoomMembersByAccount(members),
+				lastMessage,
+			))
+		}
 	}
 
 	if len(pendingOutboxEvents) > 0 {
