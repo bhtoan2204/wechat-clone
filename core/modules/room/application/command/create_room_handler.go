@@ -13,6 +13,8 @@ import (
 	roomtypes "go-socket/core/modules/room/types"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/stackErr"
+
+	"github.com/google/uuid"
 )
 
 type createRoomHandler struct {
@@ -32,7 +34,7 @@ func (h *createRoomHandler) Handle(ctx context.Context, req *in.CreateRoomReques
 	}
 
 	now := time.Now().UTC()
-	room, err := entity.NewRoom(newID(), req.Name, req.Description, accountID, roomtypes.RoomType(req.RoomType), "", now)
+	room, err := entity.NewRoom(uuid.NewString(), req.Name, req.Description, accountID, roomtypes.RoomType(req.RoomType), "", now)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

@@ -1,28 +1,81 @@
-package projection
+package processor
 
 import (
 	"context"
 	"encoding/json"
+	"go-socket/core/shared/contracts/events"
 	"strings"
 	"testing"
 )
 
 type timelineProjectorStub struct {
-	projected *TimelineMessageProjection
+	projected *events.TimelineMessageProjection
 }
 
-func (s *timelineProjectorStub) UpsertMessage(_ context.Context, projection *TimelineMessageProjection) error {
+func (s *timelineProjectorStub) ProjectRoom(_ context.Context, _ *events.RoomProjection) error {
+	return nil
+}
+
+func (s *timelineProjectorStub) DeleteProjectedRoom(_ context.Context, _ string) error {
+	return nil
+}
+
+func (s *timelineProjectorStub) ProjectRoomMember(_ context.Context, _ *events.RoomMemberProjection) error {
+	return nil
+}
+
+func (s *timelineProjectorStub) DeleteProjectedRoomMember(_ context.Context, _, _ string) error {
+	return nil
+}
+
+func (s *timelineProjectorStub) ProjectMessage(_ context.Context, projection *events.TimelineMessageProjection) error {
 	s.projected = projection
 	return nil
 }
 
-type searchIndexerStub struct {
-	document *SearchMessageDocument
+func (s *timelineProjectorStub) ProjectMessageReceipt(_ context.Context, _ *events.MessageReceiptProjection) error {
+	return nil
 }
 
-func (s *searchIndexerStub) UpsertMessage(_ context.Context, document *SearchMessageDocument) error {
+func (s *timelineProjectorStub) ProjectMessageDeletion(_ context.Context, _ *events.MessageDeletionProjection) error {
+	return nil
+}
+
+type searchIndexerStub struct {
+	document *events.SearchMessageDocument
+}
+
+func (s *searchIndexerStub) UpsertMessage(_ context.Context, document *events.SearchMessageDocument) error {
 	s.document = document
 	return nil
+}
+
+func (p *searchIndexerStub) DeleteProjectedRoom(ctx context.Context, roomID string) error {
+	panic("unimplemented")
+}
+
+func (p *searchIndexerStub) DeleteProjectedRoomMember(ctx context.Context, roomID string, accountID string) error {
+	panic("unimplemented")
+}
+
+func (p *searchIndexerStub) ProjectMessage(ctx context.Context, projection *events.TimelineMessageProjection) error {
+	panic("unimplemented")
+}
+
+func (p *searchIndexerStub) ProjectMessageDeletion(ctx context.Context, projection *events.MessageDeletionProjection) error {
+	panic("unimplemented")
+}
+
+func (p *searchIndexerStub) ProjectMessageReceipt(ctx context.Context, projection *events.MessageReceiptProjection) error {
+	panic("unimplemented")
+}
+
+func (p *searchIndexerStub) ProjectRoom(ctx context.Context, projection *events.RoomProjection) error {
+	panic("unimplemented")
+}
+
+func (p *searchIndexerStub) ProjectRoomMember(ctx context.Context, projection *events.RoomMemberProjection) error {
+	panic("unimplemented")
 }
 
 func TestHandleRoomOutboxEventProjectsTimelineAndSearch(t *testing.T) {
@@ -38,7 +91,7 @@ func TestHandleRoomOutboxEventProjectsTimelineAndSearch(t *testing.T) {
 		"aggregate_id": "room-1",
 		"aggregate_type": "RoomAggregate",
 		"version": 4,
-		"event_name": "EventRoomMessageCreated",
+		"event_name": "EventRoomMessageProjectionUpserted",
 		"event_data": {
 			"room_id": "room-1",
 			"room_name": "Backend",
@@ -91,12 +144,12 @@ func TestHandleRoomOutboxEventProjectsTimelineAndSearch(t *testing.T) {
 }
 
 func TestSearchMessageDocumentJSONUsesSnakeCaseFields(t *testing.T) {
-	document := &SearchMessageDocument{
+	document := &events.SearchMessageDocument{
 		RoomID:            "room-1",
 		MessageID:         "msg-1",
 		MessageSenderID:   "acc-1",
 		MessageSenderName: "Alice",
-		Mentions: []ProjectionMention{
+		Mentions: []events.ProjectionMention{
 			{
 				AccountID:   "acc-2",
 				DisplayName: "Bob",

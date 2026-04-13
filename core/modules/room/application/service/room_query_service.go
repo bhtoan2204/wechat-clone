@@ -3,23 +3,23 @@ package service
 import (
 	"context"
 
+	"go-socket/core/modules/room/application/projection"
 	roomsupport "go-socket/core/modules/room/application/support"
 	apptypes "go-socket/core/modules/room/application/types"
-	"go-socket/core/modules/room/domain/repos"
 	"go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/utils"
 )
 
 type RoomQueryService struct {
-	repos repos.QueryRepos
+	readRepos projection.QueryRepos
 }
 
-func NewRoomQueryService(repos repos.QueryRepos) *RoomQueryService {
-	return &RoomQueryService{repos: repos}
+func NewRoomQueryService(readRepos projection.QueryRepos) *RoomQueryService {
+	return &RoomQueryService{readRepos: readRepos}
 }
 
 func (s *RoomQueryService) GetRoom(ctx context.Context, query apptypes.GetRoomQuery) (*apptypes.RoomResult, error) {
-	room, err := s.repos.RoomReadRepository().GetRoomByID(ctx, query.ID)
+	room, err := s.readRepos.RoomReadRepository().GetRoomByID(ctx, query.ID)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -36,7 +36,7 @@ func (s *RoomQueryService) ListRooms(ctx context.Context, query apptypes.ListRoo
 		limit = 20
 	}
 
-	rooms, err := s.repos.RoomReadRepository().ListRooms(ctx, utils.QueryOptions{
+	rooms, err := s.readRepos.RoomReadRepository().ListRooms(ctx, utils.QueryOptions{
 		Offset:         &page,
 		Limit:          &limit,
 		OrderBy:        "updated_at",

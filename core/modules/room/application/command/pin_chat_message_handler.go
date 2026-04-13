@@ -34,13 +34,14 @@ func (h *pinChatMessageHandler) Handle(ctx context.Context, req *in.PinChatMessa
 	if err := agg.PinMessage(accountID, req.MessageID, time.Now().UTC(), accountID); err != nil {
 		return nil, stackErr.Error(err)
 	}
+	lastMessage := lastPendingMessage(agg.PendingMessages())
 	if err := h.baseRepo.WithTransaction(ctx, func(txRepos roomrepos.Repos) error {
 		return stackErr.Error(txRepos.RoomAggregateRepository().Save(ctx, agg))
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
 
-	res, err := roomsupport.BuildConversationResult(ctx, h.baseRepo, accountID, agg.Room(), true)
+	res, err := roomsupport.BuildConversationResultFromState(ctx, h.baseRepo, accountID, agg.Room(), agg.Members(), lastMessage, true)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"go-socket/core/modules/room/domain/aggregate"
+	"go-socket/core/modules/room/domain/entity"
 	"go-socket/core/modules/room/domain/repos"
 	"go-socket/core/shared/pkg/stackErr"
 
@@ -11,20 +12,29 @@ import (
 )
 
 type messageAggregateRepoImpl struct {
-	db              *gorm.DB
-	messageRepo     repos.MessageRepository
-	messageReadRepo repos.MessageReadRepository
-	roomMemberRepo  repos.RoomMemberRepository
-	memberReadRepo  repos.RoomMemberReadRepository
+	db             *gorm.DB
+	messageRepo    repos.MessageRepository
+	roomRepo       repos.RoomRepository
+	roomMemberRepo repos.RoomMemberRepository
+	accountRepo    repos.RoomAccountProjectionRepository
+	outboxRepo     repos.RoomOutboxEventsRepository
 }
 
-func newMessageAggregateRepoImpl(db *gorm.DB, messageRepo repos.MessageRepository, messageReadRepo repos.MessageReadRepository, roomMemberRepo repos.RoomMemberRepository, memberReadRepo repos.RoomMemberReadRepository) repos.MessageAggregateRepository {
+func newMessageAggregateRepoImpl(
+	db *gorm.DB,
+	messageRepo repos.MessageRepository,
+	roomRepo repos.RoomRepository,
+	roomMemberRepo repos.RoomMemberRepository,
+	accountRepo repos.RoomAccountProjectionRepository,
+	outboxRepo repos.RoomOutboxEventsRepository,
+) repos.MessageAggregateRepository {
 	return &messageAggregateRepoImpl{
-		db:              db,
-		messageRepo:     messageRepo,
-		messageReadRepo: messageReadRepo,
-		roomMemberRepo:  roomMemberRepo,
-		memberReadRepo:  memberReadRepo,
+		db:             db,
+		messageRepo:    messageRepo,
+		roomRepo:       roomRepo,
+		roomMemberRepo: roomMemberRepo,
+		accountRepo:    accountRepo,
+		outboxRepo:     outboxRepo,
 	}
 }
 
@@ -41,41 +51,55 @@ func (r *messageAggregateRepoImpl) Save(ctx context.Context, agg *aggregate.Mess
 		return stackErr.Error(aggregate.ErrMessageAggregateNil)
 	}
 
+	roomID := agg.Message().RoomID
+	pendingOutboxEvents := make([]pendingRoomOutboxEvent, 0, 4)
+
 	if agg.MessageDirty() {
 		if err := r.messageRepo.UpdateMessage(ctx, agg.Message()); err != nil {
 			return stackErr.Error(err)
 		}
-		if err := r.messageReadRepo.UpsertMessage(ctx, agg.Message()); err != nil {
-			return stackErr.Error(err)
-		}
-	}
 
-	if deletion := agg.PendingDeletion(); deletion != nil {
-		if err := r.messageReadRepo.UpsertMessageDeletion(ctx, deletion.MessageID, deletion.AccountID, deletion.CreatedAt); err != nil {
+		room, err := r.roomRepo.GetRoomByID(ctx, roomID)
+		if err != nil {
 			return stackErr.Error(err)
 		}
-	}
 
-	if receipt := agg.PendingReceipt(); receipt != nil {
-		if err := r.messageReadRepo.UpsertMessageReceipt(
-			ctx,
-			receipt.MessageID,
-			receipt.AccountID,
-			receipt.Status,
-			receipt.DeliveredAt,
-			receipt.SeenAt,
-			receipt.CreatedAt,
-			receipt.UpdatedAt,
-		); err != nil {
-			return stackErr.Error(err)
+		var senderProjection *entity.AccountEntity
+		if r.accountRepo != nil {
+			accountProjections, projectionErr := r.accountRepo.ListByAccountIDs(ctx, []string{agg.Message().SenderID})
+			if projectionErr != nil {
+				return stackErr.Error(projectionErr)
+			}
+			if len(accountProjections) > 0 {
+				senderProjection = accountProjections[0]
+			}
 		}
+
+		senderName, senderEmail := senderIdentityFromProjection(senderProjection, agg.Message().SenderID)
+		pendingOutboxEvents = append(pendingOutboxEvents, buildRoomMessageProjectionUpsertEvent(agg.Message(), room, senderName, senderEmail))
 	}
 
 	if agg.MemberDirty() && agg.RecipientMember() != nil {
 		if err := r.roomMemberRepo.UpdateRoomMember(ctx, agg.RecipientMember()); err != nil {
 			return stackErr.Error(err)
 		}
-		if err := r.memberReadRepo.UpsertRoomMember(ctx, agg.RecipientMember()); err != nil {
+		pendingOutboxEvents = append(pendingOutboxEvents, buildRoomMemberProjectionUpsertEvent(agg.RecipientMember()))
+	}
+
+	if receipt := agg.PendingReceipt(); receipt != nil {
+		pendingOutboxEvents = append(pendingOutboxEvents, buildRoomMessageReceiptProjectionEvent(roomID, *receipt))
+	}
+
+	if deletion := agg.PendingDeletion(); deletion != nil {
+		pendingOutboxEvents = append(pendingOutboxEvents, buildRoomMessageDeletionProjectionEvent(roomID, agg.Message(), deletion))
+	}
+
+	if len(pendingOutboxEvents) > 0 {
+		baseVersion, err := loadLatestRoomOutboxVersion(ctx, r.db, roomID)
+		if err != nil {
+			return stackErr.Error(err)
+		}
+		if _, err := appendRoomOutboxEvents(ctx, r.outboxRepo, roomID, baseVersion, pendingOutboxEvents); err != nil {
 			return stackErr.Error(err)
 		}
 	}

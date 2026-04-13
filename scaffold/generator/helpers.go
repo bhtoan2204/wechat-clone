@@ -54,6 +54,14 @@ func isGeneratedFile(path, kind string) bool {
 	return strings.Contains(string(content), marker)
 }
 
+func isScaffoldStubFile(path string) bool {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(content), `fmt.Errorf("not implemented yet")`)
+}
+
 type moduleEndpoints struct {
 	Module    modulePaths
 	Endpoints []models.Endpoint

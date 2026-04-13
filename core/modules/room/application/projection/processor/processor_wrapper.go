@@ -1,4 +1,4 @@
-package projection
+package processor
 
 import (
 	"context"

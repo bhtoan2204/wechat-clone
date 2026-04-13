@@ -40,7 +40,8 @@ type DBConfig struct {
 }
 
 type AuthConfig struct {
-	PasetoKey             string `env:"AUTH_PASETO_KEY" json:"-"`
+	PublicKey             string `env:"AUTH_PUBLIC_KEY"`
+	PrivateKey            string `env:"AUTH_PRIVATE_KEY"`
 	TokenIssuer           string `env:"AUTH_TOKEN_ISSUER"`
 	AccessTokenTTLSeconds int64  `env:"AUTH_ACCESS_TOKEN_TTL_SECONDS"`
 }

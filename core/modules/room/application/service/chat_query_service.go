@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"go-socket/core/modules/room/application/projection"
 	roomsupport "go-socket/core/modules/room/application/support"
 	apptypes "go-socket/core/modules/room/application/types"
-	"go-socket/core/modules/room/domain/entity"
-	"go-socket/core/modules/room/domain/repos"
+	"go-socket/core/modules/room/infra/projection/cassandra/views"
 	"go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/utils"
 
@@ -17,12 +17,15 @@ import (
 )
 
 type ChatQueryService struct {
-	repos repos.QueryRepos
-	redis *redis.Client
+	readRepos projection.QueryRepos
+	redis     *redis.Client
 }
 
-func NewChatQueryService(repos repos.QueryRepos, redis *redis.Client) *ChatQueryService {
-	return &ChatQueryService{repos: repos, redis: redis}
+func NewChatQueryService(readRepos projection.QueryRepos, redis *redis.Client) *ChatQueryService {
+	return &ChatQueryService{
+		readRepos: readRepos,
+		redis:     redis,
+	}
 }
 
 func (s *ChatQueryService) ListConversations(ctx context.Context, accountID string, query apptypes.ListConversationsQuery) ([]apptypes.ConversationResult, error) {
@@ -35,10 +38,10 @@ func (s *ChatQueryService) ListConversations(ctx context.Context, accountID stri
 		offset = 0
 	}
 
-	rooms, err := s.repos.RoomReadRepository().ListRoomsByAccount(ctx, accountID, utils.QueryOptions{
+	rooms, err := s.readRepos.RoomReadRepository().ListRoomsByAccount(ctx, accountID, utils.QueryOptions{
 		Limit:          &limit,
 		Offset:         &offset,
-		OrderBy:        "rr.updated_at",
+		OrderBy:        "updated_at",
 		OrderDirection: "DESC",
 	})
 	if err != nil {
@@ -47,7 +50,7 @@ func (s *ChatQueryService) ListConversations(ctx context.Context, accountID stri
 
 	out := make([]apptypes.ConversationResult, 0, len(rooms))
 	for _, room := range rooms {
-		item, err := roomsupport.BuildConversationResult(ctx, s.repos, accountID, room, true)
+		item, err := roomsupport.BuildConversationResult(ctx, s.readRepos, accountID, room, true)
 		if err != nil {
 			return nil, stackErr.Error(err)
 		}
@@ -57,11 +60,11 @@ func (s *ChatQueryService) ListConversations(ctx context.Context, accountID stri
 }
 
 func (s *ChatQueryService) GetConversation(ctx context.Context, accountID string, query apptypes.GetConversationQuery) (*apptypes.ConversationResult, error) {
-	room, err := s.repos.RoomReadRepository().GetRoomByID(ctx, query.RoomID)
+	room, err := s.readRepos.RoomReadRepository().GetRoomByID(ctx, query.RoomID)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	return roomsupport.BuildConversationResult(ctx, s.repos, accountID, room, true)
+	return roomsupport.BuildConversationResult(ctx, s.readRepos, accountID, room, true)
 }
 
 func (s *ChatQueryService) ListMessages(ctx context.Context, accountID string, query apptypes.ListMessagesQuery) ([]apptypes.MessageResult, error) {
@@ -77,7 +80,7 @@ func (s *ChatQueryService) ListMessages(ctx context.Context, accountID string, q
 		}
 	}
 
-	messages, err := s.repos.MessageReadRepository().ListMessages(ctx, accountID, query.RoomID, repos.MessageListOptions{
+	messages, err := s.readRepos.MessageReadRepository().ListMessages(ctx, accountID, query.RoomID, projection.MessageListOptions{
 		Limit:     limit,
 		BeforeID:  query.BeforeID,
 		BeforeAt:  beforeAt,
@@ -89,7 +92,7 @@ func (s *ChatQueryService) ListMessages(ctx context.Context, accountID string, q
 
 	out := make([]apptypes.MessageResult, 0, len(messages))
 	for _, message := range messages {
-		item, err := roomsupport.BuildMessageResult(ctx, s.repos, accountID, message)
+		item, err := roomsupport.BuildMessageResult(ctx, s.readRepos, accountID, message)
 		if err != nil {
 			return nil, stackErr.Error(err)
 		}
@@ -104,23 +107,23 @@ func (s *ChatQueryService) SearchMentionCandidates(ctx context.Context, accountI
 		return nil, stackErr.Error(errors.New("room_id is required"))
 	}
 
-	room, err := s.repos.RoomReadRepository().GetRoomByID(ctx, roomID)
+	room, err := s.readRepos.RoomReadRepository().GetRoomByID(ctx, roomID)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	if err := room.RequireGroup(); err != nil {
-		return nil, stackErr.Error(entity.ErrRoomMentionsRequireGroup)
+	if room == nil || !strings.EqualFold(strings.TrimSpace(room.RoomType), "group") {
+		return nil, stackErr.Error(errors.New("mentions are supported only in group rooms"))
 	}
 
-	member, err := s.repos.RoomMemberReadRepository().GetRoomMemberByAccount(ctx, roomID, accountID)
+	member, err := s.readRepos.RoomMemberReadRepository().GetRoomMemberByAccount(ctx, roomID, accountID)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 	if member == nil {
-		return nil, stackErr.Error(entity.ErrRoomMemberRequired)
+		return nil, stackErr.Error(errors.New("viewer is not a member of this room"))
 	}
 
-	candidates, err := s.repos.RoomMemberReadRepository().SearchMentionCandidates(
+	candidates, err := s.readRepos.RoomMemberReadRepository().SearchMentionCandidates(
 		ctx,
 		roomID,
 		query.Query,
@@ -167,7 +170,7 @@ func chatPresenceKey(accountID string) string {
 	return "chat:presence:" + strings.TrimSpace(accountID)
 }
 
-func resolveMentionCandidateDisplayName(candidate *entity.MentionCandidate) string {
+func resolveMentionCandidateDisplayName(candidate *views.MentionCandidateView) string {
 	if candidate == nil {
 		return ""
 	}

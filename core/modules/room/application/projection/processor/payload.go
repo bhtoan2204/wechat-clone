@@ -1,4 +1,4 @@
-package projection
+package processor
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 
+	roomprojectionevent "go-socket/core/modules/room/application/projection/projectionevent"
 	sharedevents "go-socket/core/shared/contracts/events"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -15,7 +16,14 @@ import (
 )
 
 var projectionEventPayloadTypes = map[string]reflect.Type{
-	sharedevents.EventRoomMessageCreated: reflect.TypeOf(sharedevents.RoomMessageCreatedEvent{}),
+	roomprojectionevent.EventRoomProjectionUpserted:                reflect.TypeOf(roomprojectionevent.RoomUpserted{}),
+	roomprojectionevent.EventRoomProjectionDeleted:                 reflect.TypeOf(roomprojectionevent.RoomDeleted{}),
+	roomprojectionevent.EventRoomMemberProjectionUpserted:          reflect.TypeOf(roomprojectionevent.RoomMemberUpserted{}),
+	roomprojectionevent.EventRoomMemberProjectionDeleted:           reflect.TypeOf(roomprojectionevent.RoomMemberDeleted{}),
+	roomprojectionevent.EventRoomMessageProjectionUpserted:         reflect.TypeOf(roomprojectionevent.RoomMessageUpserted{}),
+	roomprojectionevent.EventRoomMessageReceiptProjectionUpserted:  reflect.TypeOf(roomprojectionevent.RoomMessageReceiptUpserted{}),
+	roomprojectionevent.EventRoomMessageDeletionProjectionUpserted: reflect.TypeOf(roomprojectionevent.RoomMessageDeletionUpserted{}),
+	sharedevents.EventRoomMessageCreated:                           reflect.TypeOf(sharedevents.RoomMessageCreatedEvent{}),
 }
 
 func decodeEventPayload(ctx context.Context, eventName string, raw []byte) (interface{}, error) {

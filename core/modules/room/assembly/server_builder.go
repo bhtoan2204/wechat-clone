@@ -7,6 +7,7 @@ import (
 	roomquery "go-socket/core/modules/room/application/query"
 	roomservice "go-socket/core/modules/room/application/service"
 	roomrepo "go-socket/core/modules/room/infra/persistent/repository"
+	roomprojection "go-socket/core/modules/room/infra/projection/cassandra"
 	roomserver "go-socket/core/modules/room/transport/server"
 	"go-socket/core/shared/config"
 	"go-socket/core/shared/pkg/cqrs"
@@ -16,9 +17,19 @@ import (
 )
 
 func buildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.HTTPServer, error) {
-	roomRepos := roomrepo.NewRepoImpl(appContext)
-	roomQueryService := roomservice.NewRoomQueryService(roomRepos)
-	chatQueryService := roomservice.NewChatQueryService(roomRepos, appContext.GetRedisClient())
+	roomRepos, err := roomrepo.NewRepoImpl(appContext)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	roomReadRepos, err := roomprojection.NewQueryRepoImpl(
+		appContext.GetConfig().CassandraConfig,
+		appContext.GetCassandraSession(),
+	)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	roomQueryService := roomservice.NewRoomQueryService(roomReadRepos)
+	chatQueryService := roomservice.NewChatQueryService(roomReadRepos, appContext.GetRedisClient())
 	createRoom := cqrs.NewDispatcher(roomcommand.NewCreateRoomHandler(roomRepos))
 	updateRoom := cqrs.NewDispatcher(roomcommand.NewUpdateRoomHandler(roomRepos))
 	deleteRoom := cqrs.NewDispatcher(roomcommand.NewDeleteRoomHandler(roomRepos))

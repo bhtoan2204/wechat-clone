@@ -28,10 +28,6 @@ type resolvedMessageMentions struct {
 	MentionedAccountIDs []string
 }
 
-func newID() string {
-	return uuid.NewString()
-}
-
 func resolveMessageMentions(
 	ctx context.Context,
 	baseRepo repos.Repos,
@@ -197,6 +193,13 @@ func appendUniqueString(values []string, value string) []string {
 	return append(values, value)
 }
 
+func lastPendingMessage(messages []*entity.MessageEntity) *entity.MessageEntity {
+	if len(messages) == 0 {
+		return nil
+	}
+	return messages[len(messages)-1]
+}
+
 func ensureProjectedAccountsExist(ctx context.Context, baseRepo repos.Repos, accountIDs ...string) error {
 	normalizedIDs := make([]string, 0, len(accountIDs))
 	for _, accountID := range accountIDs {
@@ -245,7 +248,7 @@ func executeSendMessage(ctx context.Context, baseRepo repos.Repos, accountID str
 
 	now := time.Now().UTC()
 	message, err := roomAgg.SendMessage(
-		newID(),
+		uuid.NewString(),
 		accountID,
 		entity.MessageParams{
 			Message:                command.Message,
@@ -277,5 +280,5 @@ func executeSendMessage(ctx context.Context, baseRepo repos.Repos, accountID str
 		return nil, stackErr.Error(err)
 	}
 
-	return roomsupport.BuildMessageResult(ctx, baseRepo, accountID, message)
+	return roomsupport.BuildMessageResultFromState(ctx, baseRepo, accountID, message)
 }

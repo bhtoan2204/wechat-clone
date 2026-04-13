@@ -18,31 +18,25 @@ type repoImpl struct {
 	roomAggregateRepo repos.RoomAggregateRepository
 	messageAggRepo    repos.MessageAggregateRepository
 
-	roomRepo        repos.RoomRepository
-	messageRepo     repos.MessageRepository
-	roomMemberRepo  repos.RoomMemberRepository
-	roomOutboxRepo  repos.RoomOutboxEventsRepository
-	roomReadRepo    repos.RoomReadRepository
-	messageReadRepo repos.MessageReadRepository
-	memberReadRepo  repos.RoomMemberReadRepository
-	accountRepo     repos.RoomAccountProjectionRepository
+	roomRepo       repos.RoomRepository
+	messageRepo    repos.MessageRepository
+	roomMemberRepo repos.RoomMemberRepository
+	roomOutboxRepo repos.RoomOutboxEventsRepository
+	accountRepo    repos.RoomAccountProjectionRepository
 }
 
-func NewRepoImpl(appCtx *appCtx.AppContext) repos.Repos {
+func NewRepoImpl(appCtx *appCtx.AppContext) (repos.Repos, error) {
 	return newRepoImplWithDB(appCtx, appCtx.GetDB())
 }
 
-func newRepoImplWithDB(appCtx *appCtx.AppContext, db *gorm.DB) repos.Repos {
+func newRepoImplWithDB(appCtx *appCtx.AppContext, db *gorm.DB) (repos.Repos, error) {
 	roomRepo := NewRoomRepoImpl(db, appCtx.GetCache())
 	messageRepo := NewMessageRepoImpl(db)
 	roomMemberRepo := NewRoomMemberImpl(db)
 	roomOutboxRepo := NewRoomOutboxEventsRepoImpl(db)
-	roomReadRepo := NewRoomReadRepoImpl(db)
-	messageReadRepo := NewMessageReadRepoImpl(db)
-	memberReadRepo := NewRoomMemberReadRepoImpl(db)
 	accountRepo := NewRoomAccountProjectionImpl(db)
-	roomAggregateRepo := newRoomAggregateRepoImpl(db, roomRepo, roomMemberRepo, roomReadRepo, memberReadRepo, messageRepo, messageReadRepo, roomOutboxRepo)
-	messageAggregateRepo := newMessageAggregateRepoImpl(db, messageRepo, messageReadRepo, roomMemberRepo, memberReadRepo)
+	roomAggregateRepo := newRoomAggregateRepoImpl(db, roomRepo, roomMemberRepo, messageRepo, roomOutboxRepo, accountRepo)
+	messageAggregateRepo := newMessageAggregateRepoImpl(db, messageRepo, roomRepo, roomMemberRepo, accountRepo, roomOutboxRepo)
 
 	return &repoImpl{
 		roomAggregateRepo: roomAggregateRepo,
@@ -53,11 +47,8 @@ func newRepoImplWithDB(appCtx *appCtx.AppContext, db *gorm.DB) repos.Repos {
 		messageRepo:       messageRepo,
 		roomMemberRepo:    roomMemberRepo,
 		roomOutboxRepo:    roomOutboxRepo,
-		roomReadRepo:      roomReadRepo,
-		messageReadRepo:   messageReadRepo,
-		memberReadRepo:    memberReadRepo,
 		accountRepo:       accountRepo,
-	}
+	}, nil
 }
 
 func (r *repoImpl) RoomAggregateRepository() repos.RoomAggregateRepository {
@@ -84,18 +75,6 @@ func (r *repoImpl) RoomOutboxEventsRepository() repos.RoomOutboxEventsRepository
 	return r.roomOutboxRepo
 }
 
-func (r *repoImpl) RoomReadRepository() repos.RoomReadRepository {
-	return r.roomReadRepo
-}
-
-func (r *repoImpl) MessageReadRepository() repos.MessageReadRepository {
-	return r.messageReadRepo
-}
-
-func (r *repoImpl) RoomMemberReadRepository() repos.RoomMemberReadRepository {
-	return r.memberReadRepo
-}
-
 func (r *repoImpl) RoomAccountProjectionRepository() repos.RoomAccountProjectionRepository {
 	return r.accountRepo
 }
@@ -108,7 +87,11 @@ func (r *repoImpl) WithTransaction(ctx context.Context, fn func(repos.Repos) err
 		return stackErr.Error(beginErr)
 	}
 
-	tr := newRepoImplWithDB(r.appCtx, tx)
+	tr, buildErr := newRepoImplWithDB(r.appCtx, tx)
+	if buildErr != nil {
+		_ = tx.Rollback().Error
+		return stackErr.Error(buildErr)
+	}
 
 	defer func() {
 		if rec := recover(); rec != nil {

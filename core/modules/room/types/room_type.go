@@ -40,3 +40,7 @@ func (r *RoomType) Scan(value interface{}) error {
 	*r = RoomType(value.(string))
 	return nil
 }
+
+func (r *RoomType) String() string {
+	return string(*r)
+}

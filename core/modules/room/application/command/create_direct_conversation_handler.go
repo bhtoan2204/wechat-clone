@@ -16,6 +16,7 @@ import (
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/stackErr"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -37,14 +38,14 @@ func (h *createDirectConversationHandler) Handle(ctx context.Context, req *in.Cr
 	}
 
 	now := time.Now().UTC()
-	room, err := entity.NewDirectConversationRoom(newID(), accountID, req.PeerAccountID, now)
+	room, err := entity.NewDirectConversationRoom(uuid.NewString(), accountID, req.PeerAccountID, now)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 
 	existing, err := h.baseRepo.RoomAggregateRepository().LoadByDirectKey(ctx, room.DirectKey)
 	if err == nil && existing != nil {
-		res, buildErr := roomsupport.BuildConversationResult(ctx, h.baseRepo, accountID, existing.Room(), true)
+		res, buildErr := roomsupport.BuildConversationResultFromState(ctx, h.baseRepo, accountID, existing.Room(), existing.Members(), nil, true)
 		if buildErr != nil {
 			return nil, stackErr.Error(buildErr)
 		}
@@ -54,11 +55,11 @@ func (h *createDirectConversationHandler) Handle(ctx context.Context, req *in.Cr
 		return nil, stackErr.Error(err)
 	}
 
-	ownerMember, err := entity.NewRoomMember(newID(), room.ID, accountID, roomtypes.RoomRoleOwner, now)
+	ownerMember, err := entity.NewRoomMember(uuid.NewString(), room.ID, accountID, roomtypes.RoomRoleOwner, now)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	peerMember, err := entity.NewRoomMember(newID(), room.ID, req.PeerAccountID, roomtypes.RoomRoleMember, now)
+	peerMember, err := entity.NewRoomMember(uuid.NewString(), room.ID, req.PeerAccountID, roomtypes.RoomRoleMember, now)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -74,13 +75,15 @@ func (h *createDirectConversationHandler) Handle(ctx context.Context, req *in.Cr
 		return nil, stackErr.Error(err)
 	}
 
+	lastMessage := lastPendingMessage(agg.PendingMessages())
+
 	if err := h.baseRepo.WithTransaction(ctx, func(txRepos roomrepos.Repos) error {
 		return stackErr.Error(txRepos.RoomAggregateRepository().Save(ctx, agg))
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
 
-	res, err := roomsupport.BuildConversationResult(ctx, h.baseRepo, accountID, room, true)
+	res, err := roomsupport.BuildConversationResultFromState(ctx, h.baseRepo, accountID, room, agg.Members(), lastMessage, true)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

@@ -6,7 +6,6 @@ import (
 
 	"go-socket/core/modules/room/application/dto/in"
 	"go-socket/core/modules/room/application/dto/out"
-	roomsupport "go-socket/core/modules/room/application/support"
 	roomrepos "go-socket/core/modules/room/domain/repos"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/stackErr"
@@ -40,11 +39,10 @@ func (h *updateRoomHandler) Handle(ctx context.Context, req *in.UpdateRoomReques
 		}
 	}
 
-	room := roomsupport.BuildRoomResult(agg.Room())
 	return &out.UpdateRoomResponse{
-		ID:        room.ID,
-		Name:      room.Name,
-		CreatedAt: room.CreatedAt,
-		UpdatedAt: room.UpdatedAt,
+		ID:        agg.Room().ID,
+		Name:      agg.Room().Name,
+		CreatedAt: agg.Room().CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt: agg.Room().UpdatedAt.UTC().Format(time.RFC3339),
 	}, nil
 }

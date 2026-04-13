@@ -12,6 +12,8 @@ import (
 	"go-socket/core/modules/room/types"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/stackErr"
+
+	"github.com/google/uuid"
 )
 
 type addChatMemberHandler struct {
@@ -36,7 +38,7 @@ func (h *addChatMemberHandler) Handle(ctx context.Context, req *in.AddChatMember
 	}
 
 	now := time.Now().UTC()
-	member, err := entity.NewRoomMember(newID(), req.RoomID, req.AccountID, types.RoomRole(req.Role), now)
+	member, err := entity.NewRoomMember(uuid.NewString(), req.RoomID, req.AccountID, types.RoomRole(req.Role), now)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -45,6 +47,7 @@ func (h *addChatMemberHandler) Handle(ctx context.Context, req *in.AddChatMember
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
+	lastMessage := lastPendingMessage(agg.PendingMessages())
 	if added {
 		if err := h.baseRepo.WithTransaction(ctx, func(txRepos roomrepos.Repos) error {
 			return stackErr.Error(txRepos.RoomAggregateRepository().Save(ctx, agg))
@@ -53,7 +56,7 @@ func (h *addChatMemberHandler) Handle(ctx context.Context, req *in.AddChatMember
 		}
 	}
 
-	res, err := roomsupport.BuildConversationResult(ctx, h.baseRepo, accountID, agg.Room(), true)
+	res, err := roomsupport.BuildConversationResultFromState(ctx, h.baseRepo, accountID, agg.Room(), agg.Members(), lastMessage, true)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

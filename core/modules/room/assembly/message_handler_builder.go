@@ -8,6 +8,9 @@ import (
 )
 
 func buildProjectionHandler(cfg *config.Config, appCtx *appCtx.AppContext) (roomprojection.MessageHandler, error) {
-	repos := roomrepo.NewRepoImpl(appCtx)
+	repos, err := roomrepo.NewRepoImpl(appCtx)
+	if err != nil {
+		return nil, err
+	}
 	return roomprojection.NewMessageHandler(cfg, repos.RoomAccountProjectionRepository())
 }

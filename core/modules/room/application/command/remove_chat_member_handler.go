@@ -35,6 +35,7 @@ func (h *removeChatMemberHandler) Handle(ctx context.Context, req *in.RemoveChat
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
+	lastMessage := lastPendingMessage(agg.PendingMessages())
 	if removed {
 		if err := h.baseRepo.WithTransaction(ctx, func(txRepos roomrepos.Repos) error {
 			return stackErr.Error(txRepos.RoomAggregateRepository().Save(ctx, agg))
@@ -43,7 +44,7 @@ func (h *removeChatMemberHandler) Handle(ctx context.Context, req *in.RemoveChat
 		}
 	}
 
-	res, err := roomsupport.BuildConversationResult(ctx, h.baseRepo, accountID, agg.Room(), true)
+	res, err := roomsupport.BuildConversationResultFromState(ctx, h.baseRepo, accountID, agg.Room(), agg.Members(), lastMessage, true)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

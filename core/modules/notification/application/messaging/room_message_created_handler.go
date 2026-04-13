@@ -8,6 +8,7 @@ import (
 
 	"go-socket/core/modules/notification/domain/entity"
 	"go-socket/core/modules/notification/types"
+	"go-socket/core/shared/contracts"
 	sharedevents "go-socket/core/shared/contracts/events"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -19,7 +20,7 @@ import (
 func (h *messageHandler) handleRoomOutboxEvent(ctx context.Context, value []byte) error {
 	log := logging.FromContext(ctx).Named("handleRoomOutboxEvent")
 
-	var event outboxMessage
+	var event contracts.OutboxMessage
 	if err := json.Unmarshal(value, &event); err != nil {
 		return stackErr.Error(fmt.Errorf("unmarshal room outbox event failed: %v", err))
 	}

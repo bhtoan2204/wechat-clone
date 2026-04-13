@@ -40,7 +40,7 @@ func (h *editChatMessageHandler) Handle(ctx context.Context, req *in.EditChatMes
 		return nil, stackErr.Error(err)
 	}
 
-	res, err := roomsupport.BuildMessageResult(ctx, h.baseRepo, accountID, agg.Message())
+	res, err := roomsupport.BuildMessageResultFromState(ctx, h.baseRepo, accountID, agg.Message())
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

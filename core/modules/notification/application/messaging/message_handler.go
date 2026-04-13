@@ -7,6 +7,7 @@ import (
 	"go-socket/core/modules/notification/application/adapter"
 	"go-socket/core/modules/notification/domain/repos"
 	"go-socket/core/shared/config"
+	"go-socket/core/shared/contracts"
 	sharedevents "go-socket/core/shared/contracts/events"
 	infraMessaging "go-socket/core/shared/infra/messaging"
 	"go-socket/core/shared/pkg/logging"
@@ -82,7 +83,7 @@ func (h *messageHandler) Stop() error {
 
 func (h *messageHandler) handleAccountEvent(ctx context.Context, value []byte) error {
 	log := logging.FromContext(ctx).Named("handleAccountEvent")
-	var event outboxMessage
+	var event contracts.OutboxMessage
 	if err := json.Unmarshal(value, &event); err != nil {
 		return stackErr.Error(fmt.Errorf("unmarshal account outbox event failed: %v", err))
 	}

@@ -31,3 +31,10 @@ func DecodeCursor(cursor string) (time.Time, string, error) {
 
 	return t, parts[1], nil
 }
+
+func NullableString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}

@@ -2,12 +2,14 @@ package xpaseto
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"time"
 
 	"go-socket/core/modules/account/domain/entity"
+	"go-socket/core/shared/config"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
 
@@ -27,28 +29,44 @@ type PasetoService interface {
 }
 
 type pasetoService struct {
-	paseto       *paseto.V2
-	symmetricKey []byte
-	issuer       string
-	ttl          time.Duration
+	paseto     *paseto.V2
+	publicKey  ed25519.PublicKey
+	privateKey ed25519.PrivateKey
+	issuer     string
+	ttl        time.Duration
 }
 
-func NewPaseto(symmetricKey string, issuer string, ttl time.Duration) (PasetoService, error) {
-	keyBytes, err := base64.StdEncoding.DecodeString(symmetricKey)
+func NewPaseto(cfg *config.Config) (PasetoService, error) {
+	privateKeyBytes, err := base64.StdEncoding.DecodeString(cfg.AuthConfig.PrivateKey)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	if len(keyBytes) != 32 {
-		return nil, stackErr.Error(fmt.Errorf("paseto key must be 32 bytes"))
+
+	publicKeyBytes, err := base64.StdEncoding.DecodeString(cfg.AuthConfig.PublicKey)
+	if err != nil {
+		return nil, stackErr.Error(err)
 	}
-	if ttl <= 0 {
+
+	privateKey := ed25519.PrivateKey(privateKeyBytes)
+	publicKey := ed25519.PublicKey(publicKeyBytes)
+
+	if len(privateKey) != ed25519.PrivateKeySize {
+		return nil, stackErr.Error(fmt.Errorf("invalid private key size"))
+	}
+	if len(publicKey) != ed25519.PublicKeySize {
+		return nil, stackErr.Error(fmt.Errorf("invalid public key size"))
+	}
+
+	if cfg.AuthConfig.AccessTokenTTLSeconds <= 0 {
 		return nil, stackErr.Error(fmt.Errorf("token ttl must be positive"))
 	}
+
 	return &pasetoService{
-		paseto:       paseto.NewV2(),
-		symmetricKey: keyBytes,
-		issuer:       issuer,
-		ttl:          ttl,
+		paseto:     paseto.NewV2(),
+		publicKey:  publicKey,
+		privateKey: privateKey,
+		issuer:     cfg.AuthConfig.TokenIssuer,
+		ttl:        time.Duration(cfg.AuthConfig.AccessTokenTTLSeconds) * time.Second,
 	}, nil
 }
 
@@ -66,7 +84,7 @@ func (p *pasetoService) GenerateToken(ctx context.Context, account *entity.Accou
 	}
 	payload.Set("email", account.Email.Value())
 
-	token, err := p.paseto.Encrypt(p.symmetricKey, payload, nil)
+	token, err := p.paseto.Sign(p.privateKey, payload, nil)
 	if err != nil {
 		return "", time.Time{}, stackErr.Error(err)
 	}
@@ -75,16 +93,20 @@ func (p *pasetoService) GenerateToken(ctx context.Context, account *entity.Accou
 
 func (p *pasetoService) ParseToken(ctx context.Context, token string) (*PasetoPayload, error) {
 	logger := logging.FromContext(ctx)
+
 	var jsonToken paseto.JSONToken
-	var custom map[string]interface{}
-	if err := p.paseto.Decrypt(token, p.symmetricKey, &jsonToken, &custom); err != nil {
+
+	if err := p.paseto.Verify(token, p.publicKey, &jsonToken, nil); err != nil {
 		logger.Errorw("Parse token failed", zap.Error(err))
 		return nil, stackErr.Error(err)
 	}
+
 	if !jsonToken.Expiration.IsZero() && time.Now().UTC().After(jsonToken.Expiration.UTC()) {
 		return nil, stackErr.Error(errors.New("token expired"))
 	}
-	email, _ := custom["email"].(string)
+
+	email := jsonToken.Get("email")
+
 	return &PasetoPayload{
 		AccountID: jsonToken.Subject,
 		Email:     email,

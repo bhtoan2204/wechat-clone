@@ -1,4 +1,4 @@
-package projection
+package elasticsearch
 
 import (
 	"bytes"
@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"strings"
 
-	roomprojection "go-socket/core/modules/room/application/projection"
 	"go-socket/core/shared/config"
+	"go-socket/core/shared/contracts/events"
 	"go-socket/core/shared/pkg/stackErr"
 
 	es8 "github.com/elastic/go-elasticsearch/v8"
@@ -22,7 +22,7 @@ type elasticsearchMessageIndexer struct {
 	index  string
 }
 
-func NewElasticsearchMessageIndexer(cfg config.ElasticsearchConfig, client *es8.Client) (roomprojection.MessageSearchIndexer, error) {
+func NewElasticsearchMessageIndexer(cfg config.ElasticsearchConfig, client *es8.Client) (events.MessageSearchIndexer, error) {
 	if !cfg.Enabled || client == nil {
 		return nil, nil
 	}
@@ -39,7 +39,7 @@ func NewElasticsearchMessageIndexer(cfg config.ElasticsearchConfig, client *es8.
 	return indexer, nil
 }
 
-func (i *elasticsearchMessageIndexer) UpsertMessage(ctx context.Context, document *roomprojection.SearchMessageDocument) error {
+func (i *elasticsearchMessageIndexer) UpsertMessage(ctx context.Context, document *events.SearchMessageDocument) error {
 	if i == nil || i.client == nil || document == nil {
 		return nil
 	}

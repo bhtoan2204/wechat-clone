@@ -6,6 +6,7 @@ import (
 	"go-socket/core/modules/room/domain/repos"
 	"go-socket/core/modules/room/infra/persistent/models"
 	"go-socket/core/shared/pkg/stackErr"
+	"go-socket/core/shared/utils"
 
 	"gorm.io/gorm"
 )
@@ -79,12 +80,12 @@ func (r *messageRepoImpl) toModel(e *entity.MessageEntity) (*models.MessageModel
 		MessageType:            e.MessageType,
 		MentionsJSON:           mentionsJSON,
 		MentionAll:             e.MentionAll,
-		ReplyToMessageID:       nullableString(e.ReplyToMessageID),
-		ForwardedFromMessageID: nullableString(e.ForwardedFromMessageID),
-		FileName:               nullableString(e.FileName),
-		FileSize:               int64Ptr(e.FileSize),
-		MimeType:               nullableString(e.MimeType),
-		ObjectKey:              nullableString(e.ObjectKey),
+		ReplyToMessageID:       utils.NullableString(e.ReplyToMessageID),
+		ForwardedFromMessageID: utils.NullableString(e.ForwardedFromMessageID),
+		FileName:               utils.NullableString(e.FileName),
+		FileSize:               utils.Int64Ptr(e.FileSize),
+		MimeType:               utils.NullableString(e.MimeType),
+		ObjectKey:              utils.NullableString(e.ObjectKey),
 		EditedAt:               e.EditedAt,
 		DeletedForEveryoneAt:   e.DeletedForEveryoneAt,
 		CreatedAt:              e.CreatedAt,
@@ -115,13 +116,6 @@ func (r *messageRepoImpl) toEntity(m *models.MessageModel) (*entity.MessageEntit
 		DeletedForEveryoneAt:   m.DeletedForEveryoneAt,
 		CreatedAt:              m.CreatedAt,
 	}, nil
-}
-
-func nullableString(value string) *string {
-	if value == "" {
-		return nil
-	}
-	return &value
 }
 
 func derefString(value *string) string {

@@ -16,7 +16,6 @@ import (
 	"go-socket/core/shared/infra/xpaseto"
 	"go-socket/core/shared/pkg/hasher"
 	"go-socket/core/shared/pkg/stackErr"
-	"time"
 )
 
 func LoadAppCtx(ctx context.Context, cfg *config.Config) (*AppContext, error) {
@@ -44,7 +43,7 @@ func LoadAppCtx(ctx context.Context, cfg *config.Config) (*AppContext, error) {
 	}
 	opts = append(opts, WithHasher(hasher))
 
-	paseto, err := xpaseto.NewPaseto(cfg.AuthConfig.PasetoKey, cfg.AuthConfig.TokenIssuer, time.Duration(cfg.AuthConfig.AccessTokenTTLSeconds)*time.Second)
+	paseto, err := xpaseto.NewPaseto(cfg)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

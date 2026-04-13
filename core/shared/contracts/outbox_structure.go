@@ -1,13 +1,12 @@
-package messaging
+package contracts
 
 import (
 	"encoding/json"
-	"strings"
-
 	"go-socket/core/shared/pkg/stackErr"
+	"strings"
 )
 
-type outboxMessage struct {
+type OutboxMessage struct {
 	ID            json.RawMessage `json:"id"`
 	AggregateID   string          `json:"aggregate_id"`
 	AggregateType string          `json:"aggregate_type"`
@@ -18,7 +17,7 @@ type outboxMessage struct {
 	CreatedAt     string          `json:"created_at"`
 }
 
-func (m *outboxMessage) UnmarshalJSON(data []byte) error {
+func (m *OutboxMessage) UnmarshalJSON(data []byte) error {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return stackErr.Error(err)
@@ -38,7 +37,7 @@ func (m *outboxMessage) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	type alias outboxMessage
+	type alias OutboxMessage
 	var aux alias
 	normalizedData, err := json.Marshal(normalized)
 	if err != nil {
@@ -48,6 +47,6 @@ func (m *outboxMessage) UnmarshalJSON(data []byte) error {
 		return stackErr.Error(err)
 	}
 
-	*m = outboxMessage(aux)
+	*m = OutboxMessage(aux)
 	return nil
 }

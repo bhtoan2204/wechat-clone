@@ -3,18 +3,19 @@ package support
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
+	"go-socket/core/modules/room/application/projection"
 	apptypes "go-socket/core/modules/room/application/types"
-	"go-socket/core/modules/room/domain/entity"
-	"go-socket/core/modules/room/domain/repos"
+	"go-socket/core/modules/room/infra/projection/cassandra/views"
 	"go-socket/core/shared/pkg/stackErr"
 
 	"github.com/samber/lo"
 	"golang.org/x/sync/errgroup"
 )
 
-func BuildRoomResult(room *entity.Room) *apptypes.RoomResult {
+func BuildRoomResult(room *views.RoomView) *apptypes.RoomResult {
 	if room == nil {
 		return nil
 	}
@@ -23,7 +24,7 @@ func BuildRoomResult(room *entity.Room) *apptypes.RoomResult {
 		ID:          room.ID,
 		Name:        room.Name,
 		Description: room.Description,
-		RoomType:    string(room.RoomType),
+		RoomType:    strings.TrimSpace(room.RoomType),
 		OwnerID:     room.OwnerID,
 		CreatedAt:   room.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:   room.UpdatedAt.UTC().Format(time.RFC3339),
@@ -32,47 +33,37 @@ func BuildRoomResult(room *entity.Room) *apptypes.RoomResult {
 
 func BuildConversationResult(
 	ctx context.Context,
-	readRepos repos.QueryRepos,
+	readRepos projection.QueryRepos,
 	viewerID string,
-	room *entity.Room,
+	room *views.RoomView,
 	includeMembers bool,
 ) (*apptypes.ConversationResult, error) {
+	if room == nil {
+		return nil, stackErr.Error(errors.New("room is required"))
+	}
+
 	members, err := readRepos.RoomMemberReadRepository().ListRoomMembers(ctx, room.ID)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 
-	var viewerMember *entity.RoomMemberEntity
+	var viewerMember *views.RoomMemberView
 	for _, member := range members {
-		if member.AccountID == viewerID {
+		if member != nil && strings.TrimSpace(member.AccountID) == strings.TrimSpace(viewerID) {
 			viewerMember = member
+			break
 		}
 	}
 	if viewerMember == nil {
 		return nil, stackErr.Error(errors.New("viewer is not a member of this room"))
 	}
 
-	accountIDs := lo.Map(members, func(member *entity.RoomMemberEntity, _ int) string {
-		return member.AccountID
-	})
-
 	var (
-		accountProjections []*entity.AccountEntity
-		unreadCount        int64
-		lastMessage        *entity.MessageEntity
+		unreadCount int64
+		lastMessage *views.MessageView
 	)
 
 	eg, egCtx := errgroup.WithContext(ctx)
-
-	eg.Go(func() error {
-		var runErr error
-		accountProjections, runErr = readRepos.RoomAccountProjectionRepository().ListByAccountIDs(egCtx, accountIDs)
-		if runErr != nil {
-			return stackErr.Error(runErr)
-		}
-		return nil
-	})
-
 	eg.Go(func() error {
 		var runErr error
 		unreadCount, runErr = readRepos.MessageReadRepository().CountUnreadMessages(
@@ -86,7 +77,6 @@ func BuildConversationResult(
 		}
 		return nil
 	})
-
 	eg.Go(func() error {
 		var runErr error
 		lastMessage, runErr = readRepos.MessageReadRepository().GetLastMessage(egCtx, room.ID)
@@ -95,32 +85,16 @@ func BuildConversationResult(
 		}
 		return nil
 	})
-
 	if err := eg.Wait(); err != nil {
 		return nil, stackErr.Error(err)
 	}
 
-	accountMap := lo.SliceToMap(accountProjections, func(acc *entity.AccountEntity) (string, *entity.AccountEntity) {
-		return acc.AccountID, acc
-	})
-
 	name := room.Name
-	if string(room.RoomType) == "direct" {
-		if otherMember, found := lo.Find(members, func(member *entity.RoomMemberEntity) bool {
-			return member.AccountID != viewerID
+	if strings.EqualFold(strings.TrimSpace(room.RoomType), "direct") {
+		if otherMember, found := lo.Find(members, func(member *views.RoomMemberView) bool {
+			return member != nil && strings.TrimSpace(member.AccountID) != strings.TrimSpace(viewerID)
 		}); found {
-			if acc, ok := accountMap[otherMember.AccountID]; ok {
-				switch {
-				case acc.DisplayName != "":
-					name = acc.DisplayName
-				case acc.Username != "":
-					name = acc.Username
-				default:
-					name = otherMember.AccountID
-				}
-			} else {
-				name = otherMember.AccountID
-			}
+			name = firstNonEmpty(otherMember.DisplayName, otherMember.Username, otherMember.AccountID)
 		}
 	}
 
@@ -128,9 +102,9 @@ func BuildConversationResult(
 		RoomID:          room.ID,
 		Name:            name,
 		Description:     room.Description,
-		RoomType:        string(room.RoomType),
+		RoomType:        strings.TrimSpace(room.RoomType),
 		OwnerID:         room.OwnerID,
-		PinnedMessageID: room.PinnedMessageID,
+		PinnedMessageID: derefString(room.PinnedMessageID),
 		MemberCount:     len(members),
 		UnreadCount:     unreadCount,
 		CreatedAt:       room.CreatedAt.UTC().Format(time.RFC3339),
@@ -138,20 +112,19 @@ func BuildConversationResult(
 	}
 
 	if includeMembers {
-		result.Members = lo.Map(members, func(member *entity.RoomMemberEntity, _ int) apptypes.ConversationMemberResult {
-			item := apptypes.ConversationMemberResult{
-				AccountID: member.AccountID,
-				Role:      string(member.Role),
+		result.Members = make([]apptypes.ConversationMemberResult, 0, len(members))
+		for _, member := range members {
+			if member == nil {
+				continue
 			}
-
-			if acc, ok := accountMap[member.AccountID]; ok {
-				item.DisplayName = acc.DisplayName
-				item.Username = acc.Username
-				item.AvatarObjectKey = acc.AvatarObjectKey
-			}
-
-			return item
-		})
+			result.Members = append(result.Members, apptypes.ConversationMemberResult{
+				AccountID:       member.AccountID,
+				Role:            strings.TrimSpace(member.Role),
+				DisplayName:     strings.TrimSpace(member.DisplayName),
+				Username:        strings.TrimSpace(member.Username),
+				AvatarObjectKey: strings.TrimSpace(member.AvatarObjectKey),
+			})
+		}
 	}
 
 	if lastMessage != nil {
@@ -164,9 +137,18 @@ func BuildConversationResult(
 	return result, nil
 }
 
-func BuildMessageResult(ctx context.Context, readRepos repos.QueryRepos, viewerID string, message *entity.MessageEntity) (*apptypes.MessageResult, error) {
+func BuildMessageResult(
+	ctx context.Context,
+	readRepos projection.QueryRepos,
+	viewerID string,
+	message *views.MessageView,
+) (*apptypes.MessageResult, error) {
+	if message == nil {
+		return nil, stackErr.Error(errors.New("message is required"))
+	}
+
 	status := "sent"
-	if message.SenderID == viewerID {
+	if strings.TrimSpace(message.SenderID) == strings.TrimSpace(viewerID) {
 		seenCount, err := readRepos.MessageReadRepository().CountMessageReceiptsByStatus(ctx, message.ID, "seen")
 		if err != nil {
 			return nil, stackErr.Error(err)
@@ -184,7 +166,7 @@ func BuildMessageResult(ctx context.Context, readRepos repos.QueryRepos, viewerI
 		}
 	} else {
 		receiptStatus, _, _, err := readRepos.MessageReadRepository().GetMessageReceipt(ctx, message.ID, viewerID)
-		if err == nil && receiptStatus != "" {
+		if err == nil && strings.TrimSpace(receiptStatus) != "" {
 			status = receiptStatus
 		}
 	}
@@ -249,4 +231,21 @@ func BuildMessageResult(ctx context.Context, readRepos repos.QueryRepos, viewerI
 	}
 
 	return result, nil
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(*value)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

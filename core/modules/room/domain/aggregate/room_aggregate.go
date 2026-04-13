@@ -13,6 +13,7 @@ type RoomAggregate struct {
 	event.AggregateRoot
 
 	RoomID              string
+	RoomName            string
 	RoomType            types.RoomType
 	MemberCount         int
 	LastMessageID       string

@@ -56,6 +56,26 @@ func TestApplicationHandlerTemplateFormats(t *testing.T) {
 				{Name: "services", Type: "service.Services"},
 			},
 		},
+		{
+			PackageName:       "query",
+			HandlerName:       "ListRooms",
+			StructName:        "listRoomsHandler",
+			RequestStruct:     "ListRoomsRequest",
+			ResponseType:      "*out.ListRoomsResponse",
+			RequestDtoImport:  "go-socket/core/modules/room/application/dto/in",
+			ResponseDtoImport: "go-socket/core/modules/room/application/dto/out",
+			CQRSImport:        "go-socket/core/shared/pkg/cqrs",
+			Imports: []applicationHandlerImport{
+				{Alias: "appCtx", Path: "go-socket/core/context"},
+				{Alias: "repos", Path: "go-socket/core/modules/room/domain/repos"},
+				{Path: "go-socket/core/modules/room/application/service"},
+			},
+			Params: []applicationHandlerParam{
+				{Name: "appCtx", Type: "*appCtx.AppContext"},
+				{Name: "readRepo", Type: "repos.QueryRepos"},
+				{Name: "roomQueryService", Type: "*service.RoomQueryService"},
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -84,6 +104,9 @@ func TestApplicationHandlerTemplateFormats(t *testing.T) {
 				if !strings.Contains(output, "baseRepo repos.Repos") {
 					t.Fatalf("expected baseRepo param, got:\n%s", output)
 				}
+			}
+			if tc.HandlerName == "ListRooms" && !strings.Contains(output, "readRepo repos.QueryRepos") {
+				t.Fatalf("expected readRepo param, got:\n%s", output)
 			}
 		})
 	}

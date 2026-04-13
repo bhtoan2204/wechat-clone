@@ -25,6 +25,7 @@ func GenerateApplicationHandler(endpoints []models.Endpoint) (string, error) {
 
 	seen := make(map[string]bool)
 	created := 0
+	updated := 0
 	skipped := 0
 	for _, ep := range endpoints {
 		if !shouldGenerateApplicationHandler(ep) {
@@ -43,18 +44,21 @@ func GenerateApplicationHandler(endpoints []models.Endpoint) (string, error) {
 		}
 		seen[key] = true
 
-		written, err := writeApplicationHandlerFile(tmpl, module, ep)
+		writeResult, err := writeApplicationHandlerFile(tmpl, module, ep)
 		if err != nil {
 			return "", err
 		}
-		if written {
+		switch writeResult {
+		case applicationHandlerWriteCreated:
 			created++
-		} else {
+		case applicationHandlerWriteUpdated:
+			updated++
+		default:
 			skipped++
 		}
 	}
 
-	return fmt.Sprintf("generated %d application handler(s), skipped %d existing file(s)", created, skipped), nil
+	return fmt.Sprintf("generated %d application handler(s), updated %d existing generated file(s), skipped %d hand-written file(s)", created, updated, skipped), nil
 }
 
 func shouldGenerateApplicationHandler(ep models.Endpoint) bool {
@@ -67,30 +71,38 @@ func shouldGenerateApplicationHandler(ep models.Endpoint) bool {
 	return true
 }
 
-func writeApplicationHandlerFile(tmpl *template.Template, module modulePaths, ep models.Endpoint) (bool, error) {
+type applicationHandlerWriteResult string
+
+const (
+	applicationHandlerWriteCreated applicationHandlerWriteResult = "created"
+	applicationHandlerWriteUpdated applicationHandlerWriteResult = "updated"
+	applicationHandlerWriteSkipped applicationHandlerWriteResult = "skipped"
+)
+
+func writeApplicationHandlerFile(tmpl *template.Template, module modulePaths, ep models.Endpoint) (applicationHandlerWriteResult, error) {
 	kind := applicationHandlerKind(ep)
 	handlerName := ep.Usecase.Method
 	structName := lowerFirst(handlerName) + "Handler"
 
 	config, err := applicationHandlerConfigForEndpoint(module, ep)
 	if err != nil {
-		return false, err
+		return applicationHandlerWriteSkipped, err
 	}
 
 	fileName := utils.Snake(handlerName) + "_handler.go"
 	dst := filepath.Join(module.FsRoot, "application", kind, fileName)
 	if structExistsInDirExcept(filepath.Dir(dst), structName, dst) {
-		return false, nil
+		return applicationHandlerWriteSkipped, nil
 	}
 
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return false, err
+		return applicationHandlerWriteSkipped, err
 	}
 	if fileExists(dst) && !isGeneratedFile(dst, "application-handler") {
-		return false, nil
+		return applicationHandlerWriteSkipped, nil
 	}
-	if fileExists(dst) {
-		return false, nil
+	if fileExists(dst) && !isScaffoldStubFile(dst) {
+		return applicationHandlerWriteSkipped, nil
 	}
 	data := applicationHandlerTemplateData{
 		PackageName:       kind,
@@ -107,18 +119,22 @@ func writeApplicationHandlerFile(tmpl *template.Template, module modulePaths, ep
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		return false, err
+		return applicationHandlerWriteSkipped, err
 	}
 
 	formatted, err := format.Source(buf.Bytes())
 	if err != nil {
-		return false, fmt.Errorf("format application handler failed: %v", err)
+		return applicationHandlerWriteSkipped, fmt.Errorf("format application handler failed: %v", err)
 	}
+	alreadyExists := fileExists(dst)
 	if err := os.WriteFile(dst, formatted, 0o644); err != nil {
-		return false, err
+		return applicationHandlerWriteSkipped, err
 	}
 
-	return true, nil
+	if alreadyExists {
+		return applicationHandlerWriteUpdated, nil
+	}
+	return applicationHandlerWriteCreated, nil
 }
 
 type applicationHandlerTemplateData struct {
@@ -211,6 +227,7 @@ func paymentApplicationHandlerConfig(module modulePaths, ep models.Endpoint) app
 func roomApplicationHandlerConfig(module modulePaths, ep models.Endpoint) applicationHandlerConfig {
 	serviceType := "RoomCommandService"
 	paramName := "roomService"
+	params := commonApplicationHandlerParams()
 
 	if applicationHandlerKind(ep) == "query" {
 		serviceType = "RoomQueryService"
@@ -218,6 +235,10 @@ func roomApplicationHandlerConfig(module modulePaths, ep models.Endpoint) applic
 		if usesRoomChatQueryService(ep.Usecase.Method) {
 			serviceType = "ChatQueryService"
 			paramName = "chatService"
+		}
+		params = []applicationHandlerParam{
+			{Name: "appCtx", Type: "*appCtx.AppContext"},
+			{Name: "readRepo", Type: "repos.QueryRepos"},
 		}
 	} else if usesRoomMessageCommandService(ep.Usecase.Method) {
 		serviceType = "MessageCommandService"
@@ -228,7 +249,7 @@ func roomApplicationHandlerConfig(module modulePaths, ep models.Endpoint) applic
 		Imports: append(commonApplicationHandlerImports(module),
 			applicationHandlerImport{Path: module.ImportRoot + "/application/service"},
 		),
-		Params: append(commonApplicationHandlerParams(),
+		Params: append(params,
 			applicationHandlerParam{Name: paramName, Type: "*service." + serviceType},
 		),
 	}
