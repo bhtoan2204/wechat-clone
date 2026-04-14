@@ -1,4 +1,4 @@
-// CODE_GENERATOR: handler
+// CODE_GENERATOR - do not edit: handler
 package handler
 
 import (
@@ -30,6 +30,8 @@ func (h *refreshHandler) Handle(c *gin.Context) (interface{}, error) {
 	ctx := c.Request.Context()
 	logger := logging.FromContext(ctx)
 	var request in.RefreshRequest
+	request.UserAgent = c.GetHeader("User-Agent")
+	request.IpAddress = c.GetHeader("X-Forwarded-For")
 	if err := c.ShouldBindJSON(&request); err != nil {
 		logger.Errorw("Unmarshal request failed", zap.Error(err))
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})

@@ -20,6 +20,8 @@ type repoImpl struct {
 
 	accountRepo          repos.AccountRepository
 	accountAggregateRepo repos.AccountAggregateRepository
+	deviceRepo           repos.DeviceRepository
+	sessionRepo          repos.SessionRepository
 }
 
 func NewRepoImpl(db *gorm.DB, cache sharedcache.Cache) repos.Repos {
@@ -34,6 +36,8 @@ func newRepoImplWithDB(db *gorm.DB, cache sharedcache.Cache, inTransaction bool)
 	}
 	r.accountRepo = NewAccountRepoImpl(db, cache, !inTransaction, r.runAfterCommit)
 	r.accountAggregateRepo = NewAccountAggregateRepoImpl(db, cache, r.runAfterCommit)
+	r.deviceRepo = NewDeviceRepoImpl(db)
+	r.sessionRepo = NewSessionRepoImpl(db, cache, !inTransaction, r.runAfterCommit)
 	return r
 }
 
@@ -43,6 +47,14 @@ func (r *repoImpl) AccountRepository() repos.AccountRepository {
 
 func (r *repoImpl) AccountAggregateRepository() repos.AccountAggregateRepository {
 	return r.accountAggregateRepo
+}
+
+func (r *repoImpl) DeviceRepository() repos.DeviceRepository {
+	return r.deviceRepo
+}
+
+func (r *repoImpl) SessionRepository() repos.SessionRepository {
+	return r.sessionRepo
 }
 
 func (r *repoImpl) WithTransaction(ctx context.Context, fn func(repos.Repos) error) (err error) {

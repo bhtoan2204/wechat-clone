@@ -39,20 +39,6 @@ func (m *MockServices) EXPECT() *MockServicesMockRecorder {
 	return m.recorder
 }
 
-// AccountService mocks base method.
-func (m *MockServices) AccountService() AccountService {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AccountService")
-	ret0, _ := ret[0].(AccountService)
-	return ret0
-}
-
-// AccountService indicates an expected call of AccountService.
-func (mr *MockServicesMockRecorder) AccountService() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AccountService", reflect.TypeOf((*MockServices)(nil).AccountService))
-}
-
 // AuthenticationService mocks base method.
 func (m *MockServices) AuthenticationService() AuthenticationService {
 	m.ctrl.T.Helper()
@@ -79,18 +65,4 @@ func (m *MockServices) EmailVerificationService() EmailVerificationService {
 func (mr *MockServicesMockRecorder) EmailVerificationService() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EmailVerificationService", reflect.TypeOf((*MockServices)(nil).EmailVerificationService))
-}
-
-// RegistrationService mocks base method.
-func (m *MockServices) RegistrationService() RegistrationService {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RegistrationService")
-	ret0, _ := ret[0].(RegistrationService)
-	return ret0
-}
-
-// RegistrationService indicates an expected call of RegistrationService.
-func (mr *MockServicesMockRecorder) RegistrationService() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegistrationService", reflect.TypeOf((*MockServices)(nil).RegistrationService))
 }

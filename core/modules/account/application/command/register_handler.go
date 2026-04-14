@@ -9,7 +9,6 @@ import (
 	"go-socket/core/modules/account/application/dto/out"
 	"go-socket/core/modules/account/application/service"
 	repos "go-socket/core/modules/account/domain/repos"
-	domainservice "go-socket/core/modules/account/domain/service"
 	"go-socket/core/shared/pkg/cqrs"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -18,25 +17,35 @@ import (
 )
 
 type registerHandler struct {
-	registrationService service.RegistrationService
+	authService service.AuthenticationService
 }
 
 func NewRegisterHandler(_ *appCtx.AppContext, _ repos.Repos, services service.Services) cqrs.Handler[*in.RegisterRequest, *out.RegisterResponse] {
 	return &registerHandler{
-		registrationService: services.RegistrationService(),
+		authService: services.AuthenticationService(),
 	}
 }
 
 func (u *registerHandler) Handle(ctx context.Context, req *in.RegisterRequest) (*out.RegisterResponse, error) {
 	log := logging.FromContext(ctx).Named("Register")
 
-	result, err := u.registrationService.Register(ctx, service.RegisterAccountCommand{
+	result, err := u.authService.Register(ctx, service.RegisterAccountCommand{
 		Email:       req.Email,
 		Password:    req.Password,
 		DisplayName: req.DisplayName,
+		Device: service.DeviceCommand{
+			DeviceUID:  req.DeviceUid,
+			DeviceName: req.DeviceName,
+			DeviceType: req.DeviceType,
+			OSName:     req.OsName,
+			OSVersion:  req.OsVersion,
+			AppVersion: req.AppVersion,
+			UserAgent:  req.UserAgent,
+			IPAddress:  req.IpAddress,
+		},
 	})
 	if err != nil {
-		if errors.Is(err, service.ErrRegistrationAccountExists) || errors.Is(err, domainservice.ErrAccountEmailAlreadyExists) {
+		if errors.Is(err, service.ErrRegistrationAccountExists) {
 			log.Errorw("Account already exists", zap.String("email", req.Email))
 			return nil, stackErr.Error(ErrAccountExists)
 		}

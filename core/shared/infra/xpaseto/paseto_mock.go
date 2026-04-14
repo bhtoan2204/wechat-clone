@@ -59,9 +59,9 @@ func (mr *MockPasetoServiceMockRecorder) GenerateAccessToken(ctx, account any) *
 }
 
 // GenerateRefreshToken mocks base method.
-func (m *MockPasetoService) GenerateRefreshToken(ctx context.Context, account *entity.Account) (string, time.Time, error) {
+func (m *MockPasetoService) GenerateRefreshToken(ctx context.Context, account *entity.Account, subject RefreshTokenSubject) (string, time.Time, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GenerateRefreshToken", ctx, account)
+	ret := m.ctrl.Call(m, "GenerateRefreshToken", ctx, account, subject)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(time.Time)
 	ret2, _ := ret[2].(error)
@@ -69,9 +69,9 @@ func (m *MockPasetoService) GenerateRefreshToken(ctx context.Context, account *e
 }
 
 // GenerateRefreshToken indicates an expected call of GenerateRefreshToken.
-func (mr *MockPasetoServiceMockRecorder) GenerateRefreshToken(ctx, account any) *gomock.Call {
+func (mr *MockPasetoServiceMockRecorder) GenerateRefreshToken(ctx, account, subject any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateRefreshToken", reflect.TypeOf((*MockPasetoService)(nil).GenerateRefreshToken), ctx, account)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateRefreshToken", reflect.TypeOf((*MockPasetoService)(nil).GenerateRefreshToken), ctx, account, subject)
 }
 
 // ParseAccessToken mocks base method.

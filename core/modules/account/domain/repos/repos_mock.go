@@ -68,6 +68,34 @@ func (mr *MockReposMockRecorder) AccountRepository() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AccountRepository", reflect.TypeOf((*MockRepos)(nil).AccountRepository))
 }
 
+// DeviceRepository mocks base method.
+func (m *MockRepos) DeviceRepository() DeviceRepository {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeviceRepository")
+	ret0, _ := ret[0].(DeviceRepository)
+	return ret0
+}
+
+// DeviceRepository indicates an expected call of DeviceRepository.
+func (mr *MockReposMockRecorder) DeviceRepository() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeviceRepository", reflect.TypeOf((*MockRepos)(nil).DeviceRepository))
+}
+
+// SessionRepository mocks base method.
+func (m *MockRepos) SessionRepository() SessionRepository {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SessionRepository")
+	ret0, _ := ret[0].(SessionRepository)
+	return ret0
+}
+
+// SessionRepository indicates an expected call of SessionRepository.
+func (mr *MockReposMockRecorder) SessionRepository() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SessionRepository", reflect.TypeOf((*MockRepos)(nil).SessionRepository))
+}
+
 // WithTransaction mocks base method.
 func (m *MockRepos) WithTransaction(ctx context.Context, fn func(Repos) error) error {
 	m.ctrl.T.Helper()

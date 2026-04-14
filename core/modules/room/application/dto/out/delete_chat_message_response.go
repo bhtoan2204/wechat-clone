@@ -1,4 +1,4 @@
-// CODE_GENERATOR: response
+// CODE_GENERATOR - do not edit: response
 package out
 
 type DeleteChatMessageResponse struct {

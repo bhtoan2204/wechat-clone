@@ -84,7 +84,8 @@ func (u *changePasswordHandler) Handle(ctx context.Context, req *in.ChangePasswo
 		return nil, stackErr.Error(err)
 	}
 
-	changed, err := accountAggregate.ChangePassword(hashedPasswordVO, utils.NowUTC())
+	now := utils.NowUTC()
+	changed, err := accountAggregate.ChangePassword(hashedPasswordVO, now)
 	if err != nil {
 		log.Errorw("Failed to change password on aggregate", zap.Error(err))
 		return nil, stackErr.Error(err)
@@ -94,7 +95,26 @@ func (u *changePasswordHandler) Handle(ctx context.Context, req *in.ChangePasswo
 	}
 
 	if txErr := u.baseRepo.WithTransaction(ctx, func(txRepos repos.Repos) error {
-		return txRepos.AccountAggregateRepository().Save(ctx, accountAggregate)
+		if err := txRepos.AccountAggregateRepository().Save(ctx, accountAggregate); err != nil {
+			return stackErr.Error(err)
+		}
+		sessionAggs, err := txRepos.SessionRepository().ListByAccountID(ctx, accountID)
+		if err != nil {
+			return stackErr.Error(err)
+		}
+		for _, sessionAgg := range sessionAggs {
+			changed, err := sessionAgg.Revoke("password_changed", now)
+			if err != nil {
+				return stackErr.Error(err)
+			}
+			if !changed {
+				continue
+			}
+			if err := txRepos.SessionRepository().Save(ctx, sessionAgg); err != nil {
+				return stackErr.Error(err)
+			}
+		}
+		return nil
 	}); txErr != nil {
 		log.Errorw("Failed to persist changed password", zap.Error(txErr))
 		return nil, stackErr.Error(txErr)

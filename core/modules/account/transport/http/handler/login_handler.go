@@ -1,4 +1,4 @@
-// CODE_GENERATOR: handler
+// CODE_GENERATOR - do not edit: handler
 package handler
 
 import (
@@ -30,6 +30,14 @@ func (h *loginHandler) Handle(c *gin.Context) (interface{}, error) {
 	ctx := c.Request.Context()
 	logger := logging.FromContext(ctx)
 	var request in.LoginRequest
+	request.DeviceUid = c.GetHeader("X-Device-UID")
+	request.DeviceName = c.GetHeader("X-Device-Name")
+	request.DeviceType = c.GetHeader("X-Device-Type")
+	request.OsName = c.GetHeader("X-Device-OS-Name")
+	request.OsVersion = c.GetHeader("X-Device-OS-Version")
+	request.AppVersion = c.GetHeader("X-Device-App-Version")
+	request.UserAgent = c.GetHeader("User-Agent")
+	request.IpAddress = c.GetHeader("X-Forwarded-For")
 	if err := c.ShouldBindJSON(&request); err != nil {
 		logger.Errorw("Unmarshal request failed", zap.Error(err))
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})

@@ -18,18 +18,17 @@ import (
 	"go-socket/core/shared/utils"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type confirmVerifyEmailHandler struct {
 	baseRepo            repos.Repos
-	accountService      service.AccountService
 	verificationService service.EmailVerificationService
 }
 
 func NewConfirmVerifyEmailHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos, services service.Services) cqrs.Handler[*in.ConfirmVerifyEmailRequest, *out.ConfirmVerifyEmailResponse] {
 	return &confirmVerifyEmailHandler{
 		baseRepo:            baseRepo,
-		accountService:      services.AccountService(),
 		verificationService: services.EmailVerificationService(),
 	}
 }
@@ -43,8 +42,11 @@ func (u *confirmVerifyEmailHandler) Handle(ctx context.Context, req *in.ConfirmV
 		return nil, stackErr.Error(ErrInvalidVerificationToken)
 	}
 
-	accountAggregate, err := u.accountService.LoadAccountAggregate(ctx, tokenPayload.AccountID)
+	accountAggregate, err := u.baseRepo.AccountAggregateRepository().Load(ctx, tokenPayload.AccountID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = rules.ErrAccountNotFound
+		}
 		log.Errorw("Failed to load account aggregate", zap.Error(err))
 		return nil, stackErr.Error(err)
 	}

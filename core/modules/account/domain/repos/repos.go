@@ -6,6 +6,8 @@ import "context"
 type Repos interface {
 	AccountRepository() AccountRepository
 	AccountAggregateRepository() AccountAggregateRepository
+	DeviceRepository() DeviceRepository
+	SessionRepository() SessionRepository
 
 	WithTransaction(ctx context.Context, fn func(Repos) error) error
 }

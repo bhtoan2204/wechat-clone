@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"go-socket/core/modules/account/domain/entity"
 	"go-socket/core/shared/infra/xpaseto"
@@ -14,23 +13,29 @@ func issueTokenPair(
 	ctx context.Context,
 	pasetoSvc xpaseto.PasetoService,
 	account *entity.Account,
-) (string, time.Time, string, time.Time, error) {
+	subject xpaseto.RefreshTokenSubject,
+) (*TokenPairResult, error) {
 	if pasetoSvc == nil {
-		return "", time.Time{}, "", time.Time{}, stackErr.Error(fmt.Errorf("paseto service is required"))
+		return nil, stackErr.Error(fmt.Errorf("paseto service is required"))
 	}
 	if account == nil {
-		return "", time.Time{}, "", time.Time{}, stackErr.Error(fmt.Errorf("account snapshot is required"))
+		return nil, stackErr.Error(fmt.Errorf("account snapshot is required"))
 	}
 
 	accessToken, accessExpiresAt, err := pasetoSvc.GenerateAccessToken(ctx, account)
 	if err != nil {
-		return "", time.Time{}, "", time.Time{}, stackErr.Error(fmt.Errorf("generate access token failed: %v", err))
+		return nil, stackErr.Error(fmt.Errorf("generate access token failed: %v", err))
 	}
 
-	refreshToken, refreshExpiresAt, err := pasetoSvc.GenerateRefreshToken(ctx, account)
+	refreshToken, refreshExpiresAt, err := pasetoSvc.GenerateRefreshToken(ctx, account, subject)
 	if err != nil {
-		return "", time.Time{}, "", time.Time{}, stackErr.Error(fmt.Errorf("generate refresh token failed: %v", err))
+		return nil, stackErr.Error(fmt.Errorf("generate refresh token failed: %v", err))
 	}
 
-	return accessToken, accessExpiresAt, refreshToken, refreshExpiresAt, nil
+	return &TokenPairResult{
+		AccessToken:      accessToken,
+		AccessExpiresAt:  accessExpiresAt,
+		RefreshToken:     refreshToken,
+		RefreshExpiresAt: refreshExpiresAt,
+	}, nil
 }

@@ -18,6 +18,39 @@ endpoints:
         - name: password
           type: string
           required: true
+        - name: device_uid
+          type: string
+          source: header
+          header: X-Device-UID
+          required: true
+        - name: device_name
+          type: string
+          source: header
+          header: X-Device-Name
+        - name: device_type
+          type: string
+          source: header
+          header: X-Device-Type
+        - name: os_name
+          type: string
+          source: header
+          header: X-Device-OS-Name
+        - name: os_version
+          type: string
+          source: header
+          header: X-Device-OS-Version
+        - name: app_version
+          type: string
+          source: header
+          header: X-Device-App-Version
+        - name: user_agent
+          type: string
+          source: header
+          header: User-Agent
+        - name: ip_address
+          type: string
+          source: header
+          header: X-Forwarded-For
     response:
       struct: LoginResponse
       fields:
@@ -25,6 +58,7 @@ endpoints:
           type: string
         - name: refresh_token
           type: string
+          required: true
         - name: access_expires_at
           type: int64
         - name: refresh_expires_at
@@ -49,6 +83,39 @@ endpoints:
         - name: password
           type: string
           required: true
+        - name: device_uid
+          type: string
+          source: header
+          header: X-Device-UID
+          required: true
+        - name: device_name
+          type: string
+          source: header
+          header: X-Device-Name
+        - name: device_type
+          type: string
+          source: header
+          header: X-Device-Type
+        - name: os_name
+          type: string
+          source: header
+          header: X-Device-OS-Name
+        - name: os_version
+          type: string
+          source: header
+          header: X-Device-OS-Version
+        - name: app_version
+          type: string
+          source: header
+          header: X-Device-App-Version
+        - name: user_agent
+          type: string
+          source: header
+          header: User-Agent
+        - name: ip_address
+          type: string
+          source: header
+          header: X-Forwarded-For
     response:
       struct: RegisterResponse
       fields:
@@ -93,6 +160,14 @@ endpoints:
       fields:
         - name: refresh_token
           type: string
+        - name: user_agent
+          type: string
+          source: header
+          header: User-Agent
+        - name: ip_address
+          type: string
+          source: header
+          header: X-Forwarded-For
     response:
       struct: RefreshResponse
       fields:

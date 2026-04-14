@@ -40,11 +40,26 @@ func (m *MockAuthenticationService) EXPECT() *MockAuthenticationServiceMockRecor
 	return m.recorder
 }
 
+// Register mocks base method.
+func (m *MockAuthenticationService) Register(ctx context.Context, command RegisterAccountCommand) (*TokenPairResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Register", ctx, command)
+	ret0, _ := ret[0].(*TokenPairResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Register indicates an expected call of Register.
+func (mr *MockAuthenticationServiceMockRecorder) Register(ctx, command any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockAuthenticationService)(nil).Register), ctx, command)
+}
+
 // Authenticate mocks base method.
-func (m *MockAuthenticationService) Authenticate(ctx context.Context, command AuthenticateAccountCommand) (*AuthenticationResult, error) {
+func (m *MockAuthenticationService) Authenticate(ctx context.Context, command AuthenticateAccountCommand) (*TokenPairResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Authenticate", ctx, command)
-	ret0, _ := ret[0].(*AuthenticationResult)
+	ret0, _ := ret[0].(*TokenPairResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -56,10 +71,10 @@ func (mr *MockAuthenticationServiceMockRecorder) Authenticate(ctx, command any) 
 }
 
 // RefreshAuthenticate mocks base method.
-func (m *MockAuthenticationService) RefreshAuthenticate(ctx context.Context, command RefreshTokenCommand) (*RefreshTokenResult, error) {
+func (m *MockAuthenticationService) RefreshAuthenticate(ctx context.Context, command RefreshTokenCommand) (*TokenPairResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RefreshAuthenticate", ctx, command)
-	ret0, _ := ret[0].(*RefreshTokenResult)
+	ret0, _ := ret[0].(*TokenPairResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -68,4 +83,32 @@ func (m *MockAuthenticationService) RefreshAuthenticate(ctx context.Context, com
 func (mr *MockAuthenticationServiceMockRecorder) RefreshAuthenticate(ctx, command any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshAuthenticate", reflect.TypeOf((*MockAuthenticationService)(nil).RefreshAuthenticate), ctx, command)
+}
+
+// Logout mocks base method.
+func (m *MockAuthenticationService) Logout(ctx context.Context, command LogoutCommand) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Logout", ctx, command)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Logout indicates an expected call of Logout.
+func (mr *MockAuthenticationServiceMockRecorder) Logout(ctx, command any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Logout", reflect.TypeOf((*MockAuthenticationService)(nil).Logout), ctx, command)
+}
+
+// RevokeAllSessions mocks base method.
+func (m *MockAuthenticationService) RevokeAllSessions(ctx context.Context, command RevokeAccountSessionsCommand) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevokeAllSessions", ctx, command)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RevokeAllSessions indicates an expected call of RevokeAllSessions.
+func (mr *MockAuthenticationServiceMockRecorder) RevokeAllSessions(ctx, command any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeAllSessions", reflect.TypeOf((*MockAuthenticationService)(nil).RevokeAllSessions), ctx, command)
 }

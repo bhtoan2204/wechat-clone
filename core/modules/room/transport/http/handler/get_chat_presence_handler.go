@@ -1,4 +1,4 @@
-// CODE_GENERATOR: handler
+// CODE_GENERATOR - do not edit: handler
 package handler
 
 import (

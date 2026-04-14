@@ -17,21 +17,31 @@ import (
 )
 
 type loginHandler struct {
-	authenticationService service.AuthenticationService
+	authService service.AuthenticationService
 }
 
 func NewLoginHandler(_ *appCtx.AppContext, _ repos.Repos, services service.Services) cqrs.Handler[*in.LoginRequest, *out.LoginResponse] {
 	return &loginHandler{
-		authenticationService: services.AuthenticationService(),
+		authService: services.AuthenticationService(),
 	}
 }
 
 func (u *loginHandler) Handle(ctx context.Context, req *in.LoginRequest) (*out.LoginResponse, error) {
 	log := logging.FromContext(ctx).Named("Login")
 
-	result, err := u.authenticationService.Authenticate(ctx, service.AuthenticateAccountCommand{
+	result, err := u.authService.Authenticate(ctx, service.AuthenticateAccountCommand{
 		Email:    req.Email,
 		Password: req.Password,
+		Device: service.DeviceCommand{
+			DeviceUID:  req.DeviceUid,
+			DeviceName: req.DeviceName,
+			DeviceType: req.DeviceType,
+			OSName:     req.OsName,
+			OSVersion:  req.OsVersion,
+			AppVersion: req.AppVersion,
+			UserAgent:  req.UserAgent,
+			IPAddress:  req.IpAddress,
+		},
 	})
 	if err != nil {
 		switch {

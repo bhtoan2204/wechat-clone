@@ -27,15 +27,22 @@ const (
 type PasetoPayload struct {
 	AccountID string
 	Email     string
+	SessionID string
+	DeviceID  string
 	TokenType TokenType
 	ExpiresAt time.Time
 	IssuedAt  time.Time
 }
 
+type RefreshTokenSubject struct {
+	SessionID string
+	DeviceID  string
+}
+
 //go:generate mockgen -package=xpaseto -destination=paseto_mock.go -source=paseto.go
 type PasetoService interface {
 	GenerateAccessToken(ctx context.Context, account *entity.Account) (string, time.Time, error)
-	GenerateRefreshToken(ctx context.Context, account *entity.Account) (string, time.Time, error)
+	GenerateRefreshToken(ctx context.Context, account *entity.Account, subject RefreshTokenSubject) (string, time.Time, error)
 
 	ParseAccessToken(ctx context.Context, token string) (*PasetoPayload, error)
 	ParseRefreshToken(ctx context.Context, token string) (*PasetoPayload, error)
@@ -108,14 +115,14 @@ func NewPaseto(cfg *config.Config) (PasetoService, error) {
 }
 
 func (p *pasetoService) GenerateAccessToken(ctx context.Context, account *entity.Account) (string, time.Time, error) {
-	return p.generateToken(account, TokenTypeAccess)
+	return p.generateToken(account, TokenTypeAccess, RefreshTokenSubject{})
 }
 
-func (p *pasetoService) GenerateRefreshToken(ctx context.Context, account *entity.Account) (string, time.Time, error) {
-	return p.generateToken(account, TokenTypeRefresh)
+func (p *pasetoService) GenerateRefreshToken(ctx context.Context, account *entity.Account, subject RefreshTokenSubject) (string, time.Time, error) {
+	return p.generateToken(account, TokenTypeRefresh, subject)
 }
 
-func (p *pasetoService) generateToken(account *entity.Account, tokenType TokenType) (string, time.Time, error) {
+func (p *pasetoService) generateToken(account *entity.Account, tokenType TokenType, subject RefreshTokenSubject) (string, time.Time, error) {
 	if account == nil {
 		return "", time.Time{}, stackErr.Error(fmt.Errorf("account is nil"))
 	}
@@ -147,6 +154,13 @@ func (p *pasetoService) generateToken(account *entity.Account, tokenType TokenTy
 
 	payload.Set("email", account.Email.Value())
 	payload.Set("token_use", string(tokenType))
+	if tokenType == TokenTypeRefresh {
+		if subject.SessionID == "" || subject.DeviceID == "" {
+			return "", time.Time{}, stackErr.Error(fmt.Errorf("refresh token subject is incomplete"))
+		}
+		payload.Set("session_id", subject.SessionID)
+		payload.Set("device_id", subject.DeviceID)
+	}
 
 	token, err := p.paseto.Sign(privateKey, payload, nil)
 	if err != nil {
@@ -208,10 +222,17 @@ func (p *pasetoService) parseToken(ctx context.Context, token string, expectedTy
 	}
 
 	email := jsonToken.Get("email")
+	sessionID := jsonToken.Get("session_id")
+	deviceID := jsonToken.Get("device_id")
+	if expectedType == TokenTypeRefresh && (sessionID == "" || deviceID == "") {
+		return nil, stackErr.Error(errors.New("missing refresh token subject"))
+	}
 
 	return &PasetoPayload{
 		AccountID: jsonToken.Subject,
 		Email:     email,
+		SessionID: sessionID,
+		DeviceID:  deviceID,
 		TokenType: expectedType,
 		ExpiresAt: jsonToken.Expiration,
 		IssuedAt:  jsonToken.IssuedAt,

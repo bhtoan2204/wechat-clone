@@ -29,6 +29,8 @@ func NewRefresh(
 func (u *refreshHandler) Handle(ctx context.Context, req *in.RefreshRequest) (*out.RefreshResponse, error) {
 	if result, err := u.authSvc.RefreshAuthenticate(ctx, service.RefreshTokenCommand{
 		RefreshToken: req.RefreshToken,
+		UserAgent:    req.UserAgent,
+		IPAddress:    req.IpAddress,
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	} else {

@@ -48,10 +48,13 @@ func isGeneratedFile(path, kind string) bool {
 		return false
 	}
 	marker := "// CODE_GENERATOR:"
+	doNotEditMarker := "// CODE_GENERATOR - do not edit:"
 	if kind != "" {
 		marker = "// CODE_GENERATOR: " + kind
+		doNotEditMarker = "// CODE_GENERATOR - do not edit: " + kind
 	}
-	return strings.Contains(string(content), marker)
+	text := string(content)
+	return strings.Contains(text, marker) || strings.Contains(text, doNotEditMarker)
 }
 
 func isScaffoldStubFile(path string) bool {
