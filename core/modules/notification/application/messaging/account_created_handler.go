@@ -3,14 +3,15 @@ package messaging
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"go-socket/core/modules/notification/domain/entity"
+	"go-socket/core/modules/notification/domain/aggregate"
+	"go-socket/core/modules/notification/domain/repos"
 	"go-socket/core/modules/notification/types"
 	sharedevents "go-socket/core/shared/contracts/events"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -28,16 +29,29 @@ func (h *messageHandler) handleAccountCreatedEvent(ctx context.Context, raw json
 
 	subject := "Welcome to Go Socket"
 	body := fmt.Sprintf("Welcome %s!", payload.Email)
+	notificationID := aggregate.WelcomeNotificationID(payload.AccountID)
 
-	notification := &entity.NotificationEntity{
-		ID:        uuid.New().String(),
-		AccountID: payload.AccountID,
-		Type:      types.NotificationTypeAccountCreated,
-		Subject:   subject,
-		Body:      body,
-		CreatedAt: payload.CreatedAt,
+	if _, err := h.notificationRepo.Load(ctx, notificationID); err == nil {
+		return nil
+	} else if !errors.Is(err, repos.ErrNotificationNotFound) {
+		log.Errorw("load notification failed", zap.Error(err))
+		return stackErr.Error(fmt.Errorf("load notification failed: %v", err))
 	}
-	if err := h.notificationRepo.CreateNotification(ctx, notification); err != nil {
+
+	notificationAgg, err := aggregate.NewNotificationAggregate(notificationID)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+	if err := notificationAgg.Create(
+		payload.AccountID,
+		types.NotificationTypeAccountCreated,
+		subject,
+		body,
+		payload.CreatedAt,
+	); err != nil {
+		return stackErr.Error(err)
+	}
+	if err := h.notificationRepo.Save(ctx, notificationAgg); err != nil {
 		log.Errorw("create notification failed", zap.Error(err))
 		return stackErr.Error(fmt.Errorf("create notification failed: %v", err))
 	}

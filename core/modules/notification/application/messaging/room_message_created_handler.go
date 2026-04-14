@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	"go-socket/core/modules/notification/domain/entity"
+	"go-socket/core/modules/notification/domain/aggregate"
 	"go-socket/core/modules/notification/types"
 	"go-socket/core/shared/contracts"
 	sharedevents "go-socket/core/shared/contracts/events"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -58,15 +57,22 @@ func (h *messageHandler) handleRoomMessageCreatedEvent(ctx context.Context, raw 
 			continue
 		}
 
-		notification := &entity.NotificationEntity{
-			ID:        mentionNotificationID(payload.MessageID, accountID),
-			AccountID: accountID,
-			Type:      types.NotificationTypeRoomMention,
-			Subject:   buildRoomMentionSubject(payload),
-			Body:      buildRoomMentionBody(payload),
-			CreatedAt: payload.MessageSentAt,
+		notificationAgg, err := aggregate.NewNotificationAggregate(
+			aggregate.RoomMentionNotificationID(payload.MessageID, accountID),
+		)
+		if err != nil {
+			return stackErr.Error(err)
 		}
-		if err := h.notificationRepo.CreateNotification(ctx, notification); err != nil {
+		if err := notificationAgg.Create(
+			accountID,
+			types.NotificationTypeRoomMention,
+			buildRoomMentionSubject(payload),
+			buildRoomMentionBody(payload),
+			payload.MessageSentAt,
+		); err != nil {
+			return stackErr.Error(err)
+		}
+		if err := h.notificationRepo.Save(ctx, notificationAgg); err != nil {
 			return stackErr.Error(fmt.Errorf("create room mention notification failed: %v", err))
 		}
 	}
@@ -93,10 +99,6 @@ func normalizeMentionRecipients(payload *sharedevents.RoomMessageCreatedEvent) [
 		recipients = append(recipients, accountID)
 	}
 	return recipients
-}
-
-func mentionNotificationID(messageID, accountID string) string {
-	return uuid.NewSHA1(uuid.NameSpaceOID, []byte("room-message-mention:"+strings.TrimSpace(messageID)+":"+strings.TrimSpace(accountID))).String()
 }
 
 func buildRoomMentionSubject(payload *sharedevents.RoomMessageCreatedEvent) string {

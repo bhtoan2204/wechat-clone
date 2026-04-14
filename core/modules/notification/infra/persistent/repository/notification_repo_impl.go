@@ -5,9 +5,11 @@ import (
 	"errors"
 	"go-socket/core/modules/notification/application/dto/out"
 	notificationquery "go-socket/core/modules/notification/application/query"
+	"go-socket/core/modules/notification/domain/aggregate"
 	"go-socket/core/modules/notification/domain/entity"
 	"go-socket/core/modules/notification/domain/repos"
 	"go-socket/core/modules/notification/infra/persistent/models"
+	"go-socket/core/modules/notification/types"
 	"go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/utils"
 	"strings"
@@ -31,24 +33,58 @@ func NewNotificationReadRepository(db *gorm.DB) notificationquery.NotificationRe
 	return NewNotificationRepoImpl(db)
 }
 
-func (r *notificationRepoImpl) CreateNotification(ctx context.Context, notification *entity.NotificationEntity) error {
-	m := r.toModel(notification)
-	var existing models.NotificationModel
-	err := r.db.WithContext(ctx).Select("id").Where("id = ?", notification.ID).Take(&existing).Error
-	switch {
-	case err == nil:
-		return nil
-	case !errors.Is(err, gorm.ErrRecordNotFound):
+func (r *notificationRepoImpl) Load(ctx context.Context, notificationID string) (*aggregate.NotificationAggregate, error) {
+	var notification models.NotificationModel
+	if err := r.db.WithContext(ctx).
+		Where("id = ?", notificationID).
+		First(&notification).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, repos.ErrNotificationNotFound
+		}
+		return nil, stackErr.Error(err)
+	}
+
+	agg, err := aggregate.NewNotificationAggregate(notification.ID)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	if err := agg.Restore(r.toEntity(&notification)); err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return agg, nil
+}
+
+func (r *notificationRepoImpl) Save(ctx context.Context, notification *aggregate.NotificationAggregate) error {
+	snapshot, err := notification.Snapshot()
+	if err != nil {
 		return stackErr.Error(err)
 	}
 
-	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+	if err := r.db.WithContext(ctx).Save(r.toModel(snapshot)).Error; err != nil {
 		if isDuplicateNotificationError(err) {
 			return nil
 		}
 		return stackErr.Error(err)
 	}
 	return nil
+}
+
+func (r *notificationRepoImpl) ListByAccountID(ctx context.Context, accountID string) ([]*entity.NotificationEntity, error) {
+	var notifications []*models.NotificationModel
+	if err := r.db.WithContext(ctx).
+		Where("account_id = ?", accountID).
+		Order("created_at DESC").
+		Order("id DESC").
+		Find(&notifications).Error; err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	results := make([]*entity.NotificationEntity, 0, len(notifications))
+	for _, notification := range notifications {
+		results = append(results, r.toEntity(notification))
+	}
+
+	return results, nil
 }
 
 func (r *notificationRepoImpl) ListNotifications(ctx context.Context, options utils.QueryOptions) ([]*out.NotificationResponse, error) {
@@ -100,12 +136,25 @@ func (r *notificationRepoImpl) ListNotifications(ctx context.Context, options ut
 			Subject:   notification.Subject,
 			Body:      notification.Body,
 			IsRead:    notification.IsRead,
-			ReadAt:    notification.ReadAt.Format(time.DateTime),
+			ReadAt:    formatNotificationTime(notification.ReadAt),
 			CreatedAt: notification.CreatedAt.Format(time.DateTime),
 		})
 	}
 
 	return responses, nil
+}
+
+func (r *notificationRepoImpl) toEntity(m *models.NotificationModel) *entity.NotificationEntity {
+	return &entity.NotificationEntity{
+		ID:        m.ID,
+		AccountID: m.AccountID,
+		Type:      types.NotificationType(m.Type),
+		Subject:   m.Subject,
+		Body:      m.Body,
+		IsRead:    m.IsRead,
+		ReadAt:    m.ReadAt,
+		CreatedAt: m.CreatedAt,
+	}
 }
 
 func (r *notificationRepoImpl) toModel(e *entity.NotificationEntity) *models.NotificationModel {
@@ -127,4 +176,12 @@ func isDuplicateNotificationError(err error) bool {
 	}
 	message := strings.ToUpper(err.Error())
 	return strings.Contains(message, "ORA-00001") || strings.Contains(message, "UNIQUE")
+}
+
+func formatNotificationTime(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+
+	return value.UTC().Format(time.DateTime)
 }

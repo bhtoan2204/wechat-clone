@@ -11,6 +11,7 @@ package repos
 
 import (
 	context "context"
+	aggregate "go-socket/core/modules/notification/domain/aggregate"
 	entity "go-socket/core/modules/notification/domain/entity"
 	reflect "reflect"
 
@@ -41,16 +42,46 @@ func (m *MockNotificationRepository) EXPECT() *MockNotificationRepositoryMockRec
 	return m.recorder
 }
 
-// CreateNotification mocks base method.
-func (m *MockNotificationRepository) CreateNotification(ctx context.Context, notification *entity.NotificationEntity) error {
+// Load mocks base method.
+func (m *MockNotificationRepository) Load(ctx context.Context, notificationID string) (*aggregate.NotificationAggregate, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateNotification", ctx, notification)
+	ret := m.ctrl.Call(m, "Load", ctx, notificationID)
+	ret0, _ := ret[0].(*aggregate.NotificationAggregate)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Load indicates an expected call of Load.
+func (mr *MockNotificationRepositoryMockRecorder) Load(ctx, notificationID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockNotificationRepository)(nil).Load), ctx, notificationID)
+}
+
+// Save mocks base method.
+func (m *MockNotificationRepository) Save(ctx context.Context, notification *aggregate.NotificationAggregate) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Save", ctx, notification)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// CreateNotification indicates an expected call of CreateNotification.
-func (mr *MockNotificationRepositoryMockRecorder) CreateNotification(ctx, notification any) *gomock.Call {
+// Save indicates an expected call of Save.
+func (mr *MockNotificationRepositoryMockRecorder) Save(ctx, notification any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNotification", reflect.TypeOf((*MockNotificationRepository)(nil).CreateNotification), ctx, notification)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockNotificationRepository)(nil).Save), ctx, notification)
+}
+
+// ListByAccountID mocks base method.
+func (m *MockNotificationRepository) ListByAccountID(ctx context.Context, accountID string) ([]*entity.NotificationEntity, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListByAccountID", ctx, accountID)
+	ret0, _ := ret[0].([]*entity.NotificationEntity)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListByAccountID indicates an expected call of ListByAccountID.
+func (mr *MockNotificationRepositoryMockRecorder) ListByAccountID(ctx, accountID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByAccountID", reflect.TypeOf((*MockNotificationRepository)(nil).ListByAccountID), ctx, accountID)
 }

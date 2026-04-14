@@ -3,10 +3,12 @@ package messaging
 import (
 	"context"
 	"go-socket/core/modules/notification/application/adapter"
-	"go-socket/core/modules/notification/domain/entity"
+	"go-socket/core/modules/notification/domain/aggregate"
 	"go-socket/core/modules/notification/domain/repos"
+	"go-socket/core/modules/notification/types"
 	sharedevents "go-socket/core/shared/contracts/events"
 	"testing"
+	"time"
 
 	"go.uber.org/mock/gomock"
 )
@@ -84,10 +86,18 @@ func TestHandleAccountEventWithLowercaseFields(t *testing.T) {
 		Times(1)
 
 	notificationRepo.EXPECT().
-		CreateNotification(gomock.Any(), gomock.AssignableToTypeOf(&entity.NotificationEntity{})).
-		DoAndReturn(func(_ context.Context, n *entity.NotificationEntity) error {
-			if n == nil {
-				t.Fatalf("expected notification entity")
+		Load(gomock.Any(), aggregate.WelcomeNotificationID("acc-2")).
+		Return(nil, repos.ErrNotificationNotFound).
+		Times(1)
+	notificationRepo.EXPECT().
+		Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.NotificationAggregate{})).
+		DoAndReturn(func(_ context.Context, n *aggregate.NotificationAggregate) error {
+			snapshot, err := n.Snapshot()
+			if err != nil {
+				t.Fatalf("Snapshot() error = %v", err)
+			}
+			if snapshot == nil || snapshot.ID != aggregate.WelcomeNotificationID("acc-2") {
+				t.Fatalf("expected welcome notification aggregate, got %+v", snapshot)
 			}
 			return nil
 		}).
@@ -133,18 +143,22 @@ func TestHandleRoomOutboxEventCreatesMentionNotifications(t *testing.T) {
 
 	callCount := 0
 	notificationRepo.EXPECT().
-		CreateNotification(gomock.Any(), gomock.AssignableToTypeOf(&entity.NotificationEntity{})).
-		DoAndReturn(func(_ context.Context, n *entity.NotificationEntity) error {
+		Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.NotificationAggregate{})).
+		DoAndReturn(func(_ context.Context, n *aggregate.NotificationAggregate) error {
 			callCount++
 
-			if n.Type != "room.mention" {
-				t.Fatalf("expected room.mention, got %s", n.Type)
+			snapshot, err := n.Snapshot()
+			if err != nil {
+				t.Fatalf("Snapshot() error = %v", err)
 			}
-			if n.Subject != "Alice mentioned you in Backend" {
-				t.Fatalf("unexpected subject %q", n.Subject)
+			if snapshot.Type != "room.mention" {
+				t.Fatalf("expected room.mention, got %s", snapshot.Type)
 			}
-			if n.Body != "hello team" {
-				t.Fatalf("unexpected body %q", n.Body)
+			if snapshot.Subject != "Alice mentioned you in Backend" {
+				t.Fatalf("unexpected subject %q", snapshot.Subject)
+			}
+			if snapshot.Body != "hello team" {
+				t.Fatalf("unexpected body %q", snapshot.Body)
 			}
 			return nil
 		}).
@@ -156,5 +170,45 @@ func TestHandleRoomOutboxEventCreatesMentionNotifications(t *testing.T) {
 
 	if callCount != 2 {
 		t.Fatalf("expected 2 notifications, got %d", callCount)
+	}
+}
+
+func TestHandleAccountEventSkipsExistingWelcomeNotification(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	emailSender := adapter.NewMockEmailSender(ctrl)
+	notificationRepo := repos.NewMockNotificationRepository(ctrl)
+
+	existingAgg, err := aggregate.NewNotificationAggregate(aggregate.WelcomeNotificationID("acc-3"))
+	if err != nil {
+		t.Fatalf("NewNotificationAggregate() error = %v", err)
+	}
+	if err := existingAgg.Create("acc-3", types.NotificationTypeAccountCreated, "Welcome to Go Socket", "Welcome c@example.com!", time.Date(2026, 3, 3, 6, 5, 32, 0, time.UTC)); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	handler := &messageHandler{
+		emailSender:      emailSender,
+		notificationRepo: notificationRepo,
+	}
+
+	raw := []byte(`{
+		"id": 1,
+		"aggregate_id": "acc-3",
+		"aggregate_type": "account",
+		"version": 1,
+		"event_name": "EventAccountCreated",
+		"event_data": {"AccountID":"acc-3","Email":"c@example.com","CreatedAt":"2026-03-03T06:05:32Z"},
+		"created_at": "2026-03-03T06:05:32Z"
+	}`)
+
+	notificationRepo.EXPECT().
+		Load(gomock.Any(), aggregate.WelcomeNotificationID("acc-3")).
+		Return(existingAgg, nil).
+		Times(1)
+
+	if err := handler.handleAccountEvent(context.Background(), raw); err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
 }
