@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"go-socket/core/modules/account/domain/aggregate"
 	"go-socket/core/modules/account/domain/entity"
 	accountrepos "go-socket/core/modules/account/domain/repos"
 	"go-socket/core/modules/account/infra/persistent/models"
@@ -20,7 +21,7 @@ func NewDeviceRepoImpl(db *gorm.DB) accountrepos.DeviceRepository {
 	return &deviceRepoImpl{db: db}
 }
 
-func (r *deviceRepoImpl) FindByAccountAndUID(ctx context.Context, accountID string, deviceUID string) (*entity.Device, error) {
+func (r *deviceRepoImpl) FindByAccountAndUID(ctx context.Context, accountID string, deviceUID string) (*aggregate.DeviceAggregate, error) {
 	var model models.DeviceModel
 	if err := r.db.WithContext(ctx).
 		Where("account_id = ? AND device_uid = ?", accountID, deviceUID).
@@ -32,10 +33,10 @@ func (r *deviceRepoImpl) FindByAccountAndUID(ctx context.Context, accountID stri
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	return device, nil
+	return r.toAggregate(device)
 }
 
-func (r *deviceRepoImpl) GetByAccountAndID(ctx context.Context, accountID string, deviceID string) (*entity.Device, error) {
+func (r *deviceRepoImpl) GetByAccountAndID(ctx context.Context, accountID string, deviceID string) (*aggregate.DeviceAggregate, error) {
 	var model models.DeviceModel
 	if err := r.db.WithContext(ctx).
 		Where("account_id = ? AND id = ?", accountID, deviceID).
@@ -47,18 +48,34 @@ func (r *deviceRepoImpl) GetByAccountAndID(ctx context.Context, accountID string
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	return device, nil
+	return r.toAggregate(device)
 }
 
-func (r *deviceRepoImpl) Save(ctx context.Context, device *entity.Device) error {
+func (r *deviceRepoImpl) Save(ctx context.Context, device *aggregate.DeviceAggregate) error {
 	if device == nil {
 		return stackErr.Error(fmt.Errorf("device is nil"))
 	}
 
-	if err := r.db.WithContext(ctx).Save(r.toModel(device)).Error; err != nil {
+	snapshot, err := device.Snapshot()
+	if err != nil {
+		return stackErr.Error(err)
+	}
+
+	if err := r.db.WithContext(ctx).Save(r.toModel(snapshot)).Error; err != nil {
 		return stackErr.Error(err)
 	}
 	return nil
+}
+
+func (r *deviceRepoImpl) toAggregate(device *entity.Device) (*aggregate.DeviceAggregate, error) {
+	agg, err := aggregate.NewDeviceAggregate(device.ID)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	if err := agg.Restore(device); err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return agg, nil
 }
 
 func (r *deviceRepoImpl) toEntity(model *models.DeviceModel) (*entity.Device, error) {

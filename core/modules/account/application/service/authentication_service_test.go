@@ -47,8 +47,12 @@ func TestAuthenticationService_Authenticate_IssuesAccessAndRefreshTokens(t *test
 	txRepos.EXPECT().DeviceRepository().Return(deviceRepo)
 	deviceRepo.EXPECT().FindByAccountAndUID(gomock.Any(), "acc-1", "browser-1").Return(nil, gorm.ErrRecordNotFound)
 	deviceRepo.EXPECT().
-		Save(gomock.Any(), gomock.AssignableToTypeOf(&entity.Device{})).
-		DoAndReturn(func(_ context.Context, device *entity.Device) error {
+		Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.DeviceAggregate{})).
+		DoAndReturn(func(_ context.Context, deviceAgg *aggregate.DeviceAggregate) error {
+			device, err := deviceAgg.Snapshot()
+			if err != nil {
+				t.Fatalf("Snapshot() error = %v", err)
+			}
 			if device == nil || device.AccountID != "acc-1" || device.DeviceUID != "browser-1" {
 				t.Fatalf("expected device for acc-1/browser-1, got %+v", device)
 			}
@@ -85,8 +89,12 @@ func TestAuthenticationService_Authenticate_IssuesAccessAndRefreshTokens(t *test
 	hasherMock.EXPECT().Hash(gomock.Any(), "refresh-token").Return("hashed-refresh-token", nil)
 	txRepos.EXPECT().SessionRepository().Return(sessionRepo)
 	sessionRepo.EXPECT().
-		Save(gomock.Any(), gomock.AssignableToTypeOf(&entity.Session{})).
-		DoAndReturn(func(_ context.Context, session *entity.Session) error {
+		Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.SessionAggregate{})).
+		DoAndReturn(func(_ context.Context, sessionAgg *aggregate.SessionAggregate) error {
+			session, err := sessionAgg.Snapshot()
+			if err != nil {
+				t.Fatalf("Snapshot() error = %v", err)
+			}
 			if session == nil || session.AccountID != "acc-1" || session.DeviceID != savedDeviceID {
 				t.Fatalf("expected session for acc-1/%s, got %+v", savedDeviceID, session)
 			}
@@ -147,7 +155,8 @@ func TestAuthenticationService_RefreshAuthenticate_RotatesRefreshToken(t *testin
 
 	accessExpiresAt := time.Date(2026, time.April, 14, 12, 0, 0, 0, time.UTC)
 	refreshExpiresAt := time.Date(2026, time.April, 21, 12, 0, 0, 0, time.UTC)
-	device := newKnownDevice("acc-1", "dev-1", "browser-1")
+	deviceAgg := newKnownDeviceAggregate(t, "acc-1", "dev-1", "browser-1")
+	sessionAgg := newActiveSessionAggregate(t, "ses-1", "acc-1", "dev-1", "stored-refresh-hash", refreshExpiresAt)
 
 	pasetoMock.EXPECT().
 		ParseRefreshToken(gomock.Any(), "incoming-refresh-token").
@@ -163,14 +172,19 @@ func TestAuthenticationService_RefreshAuthenticate_RotatesRefreshToken(t *testin
 			return fn(txRepos)
 		})
 	txRepos.EXPECT().SessionRepository().Return(sessionRepo).Times(2)
+	sessionRepo.EXPECT().Load(gomock.Any(), "ses-1").Return(sessionAgg, nil)
 	hasherMock.EXPECT().Verify(gomock.Any(), "incoming-refresh-token", "stored-refresh-hash").Return(true, nil)
 	txRepos.EXPECT().AccountAggregateRepository().Return(accountAggregateRepo)
 	accountAggregateRepo.EXPECT().Load(gomock.Any(), "acc-1").Return(accountAggregate, nil)
 	txRepos.EXPECT().DeviceRepository().Return(deviceRepo).Times(2)
-	deviceRepo.EXPECT().GetByAccountAndID(gomock.Any(), "acc-1", "dev-1").Return(device, nil)
+	deviceRepo.EXPECT().GetByAccountAndID(gomock.Any(), "acc-1", "dev-1").Return(deviceAgg, nil)
 	deviceRepo.EXPECT().
-		Save(gomock.Any(), gomock.AssignableToTypeOf(&entity.Device{})).
-		DoAndReturn(func(_ context.Context, saved *entity.Device) error {
+		Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.DeviceAggregate{})).
+		DoAndReturn(func(_ context.Context, savedAgg *aggregate.DeviceAggregate) error {
+			saved, err := savedAgg.Snapshot()
+			if err != nil {
+				t.Fatalf("Snapshot() error = %v", err)
+			}
 			if saved == nil || saved.ID != "dev-1" {
 				t.Fatalf("expected saved device dev-1, got %+v", saved)
 			}
@@ -188,8 +202,12 @@ func TestAuthenticationService_RefreshAuthenticate_RotatesRefreshToken(t *testin
 		Return("rotated-refresh-token", refreshExpiresAt, nil)
 	hasherMock.EXPECT().Hash(gomock.Any(), "rotated-refresh-token").Return("rotated-refresh-hash", nil)
 	sessionRepo.EXPECT().
-		Save(gomock.Any(), gomock.AssignableToTypeOf(&entity.Session{})).
-		DoAndReturn(func(_ context.Context, session *entity.Session) error {
+		Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.SessionAggregate{})).
+		DoAndReturn(func(_ context.Context, sessionAgg *aggregate.SessionAggregate) error {
+			session, err := sessionAgg.Snapshot()
+			if err != nil {
+				t.Fatalf("Snapshot() error = %v", err)
+			}
 			if session == nil || session.ID != "ses-1" {
 				t.Fatalf("expected rotated session ses-1, got %+v", session)
 			}
@@ -326,8 +344,12 @@ func TestAuthenticationService_Register_IssuesAccessAndRefreshTokens(t *testing.
 	txRepos.EXPECT().DeviceRepository().Return(deviceRepo)
 	deviceRepo.EXPECT().FindByAccountAndUID(gomock.Any(), gomock.Any(), "browser-1").Return(nil, gorm.ErrRecordNotFound)
 	deviceRepo.EXPECT().
-		Save(gomock.Any(), gomock.AssignableToTypeOf(&entity.Device{})).
-		DoAndReturn(func(_ context.Context, device *entity.Device) error {
+		Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.DeviceAggregate{})).
+		DoAndReturn(func(_ context.Context, deviceAgg *aggregate.DeviceAggregate) error {
+			device, err := deviceAgg.Snapshot()
+			if err != nil {
+				t.Fatalf("Snapshot() error = %v", err)
+			}
 			if device == nil || device.AccountID == "" || device.DeviceUID != "browser-1" {
 				t.Fatalf("expected saved register device, got %+v", device)
 			}
@@ -364,8 +386,12 @@ func TestAuthenticationService_Register_IssuesAccessAndRefreshTokens(t *testing.
 	hasherMock.EXPECT().Hash(gomock.Any(), "refresh-token").Return("hashed-refresh-token", nil)
 	txRepos.EXPECT().SessionRepository().Return(sessionRepo)
 	sessionRepo.EXPECT().
-		Save(gomock.Any(), gomock.AssignableToTypeOf(&entity.Session{})).
-		DoAndReturn(func(_ context.Context, session *entity.Session) error {
+		Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.SessionAggregate{})).
+		DoAndReturn(func(_ context.Context, sessionAgg *aggregate.SessionAggregate) error {
+			session, err := sessionAgg.Snapshot()
+			if err != nil {
+				t.Fatalf("Snapshot() error = %v", err)
+			}
 			if session == nil || session.ID != issuedSessionID || session.DeviceID != savedDeviceID {
 				t.Fatalf("expected register session bound to issued subject, got %+v", session)
 			}
@@ -488,4 +514,39 @@ func newKnownDevice(accountID, deviceID, deviceUID string) *entity.Device {
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
+}
+
+func newActiveSessionAggregate(
+	t *testing.T,
+	sessionID,
+	accountID,
+	deviceID,
+	refreshHash string,
+	expiresAt time.Time,
+) *aggregate.SessionAggregate {
+	t.Helper()
+
+	sessionAgg, err := aggregate.NewSessionAggregate(sessionID)
+	if err != nil {
+		t.Fatalf("NewSessionAggregate() error = %v", err)
+	}
+	if err := sessionAgg.Restore(newActiveSession(sessionID, accountID, deviceID, refreshHash, expiresAt)); err != nil {
+		t.Fatalf("Restore() error = %v", err)
+	}
+
+	return sessionAgg
+}
+
+func newKnownDeviceAggregate(t *testing.T, accountID, deviceID, deviceUID string) *aggregate.DeviceAggregate {
+	t.Helper()
+
+	deviceAgg, err := aggregate.NewDeviceAggregate(deviceID)
+	if err != nil {
+		t.Fatalf("NewDeviceAggregate() error = %v", err)
+	}
+	if err := deviceAgg.Restore(newKnownDevice(accountID, deviceID, deviceUID)); err != nil {
+		t.Fatalf("Restore() error = %v", err)
+	}
+
+	return deviceAgg
 }

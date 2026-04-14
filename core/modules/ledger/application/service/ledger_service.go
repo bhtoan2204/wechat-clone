@@ -49,8 +49,11 @@ func (s *LedgerService) CreateTransaction(ctx context.Context, command CreateTra
 	log := logging.FromContext(ctx).Named("CreateLedgerTransaction")
 	transactionID := strings.TrimSpace(command.TransactionID)
 
-	aggregate, err := ledgeraggregate.NewLedgerTransactionAggregate(transactionID, toLedgerEntryInputs(command.Entries), time.Now().UTC())
+	aggregate, err := ledgeraggregate.NewLedgerTransactionAggregate(transactionID)
 	if err != nil {
+		return nil, stackErr.Error(wrapValidation(err))
+	}
+	if err := aggregate.Create(toLedgerEntryInputs(command.Entries), time.Now().UTC()); err != nil {
 		return nil, stackErr.Error(wrapValidation(err))
 	}
 
@@ -104,8 +107,11 @@ func (s *LedgerService) RecordPaymentSucceeded(ctx context.Context, command Reco
 		}
 
 		alreadyBooked := false
-		transactionAggregate, err := ledgeraggregate.NewLedgerTransactionAggregate(booking.LedgerTransactionID(), booking.LedgerEntries(), now)
+		transactionAggregate, err := ledgeraggregate.NewLedgerTransactionAggregate(booking.LedgerTransactionID())
 		if err != nil {
+			return stackErr.Error(wrapValidation(err))
+		}
+		if err := transactionAggregate.Create(booking.LedgerEntries(), now); err != nil {
 			return stackErr.Error(wrapValidation(err))
 		}
 		if err := txRepos.LedgerTransactionAggregateRepository().Save(ctx, transactionAggregate); err != nil {

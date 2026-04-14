@@ -11,7 +11,7 @@ package repos
 
 import (
 	context "context"
-	entity "go-socket/core/modules/account/domain/entity"
+	aggregate "go-socket/core/modules/account/domain/aggregate"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -42,10 +42,10 @@ func (m *MockDeviceRepository) EXPECT() *MockDeviceRepositoryMockRecorder {
 }
 
 // FindByAccountAndUID mocks base method.
-func (m *MockDeviceRepository) FindByAccountAndUID(ctx context.Context, accountID, deviceUID string) (*entity.Device, error) {
+func (m *MockDeviceRepository) FindByAccountAndUID(ctx context.Context, accountID, deviceUID string) (*aggregate.DeviceAggregate, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindByAccountAndUID", ctx, accountID, deviceUID)
-	ret0, _ := ret[0].(*entity.Device)
+	ret0, _ := ret[0].(*aggregate.DeviceAggregate)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -57,10 +57,10 @@ func (mr *MockDeviceRepositoryMockRecorder) FindByAccountAndUID(ctx, accountID, 
 }
 
 // GetByAccountAndID mocks base method.
-func (m *MockDeviceRepository) GetByAccountAndID(ctx context.Context, accountID, deviceID string) (*entity.Device, error) {
+func (m *MockDeviceRepository) GetByAccountAndID(ctx context.Context, accountID, deviceID string) (*aggregate.DeviceAggregate, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByAccountAndID", ctx, accountID, deviceID)
-	ret0, _ := ret[0].(*entity.Device)
+	ret0, _ := ret[0].(*aggregate.DeviceAggregate)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -72,7 +72,7 @@ func (mr *MockDeviceRepositoryMockRecorder) GetByAccountAndID(ctx, accountID, de
 }
 
 // Save mocks base method.
-func (m *MockDeviceRepository) Save(ctx context.Context, device *entity.Device) error {
+func (m *MockDeviceRepository) Save(ctx context.Context, device *aggregate.DeviceAggregate) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Save", ctx, device)
 	ret0, _ := ret[0].(error)

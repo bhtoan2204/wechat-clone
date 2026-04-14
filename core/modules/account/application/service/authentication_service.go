@@ -147,11 +147,11 @@ func (s *authenticationService) Register(ctx context.Context, command RegisterAc
 		if err := txRepos.AccountAggregateRepository().Save(ctx, accountAggregate); err != nil {
 			return stackErr.Error(fmt.Errorf("save account aggregate failed: %v", err))
 		}
-		device, err := s.ensureKnownDevice(ctx, txRepos.DeviceRepository(), accountSnapshot.ID, command.Device, now)
+		deviceAgg, err := s.ensureKnownDevice(ctx, txRepos.DeviceRepository(), accountSnapshot.ID, command.Device, now)
 		if err != nil {
 			return stackErr.Error(err)
 		}
-		tokenPair, err = s.createSessionTokenPair(ctx, txRepos.SessionRepository(), accountSnapshot, device.ID, command.Device, now)
+		tokenPair, err = s.createSessionTokenPair(ctx, txRepos.SessionRepository(), accountSnapshot, deviceAgg.DeviceID(), command.Device, now)
 		if err != nil {
 			return stackErr.Error(err)
 		}
@@ -203,11 +203,11 @@ func (s *authenticationService) Authenticate(ctx context.Context, command Authen
 
 	var tokenPair *TokenPairResult
 	if txErr := s.baseRepo.WithTransaction(ctx, func(txRepos repos.Repos) error {
-		device, err := s.ensureKnownDevice(ctx, txRepos.DeviceRepository(), accountSnapshot.ID, command.Device, now)
+		deviceAgg, err := s.ensureKnownDevice(ctx, txRepos.DeviceRepository(), accountSnapshot.ID, command.Device, now)
 		if err != nil {
 			return stackErr.Error(err)
 		}
-		tokenPair, err = s.createSessionTokenPair(ctx, txRepos.SessionRepository(), accountSnapshot, device.ID, command.Device, now)
+		tokenPair, err = s.createSessionTokenPair(ctx, txRepos.SessionRepository(), accountSnapshot, deviceAgg.DeviceID(), command.Device, now)
 		if err != nil {
 			return stackErr.Error(err)
 		}
@@ -269,15 +269,17 @@ func (s *authenticationService) RefreshAuthenticate(ctx context.Context, command
 			return stackErr.Error(err)
 		}
 
-		device, err := txRepos.DeviceRepository().GetByAccountAndID(ctx, claims.AccountID, session.DeviceID)
+		deviceAgg, err := txRepos.DeviceRepository().GetByAccountAndID(ctx, claims.AccountID, session.DeviceID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return stackErr.Error(ErrRefreshTokenInvalid)
 			}
 			return stackErr.Error(fmt.Errorf("load device failed: %v", err))
 		}
-		device.Touch(command.UserAgent, command.IPAddress, now)
-		if err := txRepos.DeviceRepository().Save(ctx, device); err != nil {
+		if err := deviceAgg.Touch(command.UserAgent, command.IPAddress, now); err != nil {
+			return stackErr.Error(err)
+		}
+		if err := txRepos.DeviceRepository().Save(ctx, deviceAgg); err != nil {
 			return stackErr.Error(fmt.Errorf("save device failed: %v", err))
 		}
 
@@ -390,7 +392,7 @@ func (s *authenticationService) ensureKnownDevice(
 	accountID string,
 	command DeviceCommand,
 	now time.Time,
-) (*entity.Device, error) {
+) (*aggregate.DeviceAggregate, error) {
 	registration := entity.DeviceRegistration{
 		DeviceUID:  command.DeviceUID,
 		DeviceName: command.DeviceName,
@@ -402,25 +404,28 @@ func (s *authenticationService) ensureKnownDevice(
 		IPAddress:  command.IPAddress,
 	}
 
-	device, err := deviceRepo.FindByAccountAndUID(ctx, accountID, command.DeviceUID)
+	deviceAgg, err := deviceRepo.FindByAccountAndUID(ctx, accountID, command.DeviceUID)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, stackErr.Error(fmt.Errorf("load device failed: %v", err))
 		}
-		device, err = entity.NewDevice(uuid.NewString(), accountID, registration, now)
+		deviceAgg, err = aggregate.NewDeviceAggregate(uuid.NewString())
 		if err != nil {
 			return nil, stackErr.Error(err)
 		}
+		if err := deviceAgg.Register(accountID, registration, now); err != nil {
+			return nil, stackErr.Error(err)
+		}
 	} else {
-		if err := device.RefreshRegistration(registration, now); err != nil {
+		if err := deviceAgg.RefreshRegistration(registration, now); err != nil {
 			return nil, stackErr.Error(err)
 		}
 	}
 
-	if err := deviceRepo.Save(ctx, device); err != nil {
+	if err := deviceRepo.Save(ctx, deviceAgg); err != nil {
 		return nil, stackErr.Error(fmt.Errorf("save device failed: %v", err))
 	}
-	return device, nil
+	return deviceAgg, nil
 }
 
 func (s *authenticationService) createSessionTokenPair(
