@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
+//go:generate mockgen -package=service -destination=account_service_mock.go -source=account_service.go
 type AccountService interface {
 	LoadAccountAggregate(ctx context.Context, accountID string) (*aggregate.AccountAggregate, error)
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
+//go:generate mockgen -package=storage -destination=storage_mock.go -source=storage.go
 type Storage interface {
 	PresignedGetObjectURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error)
 	PresignedPutObjectURL(ctx context.Context, objectKey string, expiry time.Duration) (string, time.Time, error)

@@ -19,6 +19,7 @@ import (
 
 var _ App = (*Server)(nil)
 
+//go:generate mockgen -package=http -destination=server_mock.go -source=server.go
 type App interface {
 	Routes(ctx context.Context, appCtx *appCtx.AppContext) *gin.Engine
 	Start(ctx context.Context, appCtx *appCtx.AppContext) error

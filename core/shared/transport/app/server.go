@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
+//go:generate mockgen -package=app -destination=server_mock.go -source=server.go
 type Server interface {
 	Start(ctx context.Context, appCtx *appCtx.AppContext) error
 }

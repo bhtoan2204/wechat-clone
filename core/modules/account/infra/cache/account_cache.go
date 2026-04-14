@@ -13,6 +13,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+//go:generate mockgen -package=cache -destination=account_cache_mock.go -source=account_cache.go
 type AccountCache interface {
 	Get(ctx context.Context, id string) (*entity.Account, bool, error)
 	Set(ctx context.Context, m *entity.Account) error

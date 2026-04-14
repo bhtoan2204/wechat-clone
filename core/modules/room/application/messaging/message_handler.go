@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
+//go:generate mockgen -package=messaging -destination=message_handler_mock.go -source=message_handler.go
 type MessageHandler interface {
 	Start() error
 	Stop() error

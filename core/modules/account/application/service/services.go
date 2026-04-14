@@ -5,6 +5,7 @@ import (
 	"go-socket/core/modules/account/domain/repos"
 )
 
+//go:generate mockgen -package=service -destination=services_mock.go -source=services.go
 type Services interface {
 	AccountService() AccountService
 	AuthenticationService() AuthenticationService

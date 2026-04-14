@@ -48,7 +48,9 @@ func (u *loginHandler) Handle(ctx context.Context, req *in.LoginRequest) (*out.L
 	}
 
 	return &out.LoginResponse{
-		Token:     result.Token,
-		ExpiresAt: result.ExpiresAt.UnixMilli(),
+		AccessToken:      result.AccessToken,
+		AccessExpiresAt:  result.AccessExpiresAt.UnixMilli(),
+		RefreshToken:     result.RefreshToken,
+		RefreshExpiresAt: result.RefreshExpiresAt.UnixMilli(),
 	}, nil
 }

@@ -53,3 +53,10 @@ func StringPtr(value string) *string {
 	}
 	return &value
 }
+
+func StringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}

@@ -6,6 +6,7 @@ import (
 	"go-socket/core/shared/utils"
 )
 
+//go:generate mockgen -package=repos -destination=room_repo_mock.go -source=room_repo.go
 type RoomRepository interface {
 	CreateRoom(ctx context.Context, room *entity.Room) error
 	ListRooms(ctx context.Context, options utils.QueryOptions) ([]*entity.Room, error)

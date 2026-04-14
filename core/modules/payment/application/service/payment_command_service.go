@@ -20,6 +20,7 @@ import (
 	"go.uber.org/zap"
 )
 
+//go:generate mockgen -package=service -destination=payment_command_service_mock.go -source=payment_command_service.go
 type PaymentCommandService interface {
 	CreatePayment(ctx context.Context, req *in.CreatePaymentRequest) (*out.CreatePaymentResponse, error)
 	ProcessWebhook(ctx context.Context, req *in.ProcessWebhookRequest) (*out.ProcessWebhookResponse, error)

@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
+//go:generate mockgen -package=processor -destination=processor_mock.go -source=processor.go
 type Processor interface {
 	Start() error
 	Stop() error

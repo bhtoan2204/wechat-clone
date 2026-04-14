@@ -13,6 +13,7 @@ import (
 	"go-socket/core/shared/pkg/stackErr"
 )
 
+//go:generate mockgen -package=projection -destination=processor_mock.go -source=processor.go
 type Processor interface {
 	Start() error
 	Stop() error

@@ -6,10 +6,18 @@ import (
 	"time"
 
 	"go-socket/core/modules/room/domain/entity"
+	reposmock "go-socket/core/modules/room/domain/repos"
+
+	"go.uber.org/mock/gomock"
 )
 
 func TestEnrichRoomMembersWithAccountProjectionsFillsProfileFields(t *testing.T) {
 	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	accountRepo := reposmock.NewMockRoomAccountProjectionRepository(ctrl)
 
 	now := time.Date(2026, time.April, 14, 2, 15, 0, 0, time.UTC)
 	members := []*entity.RoomMemberEntity{
@@ -22,16 +30,19 @@ func TestEnrichRoomMembersWithAccountProjectionsFillsProfileFields(t *testing.T)
 		},
 	}
 
-	enriched, err := enrichRoomMembersWithAccountProjections(context.Background(), &stubRoomAccountProjectionRepo{
-		accounts: []*entity.AccountEntity{
+	accountRepo.EXPECT().
+		ListByAccountIDs(gomock.Any(), []string{"acc-1"}).
+		Return([]*entity.AccountEntity{
 			{
 				AccountID:       "acc-1",
 				DisplayName:     "Alice",
 				Username:        "alice",
 				AvatarObjectKey: "avatars/alice.png",
 			},
-		},
-	}, members)
+		}, nil).
+		Times(1)
+
+	enriched, err := enrichRoomMembersWithAccountProjections(context.Background(), accountRepo, members)
 	if err != nil {
 		t.Fatalf("enrichRoomMembersWithAccountProjections() error = %v", err)
 	}
@@ -79,16 +90,4 @@ func TestMapRoomMemberProjectionsIncludesProfileFields(t *testing.T) {
 	if projections[0].AvatarObjectKey != "avatars/alice.png" {
 		t.Fatalf("expected avatar key avatars/alice.png, got %q", projections[0].AvatarObjectKey)
 	}
-}
-
-type stubRoomAccountProjectionRepo struct {
-	accounts []*entity.AccountEntity
-}
-
-func (s *stubRoomAccountProjectionRepo) ProjectAccount(context.Context, *entity.AccountEntity) error {
-	return nil
-}
-
-func (s *stubRoomAccountProjectionRepo) ListByAccountIDs(_ context.Context, _ []string) ([]*entity.AccountEntity, error) {
-	return s.accounts, nil
 }

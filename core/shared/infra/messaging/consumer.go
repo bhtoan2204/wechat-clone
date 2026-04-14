@@ -18,6 +18,7 @@ import (
 type CallBack func(ctx context.Context, topic string, value []byte) error
 type Handler func(ctx context.Context, value []byte) error
 
+//go:generate mockgen -package=messaging -destination=consumer_mock.go -source=consumer.go
 type Consumer interface {
 	Read(callback CallBack)
 	Stop()
@@ -26,6 +27,7 @@ type Consumer interface {
 	GetHandlerName() string
 }
 
+//go:generate mockgen -package=messaging -destination=consumer_mock.go -source=consumer.go
 type kafkaConsumerClient interface {
 	SubscribeTopics(topics []string, rebalanceCb kafka.RebalanceCb) error
 	Poll(timeoutMs int) kafka.Event

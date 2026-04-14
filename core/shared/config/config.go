@@ -40,10 +40,13 @@ type DBConfig struct {
 }
 
 type AuthConfig struct {
-	PublicKey             string `env:"AUTH_PUBLIC_KEY"`
-	PrivateKey            string `env:"AUTH_PRIVATE_KEY"`
-	TokenIssuer           string `env:"AUTH_TOKEN_ISSUER"`
-	AccessTokenTTLSeconds int64  `env:"AUTH_ACCESS_TOKEN_TTL_SECONDS"`
+	AccessPublicKey        string `env:"AUTH_ACCESS_PUBLIC_KEY"`
+	AccessPrivateKey       string `env:"AUTH_ACCESS_PRIVATE_KEY"`
+	RefreshPublicKey       string `env:"AUTH_REFRESH_PUBLIC_KEY"`
+	RefreshPrivateKey      string `env:"AUTH_REFRESH_PRIVATE_KEY"`
+	TokenIssuer            string `env:"AUTH_TOKEN_ISSUER"`
+	AccessTokenTTLSeconds  int64  `env:"AUTH_ACCESS_TOKEN_TTL_SECONDS"`
+	RefreshTokenTTLSeconds int64  `env:"AUTH_REFRESH_TOKEN_TTL_SECONDS"`
 }
 
 type KafkaConfig struct {

@@ -21,9 +21,13 @@ endpoints:
     response:
       struct: LoginResponse
       fields:
-        - name: token
+        - name: access_token
           type: string
-        - name: expires_at
+        - name: refresh_token
+          type: string
+        - name: access_expires_at
+          type: int64
+        - name: refresh_expires_at
           type: int64
 
   - name: AuthRegister
@@ -48,9 +52,13 @@ endpoints:
     response:
       struct: RegisterResponse
       fields:
-        - name: token
+        - name: access_token
           type: string
-        - name: expires_at
+        - name: refresh_token
+          type: string
+        - name: access_expires_at
+          type: int64
+        - name: refresh_expires_at
           type: int64
 
   - name: AuthLogout
@@ -71,6 +79,31 @@ endpoints:
       fields:
         - name: message
           type: string
+
+  - name: AuthRefresh
+    method: POST
+    path: /auth/refresh
+    handler: RefreshHandler
+    auth: true
+    usecase:
+      name: AuthUsecase
+      method: Refresh
+    request:
+      struct: RefreshRequest
+      fields:
+        - name: refresh_token
+          type: string
+    response:
+      struct: RefreshResponse
+      fields:
+        - name: access_token
+          type: string
+        - name: refresh_token
+          type: string
+        - name: access_expires_at
+          type: int64
+        - name: refresh_expires_at
+          type: int64
 
   - name: AuthGetProfile
     method: GET

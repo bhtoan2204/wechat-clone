@@ -6,6 +6,7 @@ import (
 	"go-socket/core/modules/ledger/domain/entity"
 )
 
+//go:generate mockgen -package=repos -destination=payment_repo_mock.go -source=payment_repo.go
 type PaymentRepository interface {
 	CreateIntent(ctx context.Context, intent *entity.PaymentIntent) error
 	GetIntentByTransactionID(ctx context.Context, transactionID string) (*entity.PaymentIntent, error)

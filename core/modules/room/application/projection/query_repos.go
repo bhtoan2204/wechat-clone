@@ -8,6 +8,7 @@ import (
 	"go-socket/core/shared/utils"
 )
 
+//go:generate mockgen -package=projection -destination=query_repos_mock.go -source=query_repos.go
 type QueryRepos interface {
 	RoomReadRepository() RoomReadRepository
 	MessageReadRepository() MessageReadRepository
@@ -39,12 +40,14 @@ type MentionCandidateSearch struct {
 	Limit            int
 }
 
+//go:generate mockgen -package=projection -destination=query_repos_mock.go -source=query_repos.go
 type RoomReadRepository interface {
 	ListRooms(ctx context.Context, options utils.QueryOptions) ([]*views.RoomView, error)
 	ListRoomsByAccount(ctx context.Context, accountID string, options utils.QueryOptions) ([]*views.RoomView, error)
 	GetRoomByID(ctx context.Context, id string) (*views.RoomView, error)
 }
 
+//go:generate mockgen -package=projection -destination=query_repos_mock.go -source=query_repos.go
 type MessageReadRepository interface {
 	GetMessageByID(ctx context.Context, id string) (*views.MessageView, error)
 	GetLastMessage(ctx context.Context, roomID string) (*views.MessageView, error)
@@ -54,6 +57,7 @@ type MessageReadRepository interface {
 	CountUnreadMessages(ctx context.Context, roomID, accountID string, lastReadAt *time.Time) (int64, error)
 }
 
+//go:generate mockgen -package=projection -destination=query_repos_mock.go -source=query_repos.go
 type RoomMemberReadRepository interface {
 	ListRoomMembers(ctx context.Context, roomID string) ([]*views.RoomMemberView, error)
 	GetRoomMemberByAccount(ctx context.Context, roomID, accountID string) (*views.RoomMemberView, error)

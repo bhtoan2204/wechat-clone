@@ -7,6 +7,7 @@ import (
 	eventpkg "go-socket/core/shared/pkg/event"
 )
 
+//go:generate mockgen -package=repos -destination=provider_payment_repo_mock.go -source=provider_payment_repo.go
 type ProviderPaymentRepository interface {
 	CreatePaymentIntent(ctx context.Context, intent *entity.PaymentIntent, createdEvent eventpkg.Event) error
 	SavePaymentIntent(ctx context.Context, intent *entity.PaymentIntent, outboxEvents ...eventpkg.Event) error

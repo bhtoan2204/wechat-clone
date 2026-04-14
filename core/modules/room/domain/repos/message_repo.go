@@ -5,6 +5,7 @@ import (
 	"go-socket/core/modules/room/domain/entity"
 )
 
+//go:generate mockgen -package=repos -destination=message_repo_mock.go -source=message_repo.go
 type MessageRepository interface {
 	CreateMessage(ctx context.Context, message *entity.MessageEntity) error
 	UpdateMessage(ctx context.Context, message *entity.MessageEntity) error

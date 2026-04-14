@@ -15,10 +15,12 @@ var (
 	ErrAggregateRootNil = errors.New("aggregate root can not be nil")
 )
 
+//go:generate mockgen -package=event -destination=publisher_mock.go -source=publisher.go
 type Store interface {
 	Append(ctx context.Context, event Event) error
 }
 
+//go:generate mockgen -package=event -destination=publisher_mock.go -source=publisher.go
 type Publisher interface {
 	Publish(ctx context.Context, events ...Event) error
 	PublishAggregate(ctx context.Context, agg Aggregate) error

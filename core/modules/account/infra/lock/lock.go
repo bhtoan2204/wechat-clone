@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
+//go:generate mockgen -package=lock -destination=lock_mock.go -source=lock.go
 type Lock interface {
 	AcquireLock(ctx context.Context, key, value string, expiration, retryDelay, timeout time.Duration) (bool, error)
 	ReleaseLock(ctx context.Context, key, value string) (bool, error)

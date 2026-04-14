@@ -17,6 +17,7 @@ type accountHTTPServer struct {
 	login              cqrs.Dispatcher[*in.LoginRequest, *out.LoginResponse]
 	register           cqrs.Dispatcher[*in.RegisterRequest, *out.RegisterResponse]
 	logout             cqrs.Dispatcher[*in.LogoutRequest, *out.LogoutResponse]
+	refresh            cqrs.Dispatcher[*in.RefreshRequest, *out.RefreshResponse]
 	getProfile         cqrs.Dispatcher[*in.GetProfileRequest, *out.GetProfileResponse]
 	updateProfile      cqrs.Dispatcher[*in.UpdateProfileRequest, *out.UpdateProfileResponse]
 	verifyEmail        cqrs.Dispatcher[*in.VerifyEmailRequest, *out.VerifyEmailResponse]
@@ -31,6 +32,7 @@ func NewHTTPServer(
 	login cqrs.Dispatcher[*in.LoginRequest, *out.LoginResponse],
 	register cqrs.Dispatcher[*in.RegisterRequest, *out.RegisterResponse],
 	logout cqrs.Dispatcher[*in.LogoutRequest, *out.LogoutResponse],
+	refresh cqrs.Dispatcher[*in.RefreshRequest, *out.RefreshResponse],
 	getProfile cqrs.Dispatcher[*in.GetProfileRequest, *out.GetProfileResponse],
 	updateProfile cqrs.Dispatcher[*in.UpdateProfileRequest, *out.UpdateProfileResponse],
 	verifyEmail cqrs.Dispatcher[*in.VerifyEmailRequest, *out.VerifyEmailResponse],
@@ -44,6 +46,7 @@ func NewHTTPServer(
 		login:              login,
 		register:           register,
 		logout:             logout,
+		refresh:            refresh,
 		getProfile:         getProfile,
 		updateProfile:      updateProfile,
 		verifyEmail:        verifyEmail,
@@ -60,7 +63,7 @@ func (s *accountHTTPServer) RegisterPublicRoutes(routes *gin.RouterGroup) {
 }
 
 func (s *accountHTTPServer) RegisterPrivateRoutes(routes *gin.RouterGroup) {
-	accounthttp.RegisterPrivateRoutes(routes, s.logout, s.getProfile, s.updateProfile, s.verifyEmail, s.changePassword, s.getAvatar, s.createPresignedUrl, s.searchUsers)
+	accounthttp.RegisterPrivateRoutes(routes, s.logout, s.refresh, s.getProfile, s.updateProfile, s.verifyEmail, s.changePassword, s.getAvatar, s.createPresignedUrl, s.searchUsers)
 }
 
 func (s *accountHTTPServer) Stop(_ context.Context) error {

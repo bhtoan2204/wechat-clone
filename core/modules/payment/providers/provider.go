@@ -44,6 +44,7 @@ type PaymentResult struct {
 	ExternalRef   string
 }
 
+//go:generate mockgen -package=providers -destination=provider_mock.go -source=provider.go
 type PaymentProvider interface {
 	Name() string
 	CreatePayment(ctx context.Context, req CreatePaymentRequest) (*CreatePaymentResponse, error)

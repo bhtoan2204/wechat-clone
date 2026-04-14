@@ -12,3 +12,10 @@ func FormatTime(t *time.Time) string {
 func NowUTC() time.Time {
 	return time.Now().UTC()
 }
+
+func FormatOptionalTime(value *time.Time) string {
+	if value == nil || value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
+}

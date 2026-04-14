@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
+//go:generate mockgen -package=messaging -destination=producer_mock.go -source=producer.go
 type Producer interface {
 	Produce(ctx context.Context, topic string, key string, v interface{}) error
 	Close(ctx context.Context)

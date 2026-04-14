@@ -31,10 +31,13 @@ type RegisterAccountCommand struct {
 }
 
 type RegistrationResult struct {
-	Token     string
-	ExpiresAt time.Time
+	AccessToken      string
+	RefreshToken     string
+	AccessExpiresAt  time.Time
+	RefreshExpiresAt time.Time
 }
 
+//go:generate mockgen -package=service -destination=registration_service_mock.go -source=registration_service.go
 type RegistrationService interface {
 	Register(ctx context.Context, command RegisterAccountCommand) (*RegistrationResult, error)
 }
@@ -156,13 +159,20 @@ func (s *registrationService) persistRegisteredAggregate(ctx context.Context, ac
 }
 
 func (s *registrationService) issueRegistrationSession(ctx context.Context, accountSnapshot *entity.Account) (*RegistrationResult, error) {
-	token, expiresAt, err := s.paseto.GenerateToken(ctx, accountSnapshot)
+	accessToken, accessExpiresAt, err := s.paseto.GenerateAccessToken(ctx, accountSnapshot)
+	if err != nil {
+		return nil, stackErr.Error(fmt.Errorf("generate token failed: %v", err))
+	}
+
+	refreshToken, refrestExpiresAt, err := s.paseto.GenerateAccessToken(ctx, accountSnapshot)
 	if err != nil {
 		return nil, stackErr.Error(fmt.Errorf("generate token failed: %v", err))
 	}
 
 	return &RegistrationResult{
-		Token:     token,
-		ExpiresAt: expiresAt,
+		AccessToken:      accessToken,
+		AccessExpiresAt:  accessExpiresAt,
+		RefreshToken:     refreshToken,
+		RefreshExpiresAt: refrestExpiresAt,
 	}, nil
 }

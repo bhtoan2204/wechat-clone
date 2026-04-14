@@ -28,10 +28,12 @@ func buildHTTPServer(_ context.Context, appContext *appCtx.AppContext) (http.HTT
 	confirmVerifyEmail := cqrs.NewDispatcher(command.NewConfirmVerifyEmailHandler(appContext, accountRepos, accountServices))
 	changePassword := cqrs.NewDispatcher(command.NewChangePasswordHandler(appContext, accountRepos, accountServices))
 	searchUsers := cqrs.NewDispatcher(query.NewSearchUsers(appContext, accountRepos, accountServices))
+	refresh := cqrs.NewDispatcher(command.NewRefresh(appContext, accountRepos, accountServices))
 	server, err := accountserver.NewHTTPServer(
 		login,
 		register,
 		logout,
+		refresh,
 		getProfile,
 		updateProfile,
 		verifyEmail,

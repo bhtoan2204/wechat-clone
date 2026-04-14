@@ -14,6 +14,7 @@ import (
 
 var _ Cache = (*cache)(nil)
 
+//go:generate mockgen -package=cache -destination=cache_mock.go -source=cache.go
 type Cache interface {
 	Get(ctx context.Context, key string) ([]byte, error)
 	Set(ctx context.Context, key string, value []byte) error

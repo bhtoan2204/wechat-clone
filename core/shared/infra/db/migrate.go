@@ -20,6 +20,7 @@ var onceIns sync.Once
 var singleton MigrateTool
 var mutex = &sync.Mutex{}
 
+//go:generate mockgen -package=db -destination=migrate_mock.go -source=migrate.go
 type MigrateTool interface {
 	Migrate(source, connStr string) error
 }

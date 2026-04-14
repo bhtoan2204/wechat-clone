@@ -10,6 +10,7 @@ import (
 
 var ErrAccountEmailAlreadyExists = errors.New("account email already exists")
 
+//go:generate mockgen -package=service -destination=email_uniqueness_mock.go -source=email_uniqueness.go
 type EmailUniquenessChecker interface {
 	IsEmailExists(ctx context.Context, email string) (bool, error)
 }

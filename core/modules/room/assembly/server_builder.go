@@ -34,7 +34,7 @@ func buildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 	updateRoom := cqrs.NewDispatcher(roomcommand.NewUpdateRoomHandler(roomRepos))
 	deleteRoom := cqrs.NewDispatcher(roomcommand.NewDeleteRoomHandler(roomRepos))
 	getRoom := cqrs.NewDispatcher(roomquery.NewGetRoomHandler(roomQueryService))
-	listRoom := cqrs.NewDispatcher(roomquery.NewListRoomHandler(roomQueryService))
+	listRoom := cqrs.NewDispatcher(roomquery.NewListRoomsHandler(roomQueryService))
 	createDirectConversation := cqrs.NewDispatcher(roomcommand.NewCreateDirectConversationHandler(roomRepos))
 	createGroupChat := cqrs.NewDispatcher(roomcommand.NewCreateGroupChatHandler(roomRepos))
 	updateGroupChat := cqrs.NewDispatcher(roomcommand.NewUpdateGroupChatHandler(roomRepos))

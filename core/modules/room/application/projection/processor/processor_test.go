@@ -6,48 +6,18 @@ import (
 	roomprojection "go-socket/core/modules/room/application/projection"
 	"strings"
 	"testing"
+
+	"go.uber.org/mock/gomock"
 )
 
-type servingProjectorStub struct {
-	roomSync    *roomprojection.RoomAggregateSync
-	messageSync *roomprojection.MessageAggregateSync
-	deletedRoom string
-}
-
-func (s *servingProjectorStub) SyncRoomAggregate(_ context.Context, projection *roomprojection.RoomAggregateSync) error {
-	s.roomSync = projection
-	return nil
-}
-
-func (s *servingProjectorStub) DeleteRoomAggregate(_ context.Context, roomID string) error {
-	s.deletedRoom = roomID
-	return nil
-}
-
-func (s *servingProjectorStub) SyncMessageAggregate(_ context.Context, projection *roomprojection.MessageAggregateSync) error {
-	s.messageSync = projection
-	return nil
-}
-
-type searchIndexerStub struct {
-	message *roomprojection.MessageProjection
-	roomID  string
-}
-
-func (s *searchIndexerStub) SyncMessage(_ context.Context, message *roomprojection.MessageProjection) error {
-	s.message = message
-	return nil
-}
-
-func (s *searchIndexerStub) DeleteRoom(_ context.Context, roomID string) error {
-	s.roomID = roomID
-	return nil
-}
-
 func TestHandleRoomOutboxEventProjectsServingAndSearchSnapshots(t *testing.T) {
-	serving := &servingProjectorStub{}
-	search := &searchIndexerStub{}
-	processor := &processor{
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	serving := roomprojection.NewMockServingProjector(ctrl)
+	search := roomprojection.NewMockMessageSearchIndexer(ctrl)
+
+	p := &processor{
 		servingProjector: serving,
 		searchIndexer:    search,
 	}
@@ -91,34 +61,46 @@ func TestHandleRoomOutboxEventProjectsServingAndSearchSnapshots(t *testing.T) {
 		"created_at": "2026-04-12T12:00:00Z"
 	}`)
 
-	if err := processor.handleRoomOutboxEvent(context.Background(), raw); err != nil {
+	serving.EXPECT().
+		SyncMessageAggregate(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, projection *roomprojection.MessageAggregateSync) error {
+			if projection == nil || projection.Message == nil {
+				t.Fatalf("expected message projection")
+			}
+			if projection.Message.RoomID != "room-1" || projection.Message.MessageID != "msg-1" {
+				t.Fatalf("unexpected message projection %+v", projection.Message)
+			}
+			if !projection.Message.MentionAll {
+				t.Fatalf("expected mention_all to be projected")
+			}
+			if got := len(projection.Message.MentionedAccountIDs); got != 3 {
+				t.Fatalf("expected mentioned_account_ids to be preserved, got %+v", projection.Message.MentionedAccountIDs)
+			}
+			if got := len(projection.Receipts); got != 1 || projection.Receipts[0].AccountID != "acc-2" {
+				t.Fatalf("expected receipt snapshot to be projected, got %+v", projection.Receipts)
+			}
+			return nil
+		}).
+		Times(1)
+
+	search.EXPECT().
+		SyncMessage(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, message *roomprojection.MessageProjection) error {
+			if message == nil {
+				t.Fatalf("expected search message to be indexed")
+			}
+			if message.RoomName != "Backend" {
+				t.Fatalf("expected room_name Backend, got %q", message.RoomName)
+			}
+			if message.ReplyToMessageID != "msg-0" {
+				t.Fatalf("expected reply_to_message_id msg-0, got %q", message.ReplyToMessageID)
+			}
+			return nil
+		}).
+		Times(1)
+
+	if err := p.handleRoomOutboxEvent(context.Background(), raw); err != nil {
 		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if serving.messageSync == nil {
-		t.Fatalf("expected serving snapshot to be written")
-	}
-	if serving.messageSync.Message == nil || serving.messageSync.Message.RoomID != "room-1" || serving.messageSync.Message.MessageID != "msg-1" {
-		t.Fatalf("unexpected message projection %+v", serving.messageSync.Message)
-	}
-	if !serving.messageSync.Message.MentionAll {
-		t.Fatalf("expected mention_all to be projected")
-	}
-	if len(serving.messageSync.Message.MentionedAccountIDs) != 3 {
-		t.Fatalf("expected mentioned_account_ids to be preserved, got %+v", serving.messageSync.Message.MentionedAccountIDs)
-	}
-	if len(serving.messageSync.Receipts) != 1 || serving.messageSync.Receipts[0].AccountID != "acc-2" {
-		t.Fatalf("expected receipt snapshot to be projected, got %+v", serving.messageSync.Receipts)
-	}
-
-	if search.message == nil {
-		t.Fatalf("expected search message to be indexed")
-	}
-	if search.message.RoomName != "Backend" {
-		t.Fatalf("expected room_name Backend, got %q", search.message.RoomName)
-	}
-	if search.message.ReplyToMessageID != "msg-0" {
-		t.Fatalf("expected reply_to_message_id msg-0, got %q", search.message.ReplyToMessageID)
 	}
 }
 
@@ -143,6 +125,7 @@ func TestMessageProjectionJSONUsesSnakeCaseFields(t *testing.T) {
 	}
 
 	jsonText := string(payload)
+
 	for _, expected := range []string{
 		`"room_id":"room-1"`,
 		`"message_id":"msg-1"`,
@@ -157,7 +140,12 @@ func TestMessageProjectionJSONUsesSnakeCaseFields(t *testing.T) {
 		}
 	}
 
-	for _, unexpected := range []string{`"RoomID"`, `"MessageID"`, `"MessageSenderID"`, `"AccountID"`} {
+	for _, unexpected := range []string{
+		`"RoomID"`,
+		`"MessageID"`,
+		`"MessageSenderID"`,
+		`"AccountID"`,
+	} {
 		if strings.Contains(jsonText, unexpected) {
 			t.Fatalf("expected json payload to avoid Go field name %s, got %s", unexpected, jsonText)
 		}

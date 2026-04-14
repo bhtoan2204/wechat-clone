@@ -18,6 +18,7 @@ var sendNotification = func(
 	return lib.SendNotificationWithContext(ctx, payload, subscription, options)
 }
 
+//go:generate mockgen -package=webpush -destination=webpush_mock.go -source=webpush.go
 type WebPushService interface {
 	Send(ctx context.Context, payload []byte, subscription *lib.Subscription) error
 }

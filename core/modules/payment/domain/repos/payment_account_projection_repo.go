@@ -5,6 +5,7 @@ import (
 	"go-socket/core/modules/payment/domain/entity"
 )
 
+//go:generate mockgen -package=repos -destination=payment_account_projection_repo_mock.go -source=payment_account_projection_repo.go
 type PaymentAccountProjectionRepository interface {
 	GetAccountProjectionByAccountID(ctx context.Context, accountID string) (*entity.PaymentAccount, error)
 	CreateAccountProjection(ctx context.Context, accountProjection *entity.PaymentAccount) error

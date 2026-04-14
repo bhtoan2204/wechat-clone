@@ -26,10 +26,12 @@ type EmailVerificationTokenPayload struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
+//go:generate mockgen -package=service -destination=email_verification_service_mock.go -source=email_verification_service.go
 type Mailer interface {
 	Send(ctx context.Context, to, subject, body string) error
 }
 
+//go:generate mockgen -package=service -destination=email_verification_service_mock.go -source=email_verification_service.go
 type EmailVerificationService interface {
 	SendVerificationEmail(ctx context.Context, account *entity.Account, now time.Time) (string, time.Time, error)
 	ConsumeVerificationToken(ctx context.Context, token string) (*EmailVerificationTokenPayload, error)

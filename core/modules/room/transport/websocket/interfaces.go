@@ -2,6 +2,7 @@ package socket
 
 import "context"
 
+//go:generate mockgen -package=socket -destination=interfaces_mock.go -source=interfaces.go
 type IClient interface {
 	GetID() string
 	GetUserID() string
@@ -11,6 +12,7 @@ type IClient interface {
 	Close(ctx context.Context)
 }
 
+//go:generate mockgen -package=socket -destination=interfaces_mock.go -source=interfaces.go
 type IRoom interface {
 	GetID() string
 	AddClient(ctx context.Context, client IClient)
@@ -20,6 +22,7 @@ type IRoom interface {
 	ClientCount() int
 }
 
+//go:generate mockgen -package=socket -destination=interfaces_mock.go -source=interfaces.go
 type IHub interface {
 	Register(ctx context.Context, client IClient)
 	Unregister(ctx context.Context, client IClient)

@@ -13,6 +13,7 @@ type RegisterEventsFunc = func(events ...interface{}) error
 
 var _ Serializer = (*serializer)(nil)
 
+//go:generate mockgen -package=event -destination=serializer_mock.go -source=serializer.go
 type Serializer interface {
 	ToEventsFunc(events ...interface{}) []eventFunc
 	RegisterAggregate(agg BaseAggregate) error

@@ -26,7 +26,7 @@ func AuthenMiddleware(appCtx *appCtx.AppContext) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
 		}
-		claims, err := appCtx.GetPaseto().ParseToken(c.Request.Context(), token)
+		claims, err := appCtx.GetPaseto().ParseAccessToken(c.Request.Context(), token)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return

@@ -2,11 +2,13 @@ package messaging
 
 import (
 	"context"
-	"go-socket/core/modules/notification/application/dto/out"
+	"go-socket/core/modules/notification/application/adapter"
 	"go-socket/core/modules/notification/domain/entity"
+	"go-socket/core/modules/notification/domain/repos"
 	sharedevents "go-socket/core/shared/contracts/events"
-	"go-socket/core/shared/utils"
 	"testing"
+
+	"go.uber.org/mock/gomock"
 )
 
 func TestDecodeAccountCreatedPayloadObject(t *testing.T) {
@@ -54,38 +56,17 @@ func TestDecodeAccountCreatedPayloadEmpty(t *testing.T) {
 	}
 }
 
-type emailSenderStub struct {
-	to      string
-	subject string
-	body    string
-	called  bool
-}
-
-func (s *emailSenderStub) Send(_ context.Context, to, subject, body string) error {
-	s.called = true
-	s.to = to
-	s.subject = subject
-	s.body = body
-	return nil
-}
-
-type notificationRepoStub struct {
-	created []*entity.NotificationEntity
-}
-
-func (s *notificationRepoStub) CreateNotification(_ context.Context, notification *entity.NotificationEntity) error {
-	s.created = append(s.created, notification)
-	return nil
-}
-
-func (s *notificationRepoStub) ListNotifications(context.Context, utils.QueryOptions) ([]*out.NotificationResponse, error) {
-	return nil, nil
-}
-
 func TestHandleAccountEventWithLowercaseFields(t *testing.T) {
-	stub := &emailSenderStub{}
-	repo := &notificationRepoStub{}
-	handler := &messageHandler{emailSender: stub, notificationRepo: repo}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	emailSender := adapter.NewMockEmailSender(ctrl)
+	notificationRepo := repos.NewMockNotificationRepository(ctrl)
+
+	handler := &messageHandler{
+		emailSender:      emailSender,
+		notificationRepo: notificationRepo,
+	}
 
 	raw := []byte(`{
 		"id": 1,
@@ -97,27 +78,35 @@ func TestHandleAccountEventWithLowercaseFields(t *testing.T) {
 		"created_at": "2026-03-03T13:05:32.218937909+07:00"
 	}`)
 
+	emailSender.EXPECT().
+		Send(gomock.Any(), "b@example.com", "Welcome to Go Socket", gomock.Any()).
+		Return(nil).
+		Times(1)
+
+	notificationRepo.EXPECT().
+		CreateNotification(gomock.Any(), gomock.AssignableToTypeOf(&entity.NotificationEntity{})).
+		DoAndReturn(func(_ context.Context, n *entity.NotificationEntity) error {
+			if n == nil {
+				t.Fatalf("expected notification entity")
+			}
+			return nil
+		}).
+		Times(1)
+
 	if err := handler.handleAccountEvent(context.Background(), raw); err != nil {
 		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if !stub.called {
-		t.Fatalf("expected email sender to be called")
-	}
-	if stub.to != "b@example.com" {
-		t.Fatalf("expected email recipient b@example.com, got %s", stub.to)
-	}
-	if stub.subject != "Welcome to Go Socket" {
-		t.Fatalf("expected welcome subject, got %s", stub.subject)
-	}
-	if len(repo.created) != 1 {
-		t.Fatalf("expected notification to be created")
 	}
 }
 
 func TestHandleRoomOutboxEventCreatesMentionNotifications(t *testing.T) {
-	repo := &notificationRepoStub{}
-	handler := &messageHandler{notificationRepo: repo}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	notificationRepo := repos.NewMockNotificationRepository(ctrl)
+
+	handler := &messageHandler{
+		notificationRepo: notificationRepo,
+	}
 
 	raw := []byte(`{
 		"id": 11,
@@ -142,20 +131,30 @@ func TestHandleRoomOutboxEventCreatesMentionNotifications(t *testing.T) {
 		"created_at": "2026-04-12T10:00:00Z"
 	}`)
 
+	callCount := 0
+	notificationRepo.EXPECT().
+		CreateNotification(gomock.Any(), gomock.AssignableToTypeOf(&entity.NotificationEntity{})).
+		DoAndReturn(func(_ context.Context, n *entity.NotificationEntity) error {
+			callCount++
+
+			if n.Type != "room.mention" {
+				t.Fatalf("expected room.mention, got %s", n.Type)
+			}
+			if n.Subject != "Alice mentioned you in Backend" {
+				t.Fatalf("unexpected subject %q", n.Subject)
+			}
+			if n.Body != "hello team" {
+				t.Fatalf("unexpected body %q", n.Body)
+			}
+			return nil
+		}).
+		Times(2)
+
 	if err := handler.handleRoomOutboxEvent(context.Background(), raw); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(repo.created) != 2 {
-		t.Fatalf("expected 2 mention notifications, got %d", len(repo.created))
-	}
-	if repo.created[0].Type != "room.mention" {
-		t.Fatalf("expected room mention notification type, got %s", repo.created[0].Type)
-	}
-	if repo.created[0].Subject != "Alice mentioned you in Backend" {
-		t.Fatalf("unexpected subject %q", repo.created[0].Subject)
-	}
-	if repo.created[0].Body != "hello team" {
-		t.Fatalf("unexpected body %q", repo.created[0].Body)
+	if callCount != 2 {
+		t.Fatalf("expected 2 notifications, got %d", callCount)
 	}
 }

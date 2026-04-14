@@ -8,6 +8,7 @@ import (
 	"go-socket/core/shared/pkg/stackErr"
 )
 
+//go:generate mockgen -package=service -destination=password_reuse_mock.go -source=password_reuse.go
 type PasswordReuseChecker interface {
 	Verify(ctx context.Context, val string, hash string) (bool, error)
 }

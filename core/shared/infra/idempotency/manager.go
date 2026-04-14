@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+//go:generate mockgen -package=idempotency -destination=manager_mock.go -source=manager.go
 type Store interface {
 	TryLock(ctx context.Context, key string, ttl time.Duration) (bool, error)
 	MarkDone(ctx context.Context, key string, ttl time.Duration) error

@@ -11,12 +11,14 @@ const (
 	EventMessageAggregateProjectionSynced = "EventMessageAggregateProjectionSynced"
 )
 
+//go:generate mockgen -package=projection -destination=contracts_mock.go -source=contracts.go
 type ServingProjector interface {
 	SyncRoomAggregate(ctx context.Context, projection *RoomAggregateSync) error
 	DeleteRoomAggregate(ctx context.Context, roomID string) error
 	SyncMessageAggregate(ctx context.Context, projection *MessageAggregateSync) error
 }
 
+//go:generate mockgen -package=projection -destination=contracts_mock.go -source=contracts.go
 type MessageSearchIndexer interface {
 	SyncMessage(ctx context.Context, message *MessageProjection) error
 	DeleteRoom(ctx context.Context, roomID string) error

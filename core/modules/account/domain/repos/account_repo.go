@@ -5,6 +5,7 @@ import (
 	"go-socket/core/modules/account/domain/entity"
 )
 
+//go:generate mockgen -package=repos -destination=account_repo_mock.go -source=account_repo.go
 type AccountRepository interface {
 	GetAccountByID(ctx context.Context, id string) (*entity.Account, error)
 	GetAccountByEmail(ctx context.Context, email string) (*entity.Account, error)

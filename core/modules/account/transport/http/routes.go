@@ -24,6 +24,7 @@ func RegisterPublicRoutes(
 func RegisterPrivateRoutes(
 	routes *gin.RouterGroup,
 	logout cqrs.Dispatcher[*in.LogoutRequest, *out.LogoutResponse],
+	refresh cqrs.Dispatcher[*in.RefreshRequest, *out.RefreshResponse],
 	getProfile cqrs.Dispatcher[*in.GetProfileRequest, *out.GetProfileResponse],
 	updateProfile cqrs.Dispatcher[*in.UpdateProfileRequest, *out.UpdateProfileResponse],
 	verifyEmail cqrs.Dispatcher[*in.VerifyEmailRequest, *out.VerifyEmailResponse],
@@ -33,6 +34,7 @@ func RegisterPrivateRoutes(
 	searchUsers cqrs.Dispatcher[*in.SearchUsersRequest, *out.SearchUsersResponse],
 ) {
 	routes.POST("/auth/logout", httpx.Wrap(handler.NewLogoutHandler(logout)))
+	routes.POST("/auth/refresh", httpx.Wrap(handler.NewRefreshHandler(refresh)))
 	routes.GET("/account/profile", httpx.Wrap(handler.NewGetProfileHandler(getProfile)))
 	routes.PUT("/account/profile", httpx.Wrap(handler.NewUpdateProfileHandler(updateProfile)))
 	routes.POST("/account/verify-email", httpx.Wrap(handler.NewVerifyEmailHandler(verifyEmail)))

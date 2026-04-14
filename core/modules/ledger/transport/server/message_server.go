@@ -7,6 +7,7 @@ import (
 	"go-socket/core/shared/pkg/stackErr"
 )
 
+//go:generate mockgen -package=server -destination=message_server_mock.go -source=message_server.go
 type Server interface {
 	Start() error
 	Stop() error

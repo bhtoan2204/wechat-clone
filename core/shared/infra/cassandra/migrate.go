@@ -26,6 +26,7 @@ type Migration struct {
 	Statements []string
 }
 
+//go:generate mockgen -package=cassandra -destination=migrate_mock.go -source=migrate.go
 type MigrateTool interface {
 	Migrate(ctx context.Context, session *gocql.Session, migrationTable string, migrations []Migration) error
 	MigrateFromSource(ctx context.Context, session *gocql.Session, migrationTable string, source string) error

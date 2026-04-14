@@ -27,10 +27,13 @@ type AuthenticateAccountCommand struct {
 }
 
 type AuthenticationResult struct {
-	Token     string
-	ExpiresAt time.Time
+	AccessToken      string
+	RefreshToken     string
+	AccessExpiresAt  time.Time
+	RefreshExpiresAt time.Time
 }
 
+//go:generate mockgen -package=service -destination=authentication_service_mock.go -source=authentication_service.go
 type AuthenticationService interface {
 	Authenticate(ctx context.Context, command AuthenticateAccountCommand) (*AuthenticationResult, error)
 }
@@ -81,14 +84,21 @@ func (s *authenticationService) Authenticate(ctx context.Context, command Authen
 		return nil, stackErr.Error(err)
 	}
 
-	token, expiresAt, err := s.paseto.GenerateToken(ctx, accountSnapshot)
+	accessToken, accessExpiresAt, err := s.paseto.GenerateAccessToken(ctx, accountSnapshot)
+	if err != nil {
+		return nil, stackErr.Error(fmt.Errorf("generate token failed: %v", err))
+	}
+
+	refreshToken, refrestExpiresAt, err := s.paseto.GenerateAccessToken(ctx, accountSnapshot)
 	if err != nil {
 		return nil, stackErr.Error(fmt.Errorf("generate token failed: %v", err))
 	}
 
 	return &AuthenticationResult{
-		Token:     token,
-		ExpiresAt: expiresAt,
+		AccessToken:      accessToken,
+		AccessExpiresAt:  accessExpiresAt,
+		RefreshToken:     refreshToken,
+		RefreshExpiresAt: refrestExpiresAt,
 	}, nil
 }
 

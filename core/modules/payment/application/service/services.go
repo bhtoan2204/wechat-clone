@@ -5,6 +5,7 @@ import (
 	domainservice "go-socket/core/modules/payment/domain/service"
 )
 
+//go:generate mockgen -package=service -destination=services_mock.go -source=services.go
 type Services interface {
 	PaymentCommandService() PaymentCommandService
 }

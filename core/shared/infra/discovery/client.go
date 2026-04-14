@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
+//go:generate mockgen -package=discovery -destination=client_mock.go -source=client.go
 type ConsulClient interface {
 	RegisterService(ctx context.Context, serviceID string, serviceName string, serviceAddress string, servicePort int) error
 	UnregisterService(ctx context.Context, serviceID string) error
