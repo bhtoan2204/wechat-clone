@@ -54,11 +54,9 @@ func TestCreatePaymentUsesStripeGoCheckoutSession(t *testing.T) {
 	}
 
 	response, err := provider.CreatePayment(context.Background(), providers.CreatePaymentRequest{
-		TransactionID:   "tx_123",
-		Amount:          5000,
-		Currency:        "USD",
-		DebitAccountID:  "acc_debit",
-		CreditAccountID: "acc_credit",
+		TransactionID: "tx_123",
+		Amount:        5000,
+		Currency:      "USD",
 		Metadata: map[string]string{
 			"product_name":           "Wallet top up",
 			"customer_email":         "buyer@example.com",
@@ -246,5 +244,21 @@ func TestVerifyWebhookRejectsInvalidSignature(t *testing.T) {
 	_, err := provider.VerifyWebhook(context.Background(), []byte(`{"id":"evt_test_123"}`), "t=1,v1=bad")
 	if !errors.Is(err, providers.ErrInvalidWebhookSignature) {
 		t.Fatalf("expected invalid webhook signature error, got %v", err)
+	}
+}
+
+func TestParseUnsupportedStripeEventIgnored(t *testing.T) {
+	provider := &Provider{}
+
+	_, err := provider.ParseEvent(context.Background(), &providers.WebhookEvent{
+		Provider:  ProviderName,
+		EventID:   "evt_test_ignore_123",
+		EventType: "payment_intent.created",
+		Attributes: map[string]string{
+			"object": `{}`,
+		},
+	})
+	if !errors.Is(err, providers.ErrWebhookEventIgnored) {
+		t.Fatalf("expected ignored webhook event error, got %v", err)
 	}
 }

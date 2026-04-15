@@ -11,7 +11,7 @@ import (
 func TestNewPaymentIntentNormalizesFields(t *testing.T) {
 	now := time.Date(2026, 4, 5, 10, 0, 0, 0, time.UTC)
 
-	intent, err := NewPaymentIntent(" txn-1 ", " STRIPE ", 100, " vnd ", " debit ", " credit ", now)
+	intent, err := NewProviderTopUpIntent(" txn-1 ", " STRIPE ", 100, " vnd ", " credit ", now)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -25,20 +25,26 @@ func TestNewPaymentIntentNormalizesFields(t *testing.T) {
 	if intent.Currency != "VND" {
 		t.Fatalf("unexpected currency: %s", intent.Currency)
 	}
+	if intent.ClearingAccountKey != "provider:stripe" {
+		t.Fatalf("unexpected clearing account key: %s", intent.ClearingAccountKey)
+	}
+	if intent.CreditAccountID != "credit" {
+		t.Fatalf("unexpected credit account: %s", intent.CreditAccountID)
+	}
 	if intent.Status != PaymentStatusCreating {
 		t.Fatalf("unexpected status: %s", intent.Status)
 	}
 }
 
-func TestNewPaymentIntentRejectsSameAccounts(t *testing.T) {
-	_, err := NewPaymentIntent("txn-1", "stripe", 100, "VND", "same", "same", time.Now().UTC())
-	if !errors.Is(err, ErrPaymentAccountsMustDiffer) {
-		t.Fatalf("expected same-account error, got %v", err)
+func TestNewPaymentIntentRejectsMissingClearingAccountKey(t *testing.T) {
+	_, err := newPaymentIntent("txn-1", "stripe", 100, "VND", "", "credit", time.Now().UTC())
+	if !errors.Is(err, ErrPaymentClearingAccountKeyMissing) {
+		t.Fatalf("expected missing clearing account key error, got %v", err)
 	}
 }
 
 func TestPaymentIntentProviderBehaviors(t *testing.T) {
-	intent, err := NewPaymentIntent("txn-1", "stripe", 100, "VND", "debit", "credit", time.Now().UTC())
+	intent, err := NewProviderTopUpIntent("txn-1", "stripe", 100, "VND", "credit", time.Now().UTC())
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -69,7 +75,7 @@ func TestPaymentIntentProviderBehaviors(t *testing.T) {
 }
 
 func TestPaymentIntentApplyProviderResult(t *testing.T) {
-	intent, err := NewPaymentIntent("txn-1", "stripe", 100, "VND", "debit", "credit", time.Now().UTC())
+	intent, err := NewProviderTopUpIntent("txn-1", "stripe", 100, "VND", "credit", time.Now().UTC())
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -92,9 +98,34 @@ func TestPaymentIntentApplyProviderResult(t *testing.T) {
 	}
 }
 
+func TestPaymentIntentApplyProviderResultRestoresClearingAccountKey(t *testing.T) {
+	intent := &PaymentIntent{
+		TransactionID:      "txn-1",
+		Provider:           "stripe",
+		Amount:             100,
+		Currency:           "VND",
+		ClearingAccountKey: "",
+		CreditAccountID:    "credit",
+		Status:             PaymentStatusPending,
+	}
+
+	err := intent.ApplyProviderResult(PaymentProviderResult{
+		ExternalRef: "ref-1",
+		Status:      PaymentStatusSuccess,
+		Amount:      100,
+		Currency:    "VND",
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if intent.ClearingAccountKey != "provider:stripe" {
+		t.Fatalf("unexpected clearing account key: %s", intent.ClearingAccountKey)
+	}
+}
+
 func TestPaymentIntentBuildsDomainEvents(t *testing.T) {
 	now := time.Date(2026, 4, 7, 8, 0, 0, 0, time.UTC)
-	intent, err := NewPaymentIntent("txn-1", "stripe", 100, "VND", "debit", "credit", now)
+	intent, err := NewProviderTopUpIntent("txn-1", "stripe", 100, "VND", "credit", now)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

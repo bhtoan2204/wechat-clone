@@ -86,9 +86,7 @@ func (p *Provider) CreatePayment(ctx context.Context, req providers.CreatePaymen
 		CancelURL:         stripe.String(cancelURL),
 		ClientReferenceID: stripe.String(req.TransactionID),
 		Metadata: map[string]string{
-			"transaction_id":    req.TransactionID,
-			"debit_account_id":  req.DebitAccountID,
-			"credit_account_id": req.CreditAccountID,
+			"transaction_id": req.TransactionID,
 		},
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
@@ -104,9 +102,7 @@ func (p *Provider) CreatePayment(ctx context.Context, req providers.CreatePaymen
 		},
 		PaymentIntentData: &stripe.CheckoutSessionPaymentIntentDataParams{
 			Metadata: map[string]string{
-				"transaction_id":    req.TransactionID,
-				"debit_account_id":  req.DebitAccountID,
-				"credit_account_id": req.CreditAccountID,
+				"transaction_id": req.TransactionID,
 			},
 		},
 	}
@@ -238,7 +234,7 @@ func (p *Provider) ParseEvent(_ context.Context, event *providers.WebhookEvent) 
 			ExternalRef:   charge.ID,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported stripe event type: %s", event.EventType)
+		return nil, providers.ErrWebhookEventIgnored
 	}
 }
 

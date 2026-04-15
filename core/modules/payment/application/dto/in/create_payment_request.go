@@ -12,15 +12,13 @@ type CreatePaymentRequest struct {
 	Provider        string            `json:"provider" form:"provider" binding:"required"`
 	Amount          int64             `json:"amount" form:"amount" binding:"required"`
 	Currency        string            `json:"currency" form:"currency" binding:"required"`
-	DebitAccountID  string            `json:"debit_account_id" form:"debit_account_id" binding:"required"`
-	CreditAccountID string            `json:"credit_account_id" form:"credit_account_id" binding:"required"`
+	CreditAccountID string            `json:"credit_account_id" form:"credit_account_id"`
 	Metadata        map[string]string `json:"metadata" form:"metadata"`
 }
 
 func (r *CreatePaymentRequest) Normalize() {
 	r.Provider = strings.TrimSpace(r.Provider)
 	r.Currency = strings.TrimSpace(r.Currency)
-	r.DebitAccountID = strings.TrimSpace(r.DebitAccountID)
 	r.CreditAccountID = strings.TrimSpace(r.CreditAccountID)
 	for key, value := range r.Metadata {
 		r.Metadata[key] = strings.TrimSpace(value)
@@ -37,12 +35,6 @@ func (r *CreatePaymentRequest) Validate() error {
 	}
 	if r.Currency == "" {
 		return stackErr.Error(errors.New("currency is required"))
-	}
-	if r.DebitAccountID == "" {
-		return stackErr.Error(errors.New("debit_account_id is required"))
-	}
-	if r.CreditAccountID == "" {
-		return stackErr.Error(errors.New("credit_account_id is required"))
 	}
 	return nil
 }

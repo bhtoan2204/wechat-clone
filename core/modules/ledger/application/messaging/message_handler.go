@@ -102,12 +102,12 @@ func (h *messageHandler) handlePaymentOutboxEvent(ctx context.Context, value []b
 			payload.PaymentID = event.AggregateID
 		}
 		return h.ledgerService.RecordPaymentSucceeded(ctx, ledgerservice.RecordPaymentSucceededCommand{
-			PaymentID:       payload.PaymentID,
-			TransactionID:   payload.TransactionID,
-			DebitAccountID:  payload.DebitAccountID,
-			CreditAccountID: payload.CreditAccountID,
-			Amount:          payload.Amount,
-			IdempotencyKey:  payload.IdempotencyKey,
+			PaymentID:          payload.PaymentID,
+			TransactionID:      payload.TransactionID,
+			ClearingAccountKey: payload.ClearingAccountKey,
+			CreditAccountID:    payload.CreditAccountID,
+			Currency:           payload.Currency,
+			Amount:             payload.Amount,
 		})
 	default:
 		return nil

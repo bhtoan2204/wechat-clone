@@ -11,16 +11,16 @@ const (
 )
 
 type PaymentIntent struct {
-	TransactionID   string
-	Provider        string
-	ExternalRef     string
-	Amount          int64
-	Currency        string
-	DebitAccountID  string
-	CreditAccountID string
-	Status          string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	TransactionID      string
+	Provider           string
+	ExternalRef        string
+	Amount             int64
+	Currency           string
+	ClearingAccountKey string
+	CreditAccountID    string
+	Status             string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type PaymentProviderResult struct {

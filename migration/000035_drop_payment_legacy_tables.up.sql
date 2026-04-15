@@ -1,0 +1,8 @@
+DROP TABLE payment_histories CASCADE CONSTRAINTS;
+DROP TABLE payment_transactions CASCADE CONSTRAINTS;
+DROP TABLE payment_event_offsets CASCADE CONSTRAINTS;
+DROP TABLE payment_events CASCADE CONSTRAINTS;
+DROP TABLE payment_balance_snapshots CASCADE CONSTRAINTS;
+DROP TABLE payment_balances CASCADE CONSTRAINTS;
+DROP TABLE payment_aggregates CASCADE CONSTRAINTS;
+DROP TABLE payment_account_projections CASCADE CONSTRAINTS;

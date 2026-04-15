@@ -4,6 +4,7 @@ import "time"
 
 type LedgerTransactionModel struct {
 	TransactionID string    `gorm:"primaryKey"`
+	Currency      string    `gorm:"not null"`
 	CreatedAt     time.Time `gorm:"autoCreateTime"`
 }
 

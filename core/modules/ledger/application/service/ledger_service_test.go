@@ -45,6 +45,7 @@ func TestLedgerServiceCreateTransaction(t *testing.T) {
 
 		transaction, err := service.CreateTransaction(context.Background(), CreateTransactionCommand{
 			TransactionID: "ledger-tx-valid",
+			Currency:      "VND",
 			Entries: []CreateTransactionEntryCommand{
 				{AccountID: "acc-a", Amount: -100},
 				{AccountID: "acc-b", Amount: 100},
@@ -55,6 +56,9 @@ func TestLedgerServiceCreateTransaction(t *testing.T) {
 		}
 		if transaction.TransactionID != "ledger-tx-valid" {
 			t.Fatalf("expected transaction id ledger-tx-valid, got %s", transaction.TransactionID)
+		}
+		if transaction.Currency != "VND" {
+			t.Fatalf("expected currency VND, got %s", transaction.Currency)
 		}
 		if len(transaction.Entries) != 2 {
 			t.Fatalf("expected 2 entries, got %d", len(transaction.Entries))
@@ -71,6 +75,7 @@ func TestLedgerServiceCreateTransaction(t *testing.T) {
 
 		_, err := service.CreateTransaction(context.Background(), CreateTransactionCommand{
 			TransactionID: "ledger-tx-invalid",
+			Currency:      "VND",
 			Entries: []CreateTransactionEntryCommand{
 				{AccountID: "acc-a", Amount: -100},
 				{AccountID: "acc-b", Amount: 50},
@@ -101,6 +106,7 @@ func TestLedgerServiceCreateTransaction(t *testing.T) {
 
 		_, err := service.CreateTransaction(context.Background(), CreateTransactionCommand{
 			TransactionID: "ledger-tx-dup",
+			Currency:      "VND",
 			Entries: []CreateTransactionEntryCommand{
 				{AccountID: "acc-a", Amount: -100},
 				{AccountID: "acc-b", Amount: 100},
@@ -113,59 +119,129 @@ func TestLedgerServiceCreateTransaction(t *testing.T) {
 }
 
 func TestLedgerServiceRecordPaymentSucceeded(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	baseRepo := ledgerrepos.NewMockRepos(ctrl)
-	txRepos := ledgerrepos.NewMockRepos(ctrl)
-	aggregateRepo := ledgerrepos.NewMockLedgerTransactionAggregateRepository(ctrl)
-	paymentRepo := ledgerrepos.NewMockPaymentRepository(ctrl)
+	t.Run("creates payment booking on first delivery", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		baseRepo := ledgerrepos.NewMockRepos(ctrl)
+		txRepos := ledgerrepos.NewMockRepos(ctrl)
+		aggregateRepo := ledgerrepos.NewMockLedgerTransactionAggregateRepository(ctrl)
 
-	baseRepo.EXPECT().
-		WithTransaction(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, fn func(ledgerrepos.Repos) error) error {
-			return fn(txRepos)
-		})
-	txRepos.EXPECT().PaymentRepository().Return(paymentRepo).Times(2)
-	paymentRepo.EXPECT().IsProcessed(gomock.Any(), paymentSucceededSource, "payment.succeeded:pay-1").Return(false, nil)
-	txRepos.EXPECT().LedgerTransactionAggregateRepository().Return(aggregateRepo)
-	aggregateRepo.EXPECT().
-		Save(gomock.Any(), gomock.AssignableToTypeOf(&ledgeraggregate.LedgerTransactionAggregate{})).
-		DoAndReturn(func(_ context.Context, aggregate *ledgeraggregate.LedgerTransactionAggregate) error {
-			transaction, err := aggregate.Snapshot()
-			if err != nil {
-				t.Fatalf("Snapshot() error = %v", err)
-			}
-			if transaction.TransactionID != "payment:pay-1:succeeded" {
-				t.Fatalf("expected payment booking transaction id, got %s", transaction.TransactionID)
-			}
-			if len(transaction.Entries) != 2 {
-				t.Fatalf("expected 2 ledger entries, got %d", len(transaction.Entries))
-			}
-			return aggregate.AssignEntryIDs([]int64{10, 11})
-		})
-	paymentRepo.EXPECT().
-		MarkProcessed(gomock.Any(), gomock.AssignableToTypeOf(&entity.ProcessedPaymentEvent{})).
-		DoAndReturn(func(_ context.Context, event *entity.ProcessedPaymentEvent) error {
-			if event.Provider != paymentSucceededSource {
-				t.Fatalf("expected provider %s, got %s", paymentSucceededSource, event.Provider)
-			}
-			if event.TransactionID != "pay-1" {
-				t.Fatalf("expected processed payment id pay-1, got %s", event.TransactionID)
-			}
-			if event.IdempotencyKey != "payment.succeeded:pay-1" {
-				t.Fatalf("expected idempotency key payment.succeeded:pay-1, got %s", event.IdempotencyKey)
-			}
-			return nil
-		})
+		baseRepo.EXPECT().
+			WithTransaction(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(ctx context.Context, fn func(ledgerrepos.Repos) error) error {
+				return fn(txRepos)
+			})
+		txRepos.EXPECT().LedgerTransactionAggregateRepository().Return(aggregateRepo)
+		aggregateRepo.EXPECT().
+			Save(gomock.Any(), gomock.AssignableToTypeOf(&ledgeraggregate.LedgerTransactionAggregate{})).
+			DoAndReturn(func(_ context.Context, aggregate *ledgeraggregate.LedgerTransactionAggregate) error {
+				transaction, err := aggregate.Snapshot()
+				if err != nil {
+					t.Fatalf("Snapshot() error = %v", err)
+				}
+				if transaction.TransactionID != "payment:pay-1:succeeded" {
+					t.Fatalf("expected payment booking transaction id, got %s", transaction.TransactionID)
+				}
+				if len(transaction.Entries) != 2 {
+					t.Fatalf("expected 2 ledger entries, got %d", len(transaction.Entries))
+				}
+				return aggregate.AssignEntryIDs([]int64{10, 11})
+			})
 
-	service := NewLedgerService(baseRepo)
+		service := NewLedgerService(baseRepo)
 
-	err := service.RecordPaymentSucceeded(context.Background(), RecordPaymentSucceededCommand{
-		PaymentID:       "pay-1",
-		DebitAccountID:  "wallet:pending",
-		CreditAccountID: "wallet:available",
-		Amount:          100,
+		err := service.RecordPaymentSucceeded(context.Background(), RecordPaymentSucceededCommand{
+			PaymentID:          "pay-1",
+			ClearingAccountKey: "provider:stripe",
+			CreditAccountID:    "wallet:available",
+			Currency:           "VND",
+			Amount:             100,
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
 	})
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+
+	t.Run("treats duplicate delivery as idempotent when booking matches", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		baseRepo := ledgerrepos.NewMockRepos(ctrl)
+		txRepos := ledgerrepos.NewMockRepos(ctrl)
+		aggregateRepo := ledgerrepos.NewMockLedgerTransactionAggregateRepository(ctrl)
+		ledgerRepo := ledgerrepos.NewMockLedgerRepository(ctrl)
+
+		baseRepo.EXPECT().
+			WithTransaction(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(ctx context.Context, fn func(ledgerrepos.Repos) error) error {
+				return fn(txRepos)
+			})
+		txRepos.EXPECT().LedgerTransactionAggregateRepository().Return(aggregateRepo)
+		aggregateRepo.EXPECT().
+			Save(gomock.Any(), gomock.AssignableToTypeOf(&ledgeraggregate.LedgerTransactionAggregate{})).
+			Return(ledgerrepos.ErrDuplicate)
+		txRepos.EXPECT().LedgerRepository().Return(ledgerRepo)
+		ledgerRepo.EXPECT().
+			GetTransaction(gomock.Any(), "payment:pay-1:succeeded").
+			Return(&entity.LedgerTransaction{
+				TransactionID: "payment:pay-1:succeeded",
+				Currency:      "VND",
+				Entries: []*entity.LedgerEntry{
+					{TransactionID: "payment:pay-1:succeeded", AccountID: "ledger:clearing:provider:stripe", Currency: "VND", Amount: -100},
+					{TransactionID: "payment:pay-1:succeeded", AccountID: "wallet:available", Currency: "VND", Amount: 100},
+				},
+			}, nil)
+
+		service := NewLedgerService(baseRepo)
+
+		err := service.RecordPaymentSucceeded(context.Background(), RecordPaymentSucceededCommand{
+			PaymentID:          "pay-1",
+			ClearingAccountKey: "provider:stripe",
+			CreditAccountID:    "wallet:available",
+			Currency:           "VND",
+			Amount:             100,
+		})
+		if err != nil {
+			t.Fatalf("expected duplicate delivery to be idempotent, got %v", err)
+		}
+	})
+
+	t.Run("fails when duplicate booking does not match existing ledger transaction", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		baseRepo := ledgerrepos.NewMockRepos(ctrl)
+		txRepos := ledgerrepos.NewMockRepos(ctrl)
+		aggregateRepo := ledgerrepos.NewMockLedgerTransactionAggregateRepository(ctrl)
+		ledgerRepo := ledgerrepos.NewMockLedgerRepository(ctrl)
+
+		baseRepo.EXPECT().
+			WithTransaction(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(ctx context.Context, fn func(ledgerrepos.Repos) error) error {
+				return fn(txRepos)
+			})
+		txRepos.EXPECT().LedgerTransactionAggregateRepository().Return(aggregateRepo)
+		aggregateRepo.EXPECT().
+			Save(gomock.Any(), gomock.AssignableToTypeOf(&ledgeraggregate.LedgerTransactionAggregate{})).
+			Return(ledgerrepos.ErrDuplicate)
+		txRepos.EXPECT().LedgerRepository().Return(ledgerRepo)
+		ledgerRepo.EXPECT().
+			GetTransaction(gomock.Any(), "payment:pay-1:succeeded").
+			Return(&entity.LedgerTransaction{
+				TransactionID: "payment:pay-1:succeeded",
+				Currency:      "USD",
+				Entries: []*entity.LedgerEntry{
+					{TransactionID: "payment:pay-1:succeeded", AccountID: "ledger:clearing:provider:stripe", Currency: "USD", Amount: -90},
+					{TransactionID: "payment:pay-1:succeeded", AccountID: "wallet:available", Currency: "USD", Amount: 90},
+				},
+			}, nil)
+
+		service := NewLedgerService(baseRepo)
+
+		err := service.RecordPaymentSucceeded(context.Background(), RecordPaymentSucceededCommand{
+			PaymentID:          "pay-1",
+			ClearingAccountKey: "provider:stripe",
+			CreditAccountID:    "wallet:available",
+			Currency:           "VND",
+			Amount:             100,
+		})
+		if err == nil {
+			t.Fatalf("expected mismatch duplicate delivery to fail")
+		}
+	})
 }

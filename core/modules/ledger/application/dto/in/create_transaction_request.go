@@ -10,6 +10,7 @@ import (
 
 type CreateTransactionRequest struct {
 	TransactionID string               `json:"transaction_id" form:"transaction_id" binding:"required"`
+	Currency      string               `json:"currency" form:"currency" binding:"required"`
 	Entries       []LedgerEntryRequest `json:"entries" form:"entries" binding:"required"`
 }
 
@@ -24,6 +25,7 @@ func (r *LedgerEntryRequest) Normalize() {
 
 func (r *CreateTransactionRequest) Normalize() {
 	r.TransactionID = strings.TrimSpace(r.TransactionID)
+	r.Currency = strings.ToUpper(strings.TrimSpace(r.Currency))
 	for idx := range r.Entries {
 		r.Entries[idx].Normalize()
 	}
@@ -33,6 +35,9 @@ func (r *CreateTransactionRequest) Validate() error {
 	r.Normalize()
 	if r.TransactionID == "" {
 		return stackErr.Error(errors.New("transaction_id is required"))
+	}
+	if r.Currency == "" {
+		return stackErr.Error(errors.New("currency is required"))
 	}
 	if len(r.Entries) == 0 {
 		return stackErr.Error(errors.New("entries is required"))

@@ -20,6 +20,7 @@ type LedgerTransactionAggregate struct {
 	event.AggregateRoot
 
 	TransactionID string
+	Currency      string
 	CreatedAt     time.Time
 	Entries       []*entity.LedgerEntry
 }
@@ -74,6 +75,7 @@ func (a *LedgerTransactionAggregate) Create(entries []entity.LedgerEntryInput, n
 
 	return a.ApplyChange(a, &EventLedgerTransactionCreated{
 		TransactionID: transaction.TransactionID,
+		Currency:      transaction.Currency,
 		CreatedAt:     transaction.CreatedAt,
 		Entries:       payloadEntries,
 	})
@@ -96,6 +98,7 @@ func (a *LedgerTransactionAggregate) Snapshot() (*entity.LedgerTransaction, erro
 
 	return &entity.LedgerTransaction{
 		TransactionID: a.TransactionID,
+		Currency:      a.Currency,
 		CreatedAt:     a.CreatedAt,
 		Entries:       entries,
 	}, nil
@@ -128,16 +131,22 @@ func (a *LedgerTransactionAggregate) onLedgerTransactionCreated(
 	}
 
 	a.TransactionID = transactionID
+	a.Currency = entityNormalizeLedgerCurrency(data.Currency)
 	a.CreatedAt = data.CreatedAt
 	a.Entries = make([]*entity.LedgerEntry, 0, len(data.Entries))
 	for _, entry := range data.Entries {
 		a.Entries = append(a.Entries, &entity.LedgerEntry{
 			TransactionID: transactionID,
 			AccountID:     entry.AccountID,
+			Currency:      a.Currency,
 			Amount:        entry.Amount,
 			CreatedAt:     data.CreatedAt,
 		})
 	}
 
 	return nil
+}
+
+func entityNormalizeLedgerCurrency(value string) string {
+	return strings.ToUpper(strings.TrimSpace(value))
 }

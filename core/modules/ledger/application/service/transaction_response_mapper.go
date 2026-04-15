@@ -12,6 +12,7 @@ func toTransactionResponse(transaction *entity.LedgerTransaction) *ledgerout.Tra
 			ID:            entry.ID,
 			TransactionID: entry.TransactionID,
 			AccountID:     entry.AccountID,
+			Currency:      entry.Currency,
 			Amount:        entry.Amount,
 			CreatedAt:     entry.CreatedAt,
 		})
@@ -19,6 +20,7 @@ func toTransactionResponse(transaction *entity.LedgerTransaction) *ledgerout.Tra
 
 	return &ledgerout.TransactionResponse{
 		TransactionID: transaction.TransactionID,
+		Currency:      transaction.Currency,
 		CreatedAt:     transaction.CreatedAt,
 		Entries:       entries,
 	}

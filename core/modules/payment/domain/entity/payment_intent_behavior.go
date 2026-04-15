@@ -16,9 +16,8 @@ var (
 	ErrPaymentTransactionIDRequired     = errors.New("transaction_id is required")
 	ErrPaymentAmountInvalid             = errors.New("amount must be greater than 0")
 	ErrPaymentCurrencyRequired          = errors.New("currency is required")
-	ErrPaymentDebitAccountRequired      = errors.New("debit_account_id is required")
+	ErrPaymentClearingAccountKeyMissing = errors.New("clearing_account_key is required")
 	ErrPaymentCreditAccountRequired     = errors.New("credit_account_id is required")
-	ErrPaymentAccountsMustDiffer        = errors.New("debit_account_id and credit_account_id must be different")
 	ErrPaymentStatusInvalid             = errors.New("status is invalid")
 	ErrPaymentProviderAmountMismatch    = errors.New("provider amount does not match reserved payment")
 	ErrPaymentProviderCurrencyMismatch  = errors.New("provider currency does not match reserved payment")
@@ -27,11 +26,30 @@ var (
 	ErrPaymentProcessedTxnRequired      = errors.New("transaction_id is required")
 )
 
-func NewPaymentIntent(transactionID, provider string, amount int64, currency, debitAccountID, creditAccountID string, now time.Time) (*PaymentIntent, error) {
+func NewProviderTopUpIntent(
+	transactionID,
+	provider string,
+	amount int64,
+	currency,
+	beneficiaryAccountID string,
+	now time.Time,
+) (*PaymentIntent, error) {
+	return newPaymentIntent(
+		transactionID,
+		provider,
+		amount,
+		currency,
+		providerClearingAccountKey(provider),
+		beneficiaryAccountID,
+		now,
+	)
+}
+
+func newPaymentIntent(transactionID, provider string, amount int64, currency, clearingAccountKey, creditAccountID string, now time.Time) (*PaymentIntent, error) {
 	transactionID = strings.TrimSpace(transactionID)
 	provider = strings.ToLower(strings.TrimSpace(provider))
 	currency = strings.ToUpper(strings.TrimSpace(currency))
-	debitAccountID = strings.TrimSpace(debitAccountID)
+	clearingAccountKey = effectivePaymentClearingAccountKey(provider, clearingAccountKey)
 	creditAccountID = strings.TrimSpace(creditAccountID)
 
 	switch {
@@ -43,26 +61,39 @@ func NewPaymentIntent(transactionID, provider string, amount int64, currency, de
 		return nil, ErrPaymentAmountInvalid
 	case currency == "":
 		return nil, ErrPaymentCurrencyRequired
-	case debitAccountID == "":
-		return nil, ErrPaymentDebitAccountRequired
+	case clearingAccountKey == "":
+		return nil, ErrPaymentClearingAccountKeyMissing
 	case creditAccountID == "":
 		return nil, ErrPaymentCreditAccountRequired
-	case debitAccountID == creditAccountID:
-		return nil, ErrPaymentAccountsMustDiffer
 	}
 
 	now = normalizePaymentTime(now)
 	return &PaymentIntent{
-		TransactionID:   transactionID,
-		Provider:        provider,
-		Amount:          amount,
-		Currency:        currency,
-		DebitAccountID:  debitAccountID,
-		CreditAccountID: creditAccountID,
-		Status:          PaymentStatusCreating,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		TransactionID:      transactionID,
+		Provider:           provider,
+		Amount:             amount,
+		Currency:           currency,
+		ClearingAccountKey: clearingAccountKey,
+		CreditAccountID:    creditAccountID,
+		Status:             PaymentStatusCreating,
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}, nil
+}
+
+func providerClearingAccountKey(provider string) string {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" {
+		return ""
+	}
+	return fmt.Sprintf("provider:%s", provider)
+}
+
+func effectivePaymentClearingAccountKey(provider, clearingAccountKey string) string {
+	if clearingAccountKey = strings.TrimSpace(clearingAccountKey); clearingAccountKey != "" {
+		return clearingAccountKey
+	}
+	return providerClearingAccountKey(provider)
 }
 
 func NormalizePaymentStatus(status string) string {
@@ -91,6 +122,7 @@ func (p *PaymentIntent) SetProviderState(externalRef, status string, updatedAt t
 	if p == nil {
 		return ErrPaymentTransactionIDRequired
 	}
+	p.ensureWorkflowDefaults()
 
 	normalizedStatus := NormalizePaymentStatus(status)
 	if normalizedStatus == "" {
@@ -106,6 +138,9 @@ func (p *PaymentIntent) SetProviderState(externalRef, status string, updatedAt t
 }
 
 func (p *PaymentIntent) ApplyProviderResult(result PaymentProviderResult, updatedAt time.Time) error {
+	if p != nil {
+		p.ensureWorkflowDefaults()
+	}
 	if err := p.ValidateProviderResult(result.Amount, result.Currency); err != nil {
 		return stackErr.Error(err)
 	}
@@ -180,6 +215,7 @@ func (p *PaymentIntent) PaymentIdempotencyKey(eventID, externalRef string) strin
 }
 
 func (p *PaymentIntent) CreatedEvent(metadata map[string]string, createdAt time.Time) eventpkg.Event {
+	p.ensureWorkflowDefaults()
 	occurredAt := normalizePaymentTime(createdAt)
 	return eventpkg.Event{
 		AggregateID:   p.TransactionID,
@@ -187,22 +223,23 @@ func (p *PaymentIntent) CreatedEvent(metadata map[string]string, createdAt time.
 		Version:       1,
 		EventName:     sharedevents.EventPaymentCreated,
 		EventData: sharedevents.PaymentCreatedEvent{
-			PaymentID:       p.TransactionID,
-			TransactionID:   p.TransactionID,
-			Provider:        p.Provider,
-			Amount:          p.Amount,
-			Currency:        p.Currency,
-			DebitAccountID:  p.DebitAccountID,
-			CreditAccountID: p.CreditAccountID,
-			Status:          p.Status,
-			Metadata:        metadata,
-			CreatedAt:       occurredAt,
+			PaymentID:          p.TransactionID,
+			TransactionID:      p.TransactionID,
+			Provider:           p.Provider,
+			ClearingAccountKey: p.ClearingAccountKey,
+			Amount:             p.Amount,
+			Currency:           p.Currency,
+			CreditAccountID:    p.CreditAccountID,
+			Status:             p.Status,
+			Metadata:           metadata,
+			CreatedAt:          occurredAt,
 		},
 		CreatedAt: occurredAt.Unix(),
 	}
 }
 
 func (p *PaymentIntent) CheckoutSessionCreatedEvent(checkoutURL string, occurredAt time.Time) eventpkg.Event {
+	p.ensureWorkflowDefaults()
 	eventTime := normalizePaymentTime(occurredAt)
 	return eventpkg.Event{
 		AggregateID:   p.TransactionID,
@@ -225,6 +262,7 @@ func (p *PaymentIntent) CheckoutSessionCreatedEvent(checkoutURL string, occurred
 }
 
 func (p *PaymentIntent) SucceededEvent(result PaymentProviderResult, occurredAt time.Time) eventpkg.Event {
+	p.ensureWorkflowDefaults()
 	eventTime := normalizePaymentTime(occurredAt)
 	return eventpkg.Event{
 		AggregateID:   p.TransactionID,
@@ -235,12 +273,12 @@ func (p *PaymentIntent) SucceededEvent(result PaymentProviderResult, occurredAt 
 			PaymentID:          p.TransactionID,
 			TransactionID:      p.TransactionID,
 			Provider:           p.Provider,
+			ClearingAccountKey: p.ClearingAccountKey,
 			ProviderEventID:    strings.TrimSpace(result.EventID),
 			ProviderEventType:  strings.TrimSpace(result.EventType),
 			ProviderPaymentRef: coalescePaymentValue(result.ExternalRef, p.ExternalRef),
 			Amount:             p.Amount,
 			Currency:           p.Currency,
-			DebitAccountID:     p.DebitAccountID,
 			CreditAccountID:    p.CreditAccountID,
 			IdempotencyKey:     fmt.Sprintf("%s:%s", sharedevents.EventPaymentSucceeded, p.TransactionID),
 			SucceededAt:        eventTime,
@@ -250,6 +288,7 @@ func (p *PaymentIntent) SucceededEvent(result PaymentProviderResult, occurredAt 
 }
 
 func (p *PaymentIntent) FailedEvent(result PaymentProviderResult, occurredAt time.Time) eventpkg.Event {
+	p.ensureWorkflowDefaults()
 	eventTime := normalizePaymentTime(occurredAt)
 	return eventpkg.Event{
 		AggregateID:   p.TransactionID,
@@ -317,4 +356,16 @@ func coalescePaymentValue(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func (p *PaymentIntent) ensureWorkflowDefaults() {
+	if p == nil {
+		return
+	}
+	p.TransactionID = strings.TrimSpace(p.TransactionID)
+	p.Provider = strings.ToLower(strings.TrimSpace(p.Provider))
+	p.ExternalRef = strings.TrimSpace(p.ExternalRef)
+	p.Currency = strings.ToUpper(strings.TrimSpace(p.Currency))
+	p.ClearingAccountKey = effectivePaymentClearingAccountKey(p.Provider, p.ClearingAccountKey)
+	p.CreditAccountID = strings.TrimSpace(p.CreditAccountID)
 }

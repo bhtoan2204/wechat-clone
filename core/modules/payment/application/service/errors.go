@@ -8,4 +8,5 @@ var (
 	ErrTransactionNotFound   = errors.New("transaction not found")
 	ErrDuplicatePayment      = errors.New("payment already exists")
 	ErrPaymentIntentNotFound = errors.New("payment intent not found")
+	ErrPaymentUnauthorized   = errors.New("unauthorized")
 )

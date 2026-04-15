@@ -40,18 +40,19 @@ func (r *providerPaymentRepoImpl) SavePaymentIntent(ctx context.Context, intent 
 	if intent == nil {
 		return paymentrepos.ErrProviderPaymentNotFound
 	}
+	intent = normalizeProviderPaymentIntent(intent)
 
 	result := r.db.WithContext(ctx).
 		Model(&model.ProviderPaymentIntentModel{}).
 		Where("transaction_id = ?", intent.TransactionID).
 		Updates(map[string]interface{}{
-			"provider":          intent.Provider,
-			"external_ref":      toStorageExternalRef(intent.Provider, intent.TransactionID, intent.ExternalRef),
-			"amount":            intent.Amount,
-			"currency":          intent.Currency,
-			"debit_account_id":  intent.DebitAccountID,
-			"credit_account_id": intent.CreditAccountID,
-			"status":            intent.Status,
+			"provider":             intent.Provider,
+			"external_ref":         toStorageExternalRef(intent.Provider, intent.TransactionID, intent.ExternalRef),
+			"amount":               intent.Amount,
+			"currency":             intent.Currency,
+			"clearing_account_key": intent.ClearingAccountKey,
+			"credit_account_id":    intent.CreditAccountID,
+			"status":               intent.Status,
 		})
 	if result.Error != nil {
 		return mapError(result.Error)
@@ -78,17 +79,18 @@ func (r *providerPaymentRepoImpl) FinalizeSuccessfulPayment(
 }
 
 func (r *providerPaymentRepoImpl) CreateIntent(ctx context.Context, intent *entity.PaymentIntent) error {
+	intent = normalizeProviderPaymentIntent(intent)
 	err := r.db.WithContext(ctx).Create(&model.ProviderPaymentIntentModel{
-		TransactionID:   intent.TransactionID,
-		Provider:        intent.Provider,
-		ExternalRef:     toStorageExternalRef(intent.Provider, intent.TransactionID, intent.ExternalRef),
-		Amount:          intent.Amount,
-		Currency:        intent.Currency,
-		DebitAccountID:  intent.DebitAccountID,
-		CreditAccountID: intent.CreditAccountID,
-		Status:          intent.Status,
-		CreatedAt:       intent.CreatedAt,
-		UpdatedAt:       intent.UpdatedAt,
+		TransactionID:      intent.TransactionID,
+		Provider:           intent.Provider,
+		ExternalRef:        toStorageExternalRef(intent.Provider, intent.TransactionID, intent.ExternalRef),
+		Amount:             intent.Amount,
+		Currency:           intent.Currency,
+		ClearingAccountKey: intent.ClearingAccountKey,
+		CreditAccountID:    intent.CreditAccountID,
+		Status:             intent.Status,
+		CreatedAt:          intent.CreatedAt,
+		UpdatedAt:          intent.UpdatedAt,
 	}).Error
 	return mapError(err)
 }
@@ -215,18 +217,19 @@ func toProviderPaymentIntentEntity(modelIntent *model.ProviderPaymentIntentModel
 	if modelIntent.ExternalRef != nil {
 		externalRef = fromStorageExternalRef(*modelIntent.ExternalRef)
 	}
-	return &entity.PaymentIntent{
-		TransactionID:   modelIntent.TransactionID,
-		Provider:        modelIntent.Provider,
-		ExternalRef:     externalRef,
-		Amount:          modelIntent.Amount,
-		Currency:        modelIntent.Currency,
-		DebitAccountID:  modelIntent.DebitAccountID,
-		CreditAccountID: modelIntent.CreditAccountID,
-		Status:          modelIntent.Status,
-		CreatedAt:       modelIntent.CreatedAt,
-		UpdatedAt:       modelIntent.UpdatedAt,
+	intent := &entity.PaymentIntent{
+		TransactionID:      modelIntent.TransactionID,
+		Provider:           modelIntent.Provider,
+		ExternalRef:        externalRef,
+		Amount:             modelIntent.Amount,
+		Currency:           modelIntent.Currency,
+		ClearingAccountKey: modelIntent.ClearingAccountKey,
+		CreditAccountID:    modelIntent.CreditAccountID,
+		Status:             modelIntent.Status,
+		CreatedAt:          modelIntent.CreatedAt,
+		UpdatedAt:          modelIntent.UpdatedAt,
 	}
+	return normalizeProviderPaymentIntent(intent)
 }
 
 func toStorageExternalRef(provider, transactionID, externalRef string) *string {
@@ -244,4 +247,19 @@ func fromStorageExternalRef(value string) string {
 		return ""
 	}
 	return value
+}
+
+func normalizeProviderPaymentIntent(intent *entity.PaymentIntent) *entity.PaymentIntent {
+	if intent == nil {
+		return nil
+	}
+	intent.Provider = strings.ToLower(strings.TrimSpace(intent.Provider))
+	intent.TransactionID = strings.TrimSpace(intent.TransactionID)
+	intent.ExternalRef = strings.TrimSpace(intent.ExternalRef)
+	intent.Currency = strings.ToUpper(strings.TrimSpace(intent.Currency))
+	intent.CreditAccountID = strings.TrimSpace(intent.CreditAccountID)
+	if strings.TrimSpace(intent.ClearingAccountKey) == "" && intent.Provider != "" {
+		intent.ClearingAccountKey = fmt.Sprintf("provider:%s", intent.Provider)
+	}
+	return intent
 }
