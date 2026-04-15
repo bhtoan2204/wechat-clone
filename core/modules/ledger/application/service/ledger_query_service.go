@@ -19,19 +19,24 @@ func NewLedgerQueryService(baseRepo ledgerrepos.Repos) *LedgerQueryService {
 	return &LedgerQueryService{baseRepo: baseRepo}
 }
 
-func (s *LedgerQueryService) GetAccountBalance(ctx context.Context, accountID string) (*ledgerout.AccountBalanceResponse, error) {
+func (s *LedgerQueryService) GetAccountBalance(ctx context.Context, accountID, currency string) (*ledgerout.AccountBalanceResponse, error) {
 	accountID = strings.TrimSpace(accountID)
+	currency = strings.ToUpper(strings.TrimSpace(currency))
 	if accountID == "" {
-		return nil, stackErr.Error(fmt.Errorf("%v: account_id is required", ErrValidation))
+		return nil, stackErr.Error(fmt.Errorf("%w: account_id is required", ErrValidation))
+	}
+	if currency == "" {
+		return nil, stackErr.Error(fmt.Errorf("%w: currency is required", ErrValidation))
 	}
 
-	balance, err := s.baseRepo.LedgerRepository().GetBalance(ctx, accountID)
+	balance, err := s.baseRepo.LedgerRepository().GetBalance(ctx, accountID, currency)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 
 	return &ledgerout.AccountBalanceResponse{
 		AccountID: accountID,
+		Currency:  currency,
 		Balance:   balance,
 	}, nil
 }
@@ -39,12 +44,12 @@ func (s *LedgerQueryService) GetAccountBalance(ctx context.Context, accountID st
 func (s *LedgerQueryService) GetTransaction(ctx context.Context, transactionID string) (*ledgerout.TransactionResponse, error) {
 	transactionID = strings.TrimSpace(transactionID)
 	if transactionID == "" {
-		return nil, stackErr.Error(fmt.Errorf("%v: transaction_id is required", ErrValidation))
+		return nil, stackErr.Error(fmt.Errorf("%w: transaction_id is required", ErrValidation))
 	}
 
 	transaction, err := s.baseRepo.LedgerRepository().GetTransaction(ctx, transactionID)
 	if errors.Is(err, ledgerrepos.ErrNotFound) {
-		return nil, stackErr.Error(fmt.Errorf("%v: %s", ErrTransactionNotFound, transactionID))
+		return nil, stackErr.Error(fmt.Errorf("%w: %s", ErrTransactionNotFound, transactionID))
 	}
 	if err != nil {
 		return nil, stackErr.Error(err)

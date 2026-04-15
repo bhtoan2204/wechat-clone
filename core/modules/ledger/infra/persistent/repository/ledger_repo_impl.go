@@ -21,6 +21,7 @@ func NewLedgerRepoImpl(db *gorm.DB) ledgerrepos.LedgerRepository {
 func (r *ledgerRepoImpl) CreateTransaction(ctx context.Context, transaction *entity.LedgerTransaction) error {
 	err := r.db.WithContext(ctx).Create(&model.LedgerTransactionModel{
 		TransactionID: transaction.TransactionID,
+		Currency:      transaction.Currency,
 		CreatedAt:     transaction.CreatedAt,
 	}).Error
 	return mapError(err)
@@ -32,6 +33,7 @@ func (r *ledgerRepoImpl) InsertEntries(ctx context.Context, entries []*entity.Le
 		models = append(models, model.LedgerEntryModel{
 			TransactionID: entry.TransactionID,
 			AccountID:     entry.AccountID,
+			Currency:      entry.Currency,
 			Amount:        entry.Amount,
 			CreatedAt:     entry.CreatedAt,
 		})
@@ -45,12 +47,12 @@ func (r *ledgerRepoImpl) InsertEntries(ctx context.Context, entries []*entity.Le
 	return nil
 }
 
-func (r *ledgerRepoImpl) GetBalance(ctx context.Context, accountID string) (int64, error) {
+func (r *ledgerRepoImpl) GetBalance(ctx context.Context, accountID, currency string) (int64, error) {
 	var balance int64
 	err := r.db.WithContext(ctx).
 		Model(&model.LedgerEntryModel{}).
 		Select("COALESCE(SUM(amount), 0)").
-		Where("account_id = ?", accountID).
+		Where("account_id = ? AND currency = ?", accountID, currency).
 		Scan(&balance).Error
 	return balance, mapError(err)
 }
@@ -78,6 +80,7 @@ func (r *ledgerRepoImpl) GetTransaction(ctx context.Context, transactionID strin
 			ID:            entry.ID,
 			TransactionID: entry.TransactionID,
 			AccountID:     entry.AccountID,
+			Currency:      entry.Currency,
 			Amount:        entry.Amount,
 			CreatedAt:     entry.CreatedAt,
 		})
@@ -85,6 +88,7 @@ func (r *ledgerRepoImpl) GetTransaction(ctx context.Context, transactionID strin
 
 	return &entity.LedgerTransaction{
 		TransactionID: transactionModel.TransactionID,
+		Currency:      transactionModel.Currency,
 		CreatedAt:     transactionModel.CreatedAt,
 		Entries:       entries,
 	}, nil

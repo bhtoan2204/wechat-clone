@@ -68,20 +68,6 @@ func (mr *MockReposMockRecorder) LedgerTransactionAggregateRepository() *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LedgerTransactionAggregateRepository", reflect.TypeOf((*MockRepos)(nil).LedgerTransactionAggregateRepository))
 }
 
-// PaymentRepository mocks base method.
-func (m *MockRepos) PaymentRepository() PaymentRepository {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PaymentRepository")
-	ret0, _ := ret[0].(PaymentRepository)
-	return ret0
-}
-
-// PaymentRepository indicates an expected call of PaymentRepository.
-func (mr *MockReposMockRecorder) PaymentRepository() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PaymentRepository", reflect.TypeOf((*MockRepos)(nil).PaymentRepository))
-}
-
 // WithTransaction mocks base method.
 func (m *MockRepos) WithTransaction(ctx context.Context, fn func(Repos) error) error {
 	m.ctrl.T.Helper()

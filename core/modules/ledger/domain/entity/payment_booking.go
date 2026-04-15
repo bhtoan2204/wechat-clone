@@ -4,34 +4,33 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 )
 
 var (
-	ErrPaymentSucceededEventRequired   = errors.New("payment event is required")
-	ErrPaymentBookingIDRequired        = errors.New("payment_id is required")
-	ErrPaymentBookingAccountsRequired  = errors.New("debit_account_id and credit_account_id are required")
-	ErrPaymentBookingAmountInvalid     = errors.New("amount must be positive")
-	ErrPaymentBookingProviderRequired  = errors.New("provider is required")
-	ErrPaymentBookingKeyRequired       = errors.New("idempotency_key is required")
-	ErrPaymentBookingTransactionNeeded = errors.New("transaction_id is required")
+	ErrPaymentBookingIDRequired            = errors.New("payment_id is required")
+	ErrPaymentBookingClearingKeyRequired   = errors.New("clearing_account_key is required")
+	ErrPaymentBookingCreditAccountRequired = errors.New("credit_account_id is required")
+	ErrPaymentBookingCurrencyRequired      = errors.New("currency is required")
+	ErrPaymentBookingAccountsMustDiffer    = errors.New("debit_account_id and credit_account_id must be different")
+	ErrPaymentBookingAmountInvalid         = errors.New("amount must be positive")
 )
 
 type PaymentSucceededBooking struct {
-	PaymentID       string
-	DebitAccountID  string
-	CreditAccountID string
-	Amount          int64
-	IdempotencyKey  string
+	PaymentID          string
+	ClearingAccountKey string
+	DebitAccountID     string
+	CreditAccountID    string
+	Currency           string
+	Amount             int64
 }
 
 type PaymentSucceededBookingInput struct {
-	PaymentID       string
-	TransactionID   string
-	DebitAccountID  string
-	CreditAccountID string
-	Amount          int64
-	IdempotencyKey  string
+	PaymentID          string
+	TransactionID      string
+	ClearingAccountKey string
+	CreditAccountID    string
+	Currency           string
+	Amount             int64
 }
 
 func NewPaymentSucceededBooking(input PaymentSucceededBookingInput) (*PaymentSucceededBooking, error) {
@@ -43,26 +42,33 @@ func NewPaymentSucceededBooking(input PaymentSucceededBookingInput) (*PaymentSuc
 		return nil, ErrPaymentBookingIDRequired
 	}
 
-	debitAccountID := strings.TrimSpace(input.DebitAccountID)
+	clearingAccountKey := normalizePaymentClearingAccountKey(input.ClearingAccountKey)
+	if clearingAccountKey == "" {
+		return nil, ErrPaymentBookingClearingKeyRequired
+	}
 	creditAccountID := strings.TrimSpace(input.CreditAccountID)
-	if debitAccountID == "" || creditAccountID == "" {
-		return nil, ErrPaymentBookingAccountsRequired
+	if creditAccountID == "" {
+		return nil, ErrPaymentBookingCreditAccountRequired
+	}
+	currency := normalizeLedgerCurrency(input.Currency)
+	if currency == "" {
+		return nil, ErrPaymentBookingCurrencyRequired
 	}
 	if input.Amount <= 0 {
 		return nil, ErrPaymentBookingAmountInvalid
 	}
-
-	idempotencyKey := strings.TrimSpace(input.IdempotencyKey)
-	if idempotencyKey == "" {
-		idempotencyKey = fmt.Sprintf("payment.succeeded:%s", paymentID)
+	debitAccountID := ledgerClearingAccountID(clearingAccountKey)
+	if debitAccountID == creditAccountID {
+		return nil, ErrPaymentBookingAccountsMustDiffer
 	}
 
 	return &PaymentSucceededBooking{
-		PaymentID:       paymentID,
-		DebitAccountID:  debitAccountID,
-		CreditAccountID: creditAccountID,
-		Amount:          input.Amount,
-		IdempotencyKey:  idempotencyKey,
+		PaymentID:          paymentID,
+		ClearingAccountKey: clearingAccountKey,
+		DebitAccountID:     debitAccountID,
+		CreditAccountID:    creditAccountID,
+		Currency:           currency,
+		Amount:             input.Amount,
 	}, nil
 }
 
@@ -72,27 +78,15 @@ func (b *PaymentSucceededBooking) LedgerTransactionID() string {
 
 func (b *PaymentSucceededBooking) LedgerEntries() []LedgerEntryInput {
 	return []LedgerEntryInput{
-		{AccountID: b.DebitAccountID, Amount: -b.Amount},
-		{AccountID: b.CreditAccountID, Amount: b.Amount},
+		{AccountID: b.DebitAccountID, Currency: b.Currency, Amount: -b.Amount},
+		{AccountID: b.CreditAccountID, Currency: b.Currency, Amount: b.Amount},
 	}
 }
 
-func (b *PaymentSucceededBooking) ProcessedEvent(provider string, createdAt time.Time) (*ProcessedPaymentEvent, error) {
-	provider = strings.TrimSpace(provider)
-	if provider == "" {
-		return nil, ErrPaymentBookingProviderRequired
-	}
-	if strings.TrimSpace(b.IdempotencyKey) == "" {
-		return nil, ErrPaymentBookingKeyRequired
-	}
-	if strings.TrimSpace(b.PaymentID) == "" {
-		return nil, ErrPaymentBookingTransactionNeeded
-	}
+func normalizePaymentClearingAccountKey(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
 
-	return &ProcessedPaymentEvent{
-		Provider:       provider,
-		IdempotencyKey: b.IdempotencyKey,
-		TransactionID:  b.PaymentID,
-		CreatedAt:      normalizeLedgerTime(createdAt),
-	}, nil
+func ledgerClearingAccountID(clearingAccountKey string) string {
+	return fmt.Sprintf("ledger:clearing:%s", normalizePaymentClearingAccountKey(clearingAccountKey))
 }

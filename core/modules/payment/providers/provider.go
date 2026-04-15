@@ -8,15 +8,14 @@ import (
 var (
 	ErrProviderNotFound        = errors.New("provider not found")
 	ErrInvalidWebhookSignature = errors.New("invalid webhook signature")
+	ErrWebhookEventIgnored     = errors.New("webhook event ignored")
 )
 
 type CreatePaymentRequest struct {
-	TransactionID   string
-	Amount          int64
-	Currency        string
-	DebitAccountID  string
-	CreditAccountID string
-	Metadata        map[string]string
+	TransactionID string
+	Amount        int64
+	Currency      string
+	Metadata      map[string]string
 }
 
 type CreatePaymentResponse struct {

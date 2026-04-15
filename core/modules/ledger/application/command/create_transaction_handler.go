@@ -20,6 +20,7 @@ func NewCreateTransactionHandler(service *ledgerservice.LedgerService) cqrs.Hand
 func (h *createTransactionHandler) Handle(ctx context.Context, req *ledgerin.CreateTransactionRequest) (*ledgerout.TransactionResponse, error) {
 	command := ledgerservice.CreateTransactionCommand{
 		TransactionID: req.TransactionID,
+		Currency:      req.Currency,
 		Entries:       make([]ledgerservice.CreateTransactionEntryCommand, 0, len(req.Entries)),
 	}
 	for _, entry := range req.Entries {
@@ -40,6 +41,7 @@ func (h *createTransactionHandler) Handle(ctx context.Context, req *ledgerin.Cre
 			ID:            entry.ID,
 			TransactionID: entry.TransactionID,
 			AccountID:     entry.AccountID,
+			Currency:      entry.Currency,
 			Amount:        entry.Amount,
 			CreatedAt:     entry.CreatedAt,
 		})
@@ -47,6 +49,7 @@ func (h *createTransactionHandler) Handle(ctx context.Context, req *ledgerin.Cre
 
 	return &ledgerout.TransactionResponse{
 		TransactionID: transaction.TransactionID,
+		Currency:      transaction.Currency,
 		CreatedAt:     transaction.CreatedAt,
 		Entries:       responseEntries,
 	}, nil

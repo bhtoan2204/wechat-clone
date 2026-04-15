@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"go-socket/core/modules/payment/domain/entity"
@@ -40,12 +41,10 @@ func (a *paymentProviderAdapter) CreatePayment(
 	metadata map[string]string,
 ) (*domainservice.PaymentCreation, error) {
 	response, err := a.provider.CreatePayment(ctx, providers.CreatePaymentRequest{
-		TransactionID:   intent.TransactionID,
-		Amount:          intent.Amount,
-		Currency:        intent.Currency,
-		DebitAccountID:  intent.DebitAccountID,
-		CreditAccountID: intent.CreditAccountID,
-		Metadata:        metadata,
+		TransactionID: intent.TransactionID,
+		Amount:        intent.Amount,
+		Currency:      intent.Currency,
+		Metadata:      metadata,
 	})
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -74,6 +73,12 @@ func (a *paymentProviderAdapter) ParseWebhook(
 
 	result, err := a.provider.ParseEvent(ctx, event)
 	if err != nil {
+		if errors.Is(err, providers.ErrWebhookEventIgnored) {
+			return &domainservice.PaymentWebhook{
+				Provider: a.Name(),
+				Ignored:  true,
+			}, nil
+		}
 		return nil, stackErr.Error(err)
 	}
 

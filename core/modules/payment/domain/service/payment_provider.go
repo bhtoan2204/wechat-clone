@@ -26,5 +26,6 @@ type PaymentCreation struct {
 
 type PaymentWebhook struct {
 	Provider string
+	Ignored  bool
 	Result   entity.PaymentProviderResult
 }

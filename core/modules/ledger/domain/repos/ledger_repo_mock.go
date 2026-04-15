@@ -56,18 +56,18 @@ func (mr *MockLedgerRepositoryMockRecorder) CreateTransaction(ctx, transaction a
 }
 
 // GetBalance mocks base method.
-func (m *MockLedgerRepository) GetBalance(ctx context.Context, accountID string) (int64, error) {
+func (m *MockLedgerRepository) GetBalance(ctx context.Context, accountID, currency string) (int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBalance", ctx, accountID)
+	ret := m.ctrl.Call(m, "GetBalance", ctx, accountID, currency)
 	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetBalance indicates an expected call of GetBalance.
-func (mr *MockLedgerRepositoryMockRecorder) GetBalance(ctx, accountID any) *gomock.Call {
+func (mr *MockLedgerRepositoryMockRecorder) GetBalance(ctx, accountID, currency any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockLedgerRepository)(nil).GetBalance), ctx, accountID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockLedgerRepository)(nil).GetBalance), ctx, accountID, currency)
 }
 
 // GetTransaction mocks base method.

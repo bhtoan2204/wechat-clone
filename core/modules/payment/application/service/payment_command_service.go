@@ -14,6 +14,7 @@ import (
 	"go-socket/core/modules/payment/domain/entity"
 	repos "go-socket/core/modules/payment/domain/repos"
 	domainservice "go-socket/core/modules/payment/domain/service"
+	"go-socket/core/shared/pkg/actorctx"
 	eventpkg "go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
@@ -55,14 +56,18 @@ func (s *paymentCommandService) CreatePayment(
 		return nil, stackErr.Error(err)
 	}
 
+	creditAccountID, err := s.resolveCreatePaymentCreditAccount(ctx, req)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
 	now := time.Now().UTC()
-	intent, err := entity.NewPaymentIntent(
+	intent, err := entity.NewProviderTopUpIntent(
 		uuid.New().String(),
 		req.Provider,
 		req.Amount,
 		req.Currency,
-		req.DebitAccountID,
-		req.CreditAccountID,
+		creditAccountID,
 		now,
 	)
 	if err != nil {
@@ -85,7 +90,7 @@ func (s *paymentCommandService) CreatePayment(
 		))
 	}); err != nil {
 		if errors.Is(err, repos.ErrProviderPaymentDuplicateIntent) {
-			return nil, fmt.Errorf("%v: %s", ErrDuplicatePayment, intent.TransactionID)
+			return nil, fmt.Errorf("%w: %s", ErrDuplicatePayment, intent.TransactionID)
 		}
 		return nil, stackErr.Error(err)
 	}
@@ -139,6 +144,12 @@ func (s *paymentCommandService) ProcessWebhook(
 	webhook, err := provider.ParseWebhook(ctx, []byte(req.Payload), req.Signature)
 	if err != nil {
 		return nil, stackErr.Error(err)
+	}
+	if webhook.Ignored {
+		return &out.ProcessWebhookResponse{
+			Provider:     webhook.Provider,
+			LedgerPosted: false,
+		}, nil
 	}
 	lockKey := fmt.Sprintf("payment:%s", webhook.Result.EventID)
 	lockValue := uuid.NewString()
@@ -286,7 +297,7 @@ func (s *paymentCommandService) findIntent(
 	}
 
 	return nil, stackErr.Error(fmt.Errorf(
-		"%v: transaction_id=%s external_ref=%s",
+		"%w: transaction_id=%s external_ref=%s",
 		ErrPaymentIntentNotFound,
 		result.TransactionID,
 		result.ExternalRef,
@@ -324,5 +335,22 @@ func wrapPaymentValidation(err error) error {
 	if err == nil {
 		return nil
 	}
-	return stackErr.Error(fmt.Errorf("%v: %s", ErrValidation, err.Error()))
+	return stackErr.Error(fmt.Errorf("%w: %s", ErrValidation, err.Error()))
+}
+
+func (s *paymentCommandService) resolveCreatePaymentCreditAccount(
+	ctx context.Context,
+	req *in.CreatePaymentRequest,
+) (string, error) {
+	actorAccountID, err := actorctx.AccountIDFromContext(ctx)
+	if err != nil {
+		return "", stackErr.Error(ErrPaymentUnauthorized)
+	}
+
+	requestedCreditAccountID := strings.TrimSpace(req.CreditAccountID)
+	if requestedCreditAccountID != "" && requestedCreditAccountID != actorAccountID {
+		return "", wrapPaymentValidation(fmt.Errorf("credit_account_id must match authenticated account"))
+	}
+
+	return actorAccountID, nil
 }

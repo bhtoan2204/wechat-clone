@@ -31,6 +31,7 @@ func (h *getAccountBalanceHandler) Handle(c *gin.Context) (interface{}, error) {
 	logger := logging.FromContext(ctx)
 	var request in.GetAccountBalanceRequest
 	request.AccountID = c.Param("account_id")
+	request.Currency = c.Query("currency")
 
 	if err := request.Validate(); err != nil {
 		logger.Errorw("Validate request failed", zap.Error(err))

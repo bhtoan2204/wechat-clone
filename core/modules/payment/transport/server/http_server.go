@@ -14,32 +14,17 @@ import (
 )
 
 type paymentHTTPServer struct {
-	deposit           cqrs.Dispatcher[*in.DepositRequest, *out.DepositResponse]
-	rebuildProjection cqrs.Dispatcher[*in.RebuildProjectionRequest, *out.RebuildProjectionResponse]
-	transfer          cqrs.Dispatcher[*in.TransferRequest, *out.TransferResponse]
-	withdrawal        cqrs.Dispatcher[*in.WithdrawalRequest, *out.WithdrawalResponse]
-	listTransaction   cqrs.Dispatcher[*in.ListTransactionRequest, *out.ListTransactionResponse]
-	createPayment     cqrs.Dispatcher[*in.CreatePaymentRequest, *out.CreatePaymentResponse]
-	processWebhook    cqrs.Dispatcher[*in.ProcessWebhookRequest, *out.ProcessWebhookResponse]
+	createPayment  cqrs.Dispatcher[*in.CreatePaymentRequest, *out.CreatePaymentResponse]
+	processWebhook cqrs.Dispatcher[*in.ProcessWebhookRequest, *out.ProcessWebhookResponse]
 }
 
 func NewHTTPServer(
-	deposit cqrs.Dispatcher[*in.DepositRequest, *out.DepositResponse],
-	rebuildProjection cqrs.Dispatcher[*in.RebuildProjectionRequest, *out.RebuildProjectionResponse],
-	transfer cqrs.Dispatcher[*in.TransferRequest, *out.TransferResponse],
-	withdrawal cqrs.Dispatcher[*in.WithdrawalRequest, *out.WithdrawalResponse],
-	listTransaction cqrs.Dispatcher[*in.ListTransactionRequest, *out.ListTransactionResponse],
 	createPayment cqrs.Dispatcher[*in.CreatePaymentRequest, *out.CreatePaymentResponse],
 	processWebhook cqrs.Dispatcher[*in.ProcessWebhookRequest, *out.ProcessWebhookResponse],
 ) (infrahttp.HTTPServer, error) {
 	return &paymentHTTPServer{
-		deposit:           deposit,
-		rebuildProjection: rebuildProjection,
-		transfer:          transfer,
-		withdrawal:        withdrawal,
-		listTransaction:   listTransaction,
-		createPayment:     createPayment,
-		processWebhook:    processWebhook,
+		createPayment:  createPayment,
+		processWebhook: processWebhook,
 	}, nil
 }
 
@@ -48,7 +33,7 @@ func (s *paymentHTTPServer) RegisterPublicRoutes(routes *gin.RouterGroup) {
 }
 
 func (s *paymentHTTPServer) RegisterPrivateRoutes(routes *gin.RouterGroup) {
-	paymenthttp.RegisterPrivateRoutes(routes, s.deposit, s.rebuildProjection, s.transfer, s.withdrawal, s.listTransaction, s.createPayment)
+	paymenthttp.RegisterPrivateRoutes(routes, s.createPayment)
 }
 
 func (s *paymentHTTPServer) Stop(_ context.Context) error {

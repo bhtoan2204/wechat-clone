@@ -84,6 +84,7 @@ func (r *ledgerTransactionAggregateRepoImpl) persistProjection(
 ) ([]int64, error) {
 	if err := r.db.WithContext(ctx).Create(&model.LedgerTransactionModel{
 		TransactionID: transaction.TransactionID,
+		Currency:      transaction.Currency,
 		CreatedAt:     transaction.CreatedAt,
 	}).Error; err != nil {
 		return nil, mapError(err)
@@ -94,6 +95,7 @@ func (r *ledgerTransactionAggregateRepoImpl) persistProjection(
 		entryModels = append(entryModels, model.LedgerEntryModel{
 			TransactionID: entry.TransactionID,
 			AccountID:     entry.AccountID,
+			Currency:      entry.Currency,
 			Amount:        entry.Amount,
 			CreatedAt:     entry.CreatedAt,
 		})

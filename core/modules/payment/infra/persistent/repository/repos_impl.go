@@ -15,12 +15,7 @@ type repoImpl struct {
 	appCtx *appCtx.AppContext
 	db     *gorm.DB
 
-	paymentBalanceAggregateRepo  repos.PaymentBalanceAggregateRepository
-	paymentProjectionRepo        repos.PaymentProjectionRepository
-	paymentOutboxEventsRepo      repos.PaymentOutboxEventsRepository
-	paymentAccountProjectionRepo repos.PaymentAccountProjectionRepository
-	paymentHistoryRepo           repos.PaymentHistoryRepository
-	providerPaymentRepo          repos.ProviderPaymentRepository
+	providerPaymentRepo repos.ProviderPaymentRepository
 }
 
 func NewRepoImpl(appCtx *appCtx.AppContext) repos.Repos {
@@ -28,43 +23,13 @@ func NewRepoImpl(appCtx *appCtx.AppContext) repos.Repos {
 }
 
 func newRepoImplWithDB(appCtx *appCtx.AppContext, db *gorm.DB) repos.Repos {
-	paymentBalanceAggregateRepo := newPaymentBalanceAggregateRepoImpl(db)
-	paymentProjectionRepo := newPaymentProjectionRepoImpl(db)
-	paymentOutboxEventsRepo := newPaymentOutboxEventsRepoImpl(db)
-	paymentAccountProjectionRepo := newPaymentAccountProjectionRepoImpl(db)
-	paymentHistoryRepo := newPaymentHistoryRepoImpl(db)
 	providerPaymentRepo := newProviderPaymentRepoImpl(db)
 	return &repoImpl{
 		appCtx: appCtx,
 		db:     db,
 
-		paymentBalanceAggregateRepo:  paymentBalanceAggregateRepo,
-		paymentProjectionRepo:        paymentProjectionRepo,
-		paymentOutboxEventsRepo:      paymentOutboxEventsRepo,
-		paymentAccountProjectionRepo: paymentAccountProjectionRepo,
-		paymentHistoryRepo:           paymentHistoryRepo,
-		providerPaymentRepo:          providerPaymentRepo,
+		providerPaymentRepo: providerPaymentRepo,
 	}
-}
-
-func (r *repoImpl) PaymentBalanceAggregateRepository() repos.PaymentBalanceAggregateRepository {
-	return r.paymentBalanceAggregateRepo
-}
-
-func (r *repoImpl) PaymentProjectionRepository() repos.PaymentProjectionRepository {
-	return r.paymentProjectionRepo
-}
-
-func (r *repoImpl) PaymentOutboxEventsRepository() repos.PaymentOutboxEventsRepository {
-	return r.paymentOutboxEventsRepo
-}
-
-func (r *repoImpl) PaymentAccountProjectionRepository() repos.PaymentAccountProjectionRepository {
-	return r.paymentAccountProjectionRepo
-}
-
-func (r *repoImpl) PaymentHistoryRepository() repos.PaymentHistoryRepository {
-	return r.paymentHistoryRepo
 }
 
 func (r *repoImpl) ProviderPaymentRepository() repos.ProviderPaymentRepository {

@@ -4,7 +4,6 @@ import (
 	"context"
 	appCtx "go-socket/core/context"
 	paymentcommand "go-socket/core/modules/payment/application/command"
-	paymentquery "go-socket/core/modules/payment/application/query"
 	paymentservice "go-socket/core/modules/payment/application/service"
 	paymentrepo "go-socket/core/modules/payment/infra/persistent/repository"
 	provideradapter "go-socket/core/modules/payment/infra/provider"
@@ -28,18 +27,8 @@ func buildHTTPServer(_ context.Context, appContext *appCtx.AppContext) (http.HTT
 
 	createPayment := cqrs.NewDispatcher(paymentcommand.NewCreatePayment(services))
 	processWebhook := cqrs.NewDispatcher(paymentcommand.NewProcessWebhook(appContext, services))
-	deposit := cqrs.NewDispatcher(paymentcommand.NewDepositHandler(paymentRepos))
-	rebuildProjection := cqrs.NewDispatcher(paymentcommand.NewRebuildProjectionHandler(paymentRepos))
-	transfer := cqrs.NewDispatcher(paymentcommand.NewTransferHandler(paymentRepos))
-	withdrawal := cqrs.NewDispatcher(paymentcommand.NewWithdrawalHandler(paymentRepos))
-	listTransaction := cqrs.NewDispatcher(paymentquery.NewListTransactionHandler(paymentRepos))
 
 	server, err := paymentserver.NewHTTPServer(
-		deposit,
-		rebuildProjection,
-		transfer,
-		withdrawal,
-		listTransaction,
 		createPayment,
 		processWebhook,
 	)

@@ -6,7 +6,6 @@ import (
 	appCtx "go-socket/core/context"
 	ledgerassembly "go-socket/core/modules/ledger/assembly"
 	notificationassembly "go-socket/core/modules/notification/assembly"
-	paymentassembly "go-socket/core/modules/payment/assembly"
 	roomassembly "go-socket/core/modules/room/assembly"
 	"go-socket/core/shared/config"
 	"go-socket/core/shared/pkg/logging"
@@ -80,10 +79,10 @@ func (s *appServer) buildModuleRuntimes(appContext *appCtx.AppContext) error {
 		return stackErr.Error(fmt.Errorf("build ledger messaging runtime failed: %v", err))
 	}
 
-	paymentRuntime, err := paymentassembly.BuildProjectionRuntime(s.cfg, appContext)
-	if err != nil {
-		return stackErr.Error(fmt.Errorf("build payment projection runtime failed: %v", err))
-	}
+	// paymentRuntime, err := paymentassembly.BuildProjectionRuntime(s.cfg, appContext)
+	// if err != nil {
+	// 	return stackErr.Error(fmt.Errorf("build payment projection runtime failed: %v", err))
+	// }
 
 	roomRuntime, err := roomassembly.BuildProjectionRuntime(s.cfg, appContext)
 	if err != nil {
@@ -93,7 +92,7 @@ func (s *appServer) buildModuleRuntimes(appContext *appCtx.AppContext) error {
 	s.moduleRuntimes = []modruntime.Module{
 		notificationRuntime,
 		ledgerRuntime,
-		paymentRuntime,
+		// paymentRuntime,
 		roomRuntime,
 	}
 	return nil
