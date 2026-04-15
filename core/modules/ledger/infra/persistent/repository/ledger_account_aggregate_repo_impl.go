@@ -2,79 +2,59 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"reflect"
+	"strings"
+
 	ledgeraggregate "go-socket/core/modules/ledger/domain/aggregate"
 	ledgerrepos "go-socket/core/modules/ledger/domain/repos"
-	"go-socket/core/modules/ledger/infra/persistent/model"
 	eventpkg "go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/stackErr"
-	"reflect"
-
-	"gorm.io/gorm"
 )
 
 type ledgerAccountAggregateRepositoryImpl struct {
-	db         *gorm.DB
-	serializer eventpkg.Serializer
+	store aggregateStore
 }
 
-func NewLedgerAccountAggregateRepoImpl(db *gorm.DB) ledgerrepos.LedgerAccountAggregateRepository {
-	return &ledgerAccountAggregateRepositoryImpl{
-		db:         db,
-		serializer: newLedgerAccountSerializer(),
-	}
-}
-
-func newLedgerAccountSerializer() eventpkg.Serializer {
+func NewLedgerAccountAggregateRepoImpl(dbTX dbTX) ledgerrepos.LedgerAccountAggregateRepository {
 	serializer := eventpkg.NewSerializer()
 	if err := serializer.RegisterAggregate(&ledgeraggregate.LedgerAccountAggregate{}); err != nil {
-		panic(fmt.Sprintf("register ledger transaction aggregate serializer failed: %v", err))
+		panic(fmt.Sprintf("register ledger account aggregate serializer failed: %v", err))
 	}
-	return serializer
+
+	return &ledgerAccountAggregateRepositoryImpl{
+		store: newAggregateStore(dbTX, serializer),
+	}
 }
 
 func (r *ledgerAccountAggregateRepositoryImpl) Load(ctx context.Context, accountID string) (*ledgeraggregate.LedgerAccountAggregate, error) {
+	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
 		return nil, stackErr.Error(fmt.Errorf("account id is required"))
 	}
-	aggregate, _ := ledgeraggregate.NewLedgerAccountAggregate(accountID)
 
-	var aggModel model.LedgerAggregateModel
-	err := r.db.WithContext(ctx).
-		Where("aggregate_id = ? AND aggregate_type = ?", accountID, reflect.TypeOf(aggregate).Elem().Name()).
-		First(&aggModel).Error
+	agg, err := ledgeraggregate.NewLedgerAccountAggregate(accountID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		return nil, stackErr.Error(err)
+	}
+
+	if err := r.store.Get(ctx, accountID, agg); err != nil {
+		if errors.Is(err, ledgerrepos.ErrNotFound) {
 			return nil, nil
 		}
 		return nil, stackErr.Error(err)
 	}
 
-	var eventModels []model.LedgerEventModel
-	if err := r.db.WithContext(ctx).
-		Where("aggregate_id = ? AND aggregate_type = ?", accountID, reflect.TypeOf(aggregate).Elem().Name()).
-		Order("version ASC").
-		Find(&eventModels).Error; err != nil {
-		return nil, stackErr.Error(err)
-	}
-
-	return aggregate, nil
+	return agg, nil
 }
 
 func (r *ledgerAccountAggregateRepositoryImpl) Save(ctx context.Context, aggregate *ledgeraggregate.LedgerAccountAggregate) error {
 	if aggregate == nil {
-		return stackErr.Error(fmt.Errorf("ledger transaction aggregate is nil"))
+		return stackErr.Error(fmt.Errorf("ledger account aggregate is nil"))
 	}
-
-	root := aggregate.Root()
-	events := root.CloneEvents()
-	if len(events) == 0 {
-		return nil
+	if reflect.ValueOf(aggregate).IsNil() {
+		return stackErr.Error(fmt.Errorf("ledger account aggregate is nil"))
 	}
-	if root.BaseVersion() != 0 {
-		return stackErr.Error(fmt.Errorf("ledger transaction aggregate does not support updates"))
-	}
-
-	root.Update()
-	return nil
+	return stackErr.Error(r.store.Save(ctx, aggregate))
 }

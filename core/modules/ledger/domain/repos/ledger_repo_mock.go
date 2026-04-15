@@ -41,20 +41,6 @@ func (m *MockLedgerRepository) EXPECT() *MockLedgerRepositoryMockRecorder {
 	return m.recorder
 }
 
-// CreateTransaction mocks base method.
-func (m *MockLedgerRepository) CreateTransaction(ctx context.Context, transaction *entity.LedgerTransaction) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateTransaction", ctx, transaction)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CreateTransaction indicates an expected call of CreateTransaction.
-func (mr *MockLedgerRepositoryMockRecorder) CreateTransaction(ctx, transaction any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateTransaction", reflect.TypeOf((*MockLedgerRepository)(nil).CreateTransaction), ctx, transaction)
-}
-
 // GetBalance mocks base method.
 func (m *MockLedgerRepository) GetBalance(ctx context.Context, accountID, currency string) (int64, error) {
 	m.ctrl.T.Helper()
@@ -83,18 +69,4 @@ func (m *MockLedgerRepository) GetTransaction(ctx context.Context, transactionID
 func (mr *MockLedgerRepositoryMockRecorder) GetTransaction(ctx, transactionID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTransaction", reflect.TypeOf((*MockLedgerRepository)(nil).GetTransaction), ctx, transactionID)
-}
-
-// InsertEntries mocks base method.
-func (m *MockLedgerRepository) InsertEntries(ctx context.Context, entries []*entity.LedgerEntry) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "InsertEntries", ctx, entries)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// InsertEntries indicates an expected call of InsertEntries.
-func (mr *MockLedgerRepositoryMockRecorder) InsertEntries(ctx, entries any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertEntries", reflect.TypeOf((*MockLedgerRepository)(nil).InsertEntries), ctx, entries)
 }

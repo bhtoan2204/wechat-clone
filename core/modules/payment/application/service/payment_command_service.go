@@ -90,7 +90,7 @@ func (s *paymentCommandService) CreatePayment(
 		))
 	}); err != nil {
 		if errors.Is(err, repos.ErrProviderPaymentDuplicateIntent) {
-			return nil, fmt.Errorf("%w: %s", ErrDuplicatePayment, intent.TransactionID)
+			return nil, fmt.Errorf("%v: %s", ErrDuplicatePayment, intent.TransactionID)
 		}
 		return nil, stackErr.Error(err)
 	}
@@ -297,7 +297,7 @@ func (s *paymentCommandService) findIntent(
 	}
 
 	return nil, stackErr.Error(fmt.Errorf(
-		"%w: transaction_id=%s external_ref=%s",
+		"%v: transaction_id=%s external_ref=%s",
 		ErrPaymentIntentNotFound,
 		result.TransactionID,
 		result.ExternalRef,
@@ -335,7 +335,7 @@ func wrapPaymentValidation(err error) error {
 	if err == nil {
 		return nil
 	}
-	return stackErr.Error(fmt.Errorf("%w: %s", ErrValidation, err.Error()))
+	return stackErr.Error(fmt.Errorf("%v: %s", ErrValidation, err.Error()))
 }
 
 func (s *paymentCommandService) resolveCreatePaymentCreditAccount(

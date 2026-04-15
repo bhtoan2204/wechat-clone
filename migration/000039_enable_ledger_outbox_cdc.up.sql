@@ -1,0 +1,2 @@
+GRANT SELECT ON ledger_outbox_events TO C##DBZUSER;
+ALTER TABLE ledger_outbox_events ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS;

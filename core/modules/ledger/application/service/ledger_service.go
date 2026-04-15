@@ -6,24 +6,23 @@ import (
 	"fmt"
 	"strings"
 
+	ledgerprojection "go-socket/core/modules/ledger/application/projection"
 	ledgeraggregate "go-socket/core/modules/ledger/domain/aggregate"
 	"go-socket/core/modules/ledger/domain/entity"
 	ledgerrepos "go-socket/core/modules/ledger/domain/repos"
+	eventpkg "go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
 
 	"go.uber.org/zap"
 )
 
-type CreateTransactionEntryCommand struct {
-	AccountID string
-	Amount    int64
-}
-
-type CreateTransactionCommand struct {
+type TransferToAccountCommand struct {
 	TransactionID string
+	FromAccountID string
+	ToAccountID   string
 	Currency      string
-	Entries       []CreateTransactionEntryCommand
+	Amount        int64
 }
 
 type RecordPaymentSucceededCommand struct {
@@ -35,52 +34,98 @@ type RecordPaymentSucceededCommand struct {
 	Amount             int64
 }
 
-type LedgerService struct {
+type LedgerService interface {
+	TransferToAccount(ctx context.Context, command TransferToAccountCommand) (*entity.LedgerTransaction, error)
+	RecordPaymentSucceeded(ctx context.Context, command RecordPaymentSucceededCommand) error
+}
+
+type ledgerService struct {
 	baseRepo ledgerrepos.Repos
 }
 
-func NewLedgerService(baseRepo ledgerrepos.Repos) *LedgerService {
-	return &LedgerService{baseRepo: baseRepo}
+func NewLedgerService(baseRepo ledgerrepos.Repos) *ledgerService {
+	return &ledgerService{baseRepo: baseRepo}
 }
 
-func (s *LedgerService) CreateTransaction(ctx context.Context, command CreateTransactionCommand) (*entity.LedgerTransaction, error) {
-	log := logging.FromContext(ctx).Named("CreateLedgerTransaction")
-	transactionID := strings.TrimSpace(command.TransactionID)
-
-	aggregate, err := ledgeraggregate.NewLedgerTransactionAggregate(transactionID)
+func (s *ledgerService) TransferToAccount(ctx context.Context, command TransferToAccountCommand) (*entity.LedgerTransaction, error) {
+	booking, err := entity.NewTransferBooking(entity.TransferBookingInput{
+		FromAccountID: command.FromAccountID,
+		ToAccountID:   command.ToAccountID,
+		Currency:      command.Currency,
+		Amount:        command.Amount,
+	})
 	if err != nil {
-		return nil, stackErr.Error(wrapValidation(err))
+		return nil, stackErr.Error(fmt.Errorf("%v: %v", ErrValidation, err))
 	}
-	if err := aggregate.Create(toLedgerEntryInputs(command.Entries, command.Currency)); err != nil {
-		return nil, stackErr.Error(wrapValidation(err))
+
+	transaction, err := entity.NewLedgerTransaction(strings.TrimSpace(command.TransactionID), booking.LedgerEntries())
+	if err != nil {
+		return nil, stackErr.Error(fmt.Errorf("%v: %v", ErrValidation, err))
 	}
 
 	if err := s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
-		if err := txRepos.LedgerTransactionAggregateRepository().Save(ctx, aggregate); err != nil {
-			if errors.Is(err, ledgerrepos.ErrDuplicate) {
-				return stackErr.Error(fmt.Errorf("%w: %s", ErrDuplicateTransaction, transactionID))
+		fromAgg, err := s.loadLedgerAccount(ctx, txRepos, booking.FromAccountID)
+		if err != nil {
+			return stackErr.Error(err)
+		}
+		toAgg, err := s.loadLedgerAccount(ctx, txRepos, booking.ToAccountID)
+		if err != nil {
+			return stackErr.Error(err)
+		}
+
+		fromApplied, err := fromAgg.TransferToAccount(
+			transaction.TransactionID,
+			booking.ToAccountID,
+			transaction.Currency,
+			booking.Amount,
+			transaction.CreatedAt,
+		)
+		if err != nil {
+			if errors.Is(err, ledgeraggregate.ErrLedgerAccountInsufficientFunds) {
+				return stackErr.Error(fmt.Errorf("%v: %v", ErrInsufficientFunds, err))
 			}
 			return stackErr.Error(err)
 		}
+		toApplied, err := toAgg.ReceiveTransfer(
+			transaction.TransactionID,
+			booking.FromAccountID,
+			transaction.Currency,
+			booking.Amount,
+			transaction.CreatedAt,
+		)
+		if err != nil {
+			return stackErr.Error(err)
+		}
+		if fromApplied != toApplied {
+			return stackErr.Error(fmt.Errorf("ledger transfer posting became inconsistent for transaction_id=%s", transaction.TransactionID))
+		}
+		if !fromApplied {
+			return nil
+		}
+
+		if err := txRepos.LedgerAccountAggregateRepository().Save(ctx, fromAgg); err != nil {
+			return stackErr.Error(err)
+		}
+		if err := txRepos.LedgerAccountAggregateRepository().Save(ctx, toAgg); err != nil {
+			return stackErr.Error(err)
+		}
+		if err := txRepos.LedgerOutboxEventsRepository().Append(ctx, newLedgerTransactionProjectedEvent(
+			transaction,
+			"ledger.transfer_to_account",
+			transaction.TransactionID,
+		)); err != nil {
+			return stackErr.Error(err)
+		}
+
 		return nil
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
 
-	transaction, err := aggregate.Snapshot()
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-
-	log.Infow("ledger transaction created",
-		zap.String("transaction_id", transaction.TransactionID),
-		zap.Int("entries_count", len(transaction.Entries)),
-	)
-
 	return transaction, nil
 }
 
-func (s *LedgerService) RecordPaymentSucceeded(ctx context.Context, command RecordPaymentSucceededCommand) error {
+func (s *ledgerService) RecordPaymentSucceeded(ctx context.Context, command RecordPaymentSucceededCommand) error {
 	log := logging.FromContext(ctx).Named("RecordPaymentSucceeded")
 	booking, err := entity.NewPaymentSucceededBooking(entity.PaymentSucceededBookingInput{
 		PaymentID:          command.PaymentID,
@@ -91,27 +136,67 @@ func (s *LedgerService) RecordPaymentSucceeded(ctx context.Context, command Reco
 		Amount:             command.Amount,
 	})
 	if err != nil {
-		return stackErr.Error(wrapValidation(err))
+		return stackErr.Error(fmt.Errorf("%v: %v", ErrValidation, err))
+	}
+
+	transaction, err := entity.NewLedgerTransaction(booking.LedgerTransactionID(), booking.LedgerEntries())
+	if err != nil {
+		return stackErr.Error(fmt.Errorf("%v: %v", ErrValidation, err))
 	}
 
 	alreadyBooked := false
 	if err := s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
-		transactionAggregate, err := ledgeraggregate.NewLedgerTransactionAggregate(booking.LedgerTransactionID())
+		debitAgg, err := s.loadLedgerAccount(ctx, txRepos, booking.DebitAccountID)
 		if err != nil {
-			return stackErr.Error(wrapValidation(err))
+			return stackErr.Error(err)
 		}
-		if err := transactionAggregate.Create(booking.LedgerEntries()); err != nil {
-			return stackErr.Error(wrapValidation(err))
+		creditAgg, err := s.loadLedgerAccount(ctx, txRepos, booking.CreditAccountID)
+		if err != nil {
+			return stackErr.Error(err)
 		}
-		// Duplicate payment events must reconcile against the canonical ledger
-		// transaction instead of persisting provider-oriented dedupe state here.
-		if err := txRepos.LedgerTransactionAggregateRepository().Save(ctx, transactionAggregate); err != nil {
-			if errors.Is(err, ledgerrepos.ErrDuplicate) {
-				alreadyBooked = true
-				return stackErr.Error(s.ensureExistingPaymentBooking(ctx, txRepos, booking))
-			} else {
-				return stackErr.Error(err)
-			}
+
+		debitApplied, err := debitAgg.BookPayment(
+			transaction.TransactionID,
+			booking.PaymentID,
+			booking.CreditAccountID,
+			transaction.Currency,
+			-booking.Amount,
+			transaction.CreatedAt,
+		)
+		if err != nil {
+			return stackErr.Error(err)
+		}
+		creditApplied, err := creditAgg.BookPayment(
+			transaction.TransactionID,
+			booking.PaymentID,
+			booking.DebitAccountID,
+			transaction.Currency,
+			booking.Amount,
+			transaction.CreatedAt,
+		)
+		if err != nil {
+			return stackErr.Error(err)
+		}
+		if debitApplied != creditApplied {
+			return stackErr.Error(fmt.Errorf("ledger payment booking became inconsistent for transaction_id=%s", transaction.TransactionID))
+		}
+		if !debitApplied {
+			alreadyBooked = true
+			return nil
+		}
+
+		if err := txRepos.LedgerAccountAggregateRepository().Save(ctx, debitAgg); err != nil {
+			return stackErr.Error(err)
+		}
+		if err := txRepos.LedgerAccountAggregateRepository().Save(ctx, creditAgg); err != nil {
+			return stackErr.Error(err)
+		}
+		if err := txRepos.LedgerOutboxEventsRepository().Append(ctx, newLedgerTransactionProjectedEvent(
+			transaction,
+			"payment.succeeded",
+			booking.PaymentID,
+		)); err != nil {
+			return stackErr.Error(err)
 		}
 
 		return nil
@@ -128,79 +213,56 @@ func (s *LedgerService) RecordPaymentSucceeded(ctx context.Context, command Reco
 	return nil
 }
 
-func toLedgerEntryInputs(entries []CreateTransactionEntryCommand, currency string) []entity.LedgerEntryInput {
-	out := make([]entity.LedgerEntryInput, 0, len(entries))
-	currency = strings.ToUpper(strings.TrimSpace(currency))
-	for _, entry := range entries {
-		out = append(out, entity.LedgerEntryInput{
-			AccountID: strings.TrimSpace(entry.AccountID),
-			Currency:  currency,
-			Amount:    entry.Amount,
-		})
-	}
-	return out
-}
-
-func wrapValidation(err error) error {
-	if err == nil {
-		return nil
-	}
-	return stackErr.Error(fmt.Errorf("%w: %s", ErrValidation, err.Error()))
-}
-
-func (s *LedgerService) ensureExistingPaymentBooking(
+func (s *ledgerService) loadLedgerAccount(
 	ctx context.Context,
 	repos ledgerrepos.Repos,
-	booking *entity.PaymentSucceededBooking,
-) error {
-	transaction, err := repos.LedgerRepository().GetTransaction(ctx, booking.LedgerTransactionID())
+	accountID string,
+) (*ledgeraggregate.LedgerAccountAggregate, error) {
+	account, err := repos.LedgerAccountAggregateRepository().Load(ctx, accountID)
 	if err != nil {
-		return stackErr.Error(err)
+		return nil, stackErr.Error(err)
 	}
-	if bookingMatchesTransaction(booking, transaction) {
-		return nil
+	if account != nil {
+		return account, nil
 	}
-
-	return stackErr.Error(fmt.Errorf(
-		"existing ledger transaction does not match payment booking: %s",
-		booking.LedgerTransactionID(),
-	))
+	account, err = ledgeraggregate.NewLedgerAccountAggregate(accountID)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return account, nil
 }
 
-func bookingMatchesTransaction(
-	booking *entity.PaymentSucceededBooking,
+func newLedgerTransactionProjectedEvent(
 	transaction *entity.LedgerTransaction,
-) bool {
-	if booking == nil || transaction == nil {
-		return false
-	}
-	if strings.TrimSpace(transaction.TransactionID) != booking.LedgerTransactionID() {
-		return false
-	}
-	if strings.ToUpper(strings.TrimSpace(transaction.Currency)) != booking.Currency {
-		return false
+	referenceType string,
+	referenceID string,
+) eventpkg.Event {
+	entries := make([]ledgerprojection.LedgerTransactionEntry, 0, len(transaction.Entries))
+	for _, entry := range transaction.Entries {
+		if entry == nil {
+			continue
+		}
+		entries = append(entries, ledgerprojection.LedgerTransactionEntry{
+			AccountID: entry.AccountID,
+			Currency:  entry.Currency,
+			Amount:    entry.Amount,
+			CreatedAt: entry.CreatedAt.UTC(),
+		})
 	}
 
-	expectedEntries := booking.LedgerEntries()
-	if len(transaction.Entries) != len(expectedEntries) {
-		return false
+	return eventpkg.Event{
+		AggregateID:   transaction.TransactionID,
+		AggregateType: ledgerprojection.AggregateTypeLedgerTransactionProjection,
+		Version:       1,
+		EventName:     ledgerprojection.EventLedgerTransactionProjected,
+		EventData: &ledgerprojection.LedgerTransactionProjected{
+			TransactionID: transaction.TransactionID,
+			ReferenceType: strings.TrimSpace(referenceType),
+			ReferenceID:   strings.TrimSpace(referenceID),
+			Currency:      transaction.Currency,
+			CreatedAt:     transaction.CreatedAt.UTC(),
+			Entries:       entries,
+		},
+		CreatedAt: transaction.CreatedAt.Unix(),
 	}
-
-	for i, expectedEntry := range expectedEntries {
-		actualEntry := transaction.Entries[i]
-		if actualEntry == nil {
-			return false
-		}
-		if strings.ToUpper(strings.TrimSpace(actualEntry.Currency)) != expectedEntry.Currency {
-			return false
-		}
-		if strings.TrimSpace(actualEntry.AccountID) != expectedEntry.AccountID {
-			return false
-		}
-		if actualEntry.Amount != expectedEntry.Amount {
-			return false
-		}
-	}
-
-	return true
 }

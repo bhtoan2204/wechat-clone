@@ -18,35 +18,6 @@ func NewLedgerRepoImpl(db *gorm.DB) ledgerrepos.LedgerRepository {
 	return &ledgerRepoImpl{db: db}
 }
 
-func (r *ledgerRepoImpl) CreateTransaction(ctx context.Context, transaction *entity.LedgerTransaction) error {
-	err := r.db.WithContext(ctx).Create(&model.LedgerTransactionModel{
-		TransactionID: transaction.TransactionID,
-		Currency:      transaction.Currency,
-		CreatedAt:     transaction.CreatedAt,
-	}).Error
-	return mapError(err)
-}
-
-func (r *ledgerRepoImpl) InsertEntries(ctx context.Context, entries []*entity.LedgerEntry) error {
-	models := make([]model.LedgerEntryModel, 0, len(entries))
-	for _, entry := range entries {
-		models = append(models, model.LedgerEntryModel{
-			TransactionID: entry.TransactionID,
-			AccountID:     entry.AccountID,
-			Currency:      entry.Currency,
-			Amount:        entry.Amount,
-			CreatedAt:     entry.CreatedAt,
-		})
-	}
-	if err := r.db.WithContext(ctx).Create(&models).Error; err != nil {
-		return mapError(err)
-	}
-	for i, entry := range entries {
-		entry.ID = models[i].ID
-	}
-	return nil
-}
-
 func (r *ledgerRepoImpl) GetBalance(ctx context.Context, accountID, currency string) (int64, error) {
 	var balance int64
 	err := r.db.WithContext(ctx).

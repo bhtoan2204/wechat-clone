@@ -10,10 +10,10 @@ import (
 )
 
 type getTransactionHandler struct {
-	service *ledgerservice.LedgerQueryService
+	service ledgerservice.LedgerQueryService
 }
 
-func NewGetTransactionHandler(service *ledgerservice.LedgerQueryService) cqrs.Handler[*ledgerin.GetTransactionRequest, *ledgerout.TransactionResponse] {
+func NewGetTransactionHandler(service ledgerservice.LedgerQueryService) cqrs.Handler[*ledgerin.GetTransactionRequest, *ledgerout.TransactionResponse] {
 	return &getTransactionHandler{service: service}
 }
 

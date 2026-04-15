@@ -1,0 +1,2 @@
+DROP TABLE ledger_outbox_events CASCADE CONSTRAINTS;
+DROP TABLE ledger_snapshots CASCADE CONSTRAINTS;

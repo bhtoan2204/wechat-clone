@@ -14,20 +14,17 @@ import (
 )
 
 type ledgerHTTPServer struct {
-	createTransaction   cqrs.Dispatcher[*in.CreateTransactionRequest, *out.TransactionResponse]
 	getAccountBalance   cqrs.Dispatcher[*in.GetAccountBalanceRequest, *out.AccountBalanceResponse]
 	getTransaction      cqrs.Dispatcher[*in.GetTransactionRequest, *out.TransactionResponse]
 	transferTransaction cqrs.Dispatcher[*in.TransferTransactionRequest, *out.TransactionTransactionResponse]
 }
 
 func NewHTTPServer(
-	createTransaction cqrs.Dispatcher[*in.CreateTransactionRequest, *out.TransactionResponse],
 	getAccountBalance cqrs.Dispatcher[*in.GetAccountBalanceRequest, *out.AccountBalanceResponse],
 	getTransaction cqrs.Dispatcher[*in.GetTransactionRequest, *out.TransactionResponse],
 	transferTransaction cqrs.Dispatcher[*in.TransferTransactionRequest, *out.TransactionTransactionResponse],
 ) (infrahttp.HTTPServer, error) {
 	return &ledgerHTTPServer{
-		createTransaction:   createTransaction,
 		getAccountBalance:   getAccountBalance,
 		getTransaction:      getTransaction,
 		transferTransaction: transferTransaction,
@@ -39,7 +36,7 @@ func (s *ledgerHTTPServer) RegisterPublicRoutes(routes *gin.RouterGroup) {
 }
 
 func (s *ledgerHTTPServer) RegisterPrivateRoutes(routes *gin.RouterGroup) {
-	ledgerhttp.RegisterPrivateRoutes(routes, s.createTransaction, s.getAccountBalance, s.getTransaction, s.transferTransaction)
+	ledgerhttp.RegisterPrivateRoutes(routes, s.getAccountBalance, s.getTransaction, s.transferTransaction)
 }
 
 func (s *ledgerHTTPServer) Stop(_ context.Context) error {

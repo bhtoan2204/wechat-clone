@@ -10,10 +10,10 @@ import (
 )
 
 type getAccountBalanceHandler struct {
-	service *ledgerservice.LedgerQueryService
+	service ledgerservice.LedgerQueryService
 }
 
-func NewGetAccountBalanceHandler(service *ledgerservice.LedgerQueryService) cqrs.Handler[*ledgerin.GetAccountBalanceRequest, *ledgerout.AccountBalanceResponse] {
+func NewGetAccountBalanceHandler(service ledgerservice.LedgerQueryService) cqrs.Handler[*ledgerin.GetAccountBalanceRequest, *ledgerout.AccountBalanceResponse] {
 	return &getAccountBalanceHandler{service: service}
 }
 

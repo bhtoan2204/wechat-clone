@@ -2,19 +2,16 @@ package messaging
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	ledgerservice "go-socket/core/modules/ledger/application/service"
+	ledgerprojection "go-socket/core/modules/ledger/application/projection"
+	"go-socket/core/modules/ledger/application/service"
 	"go-socket/core/shared/config"
-	sharedevents "go-socket/core/shared/contracts/events"
 	infraMessaging "go-socket/core/shared/infra/messaging"
 	"go-socket/core/shared/pkg/contxt"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
-
-	"go.uber.org/zap"
 )
 
 //go:generate mockgen -package=messaging -destination=message_handler_mock.go -source=message_handler.go
@@ -25,13 +22,19 @@ type MessageHandler interface {
 
 type messageHandler struct {
 	consumer      []infraMessaging.Consumer
-	ledgerService *ledgerservice.LedgerService
+	ledgerService service.LedgerService
+	projector     ledgerprojection.Projector
 }
 
-func NewMessageHandler(cfg *config.Config, ledgerService *ledgerservice.LedgerService) (MessageHandler, error) {
+func NewMessageHandler(
+	cfg *config.Config,
+	ledgerService service.LedgerService,
+	projector ledgerprojection.Projector,
+) (MessageHandler, error) {
 	instance := &messageHandler{
 		consumer:      make([]infraMessaging.Consumer, 0, 1),
 		ledgerService: ledgerService,
+		projector:     projector,
 	}
 
 	topic := strings.TrimSpace(cfg.KafkaConfig.KafkaLedgerConsumer.PaymentOutboxTopic)
@@ -56,6 +59,26 @@ func NewMessageHandler(cfg *config.Config, ledgerService *ledgerservice.LedgerSe
 	})
 	instance.consumer = append(instance.consumer, consumer)
 
+	ledgerOutboxTopic := strings.TrimSpace(cfg.KafkaConfig.KafkaLedgerConsumer.LedgerOutboxTopic)
+	if ledgerOutboxTopic != "" && projector != nil {
+		handlerName := fmt.Sprintf("ledger-%s-projection-handler", strings.ToLower(ledgerOutboxTopic))
+		projectionConsumer, err := infraMessaging.NewConsumer(&infraMessaging.Config{
+			Servers:      cfg.KafkaConfig.KafkaServers,
+			Group:        cfg.KafkaConfig.KafkaLedgerConsumer.LedgerProjectionGroup,
+			OffsetReset:  cfg.KafkaConfig.KafkaOffsetReset,
+			ConsumeTopic: []string{ledgerOutboxTopic},
+			HandlerName:  handlerName,
+			DLQ:          true,
+		})
+		if err != nil {
+			return nil, stackErr.Error(err)
+		}
+		projectionConsumer.SetHandler(func(ctx context.Context, value []byte) error {
+			return instance.handleLedgerOutboxEvent(ctx, value)
+		})
+		instance.consumer = append(instance.consumer, projectionConsumer)
+	}
+
 	return instance, nil
 }
 
@@ -71,47 +94,6 @@ func (h *messageHandler) Stop() error {
 		consumer.Stop()
 	}
 	return nil
-}
-
-func (h *messageHandler) handlePaymentOutboxEvent(ctx context.Context, value []byte) error {
-	log := logging.FromContext(ctx).Named("LedgerPaymentEvent")
-
-	var event paymentOutboxMessage
-	if err := json.Unmarshal(value, &event); err != nil {
-		return stackErr.Error(fmt.Errorf("unmarshal payment outbox event failed: %v", err))
-	}
-
-	log.Infow("handle payment outbox event",
-		zap.String("event_name", event.EventName),
-		zap.String("aggregate_id", event.AggregateID),
-	)
-
-	switch event.EventName {
-	case sharedevents.EventPaymentSucceeded:
-		var payload sharedevents.PaymentSucceededEvent
-		if err := json.Unmarshal(event.EventData, &payload); err != nil {
-			var raw string
-			if err2 := json.Unmarshal(event.EventData, &raw); err2 != nil {
-				return stackErr.Error(fmt.Errorf("unmarshal payment succeeded payload failed: %v", err))
-			}
-			if err2 := json.Unmarshal([]byte(raw), &payload); err2 != nil {
-				return stackErr.Error(fmt.Errorf("unmarshal inner payload failed: %v", err2))
-			}
-		}
-		if payload.PaymentID == "" {
-			payload.PaymentID = event.AggregateID
-		}
-		return h.ledgerService.RecordPaymentSucceeded(ctx, ledgerservice.RecordPaymentSucceededCommand{
-			PaymentID:          payload.PaymentID,
-			TransactionID:      payload.TransactionID,
-			ClearingAccountKey: payload.ClearingAccountKey,
-			CreditAccountID:    payload.CreditAccountID,
-			Currency:           payload.Currency,
-			Amount:             payload.Amount,
-		})
-	default:
-		return nil
-	}
 }
 
 func (h *messageHandler) processMessage(consume infraMessaging.Consumer) infraMessaging.CallBack {

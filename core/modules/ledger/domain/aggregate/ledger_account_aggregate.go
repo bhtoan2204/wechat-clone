@@ -1,32 +1,336 @@
 package aggregate
 
 import (
-	"go-socket/core/modules/ledger/domain/entity"
-	"go-socket/core/shared/pkg/event"
-	"go-socket/core/shared/pkg/stackErr"
+	"errors"
+	"fmt"
 	"reflect"
 	"strings"
+	"time"
+
+	"go-socket/core/shared/pkg/event"
+	"go-socket/core/shared/pkg/stackErr"
 )
+
+var (
+	ErrLedgerAccountAggregateRequired   = errors.New("ledger account aggregate is required")
+	ErrLedgerAccountTransactionRequired = errors.New("ledger transaction id is required")
+	ErrLedgerAccountCurrencyRequired    = errors.New("ledger currency is required")
+	ErrLedgerAccountAmountInvalid       = errors.New("ledger amount must be positive")
+	ErrLedgerAccountInsufficientFunds   = errors.New("ledger account has insufficient funds")
+)
+
+type LedgerAccountPosting struct {
+	TransactionID         string    `json:"transaction_id"`
+	ReferenceType         string    `json:"reference_type"`
+	ReferenceID           string    `json:"reference_id"`
+	CounterpartyAccountID string    `json:"counterparty_account_id"`
+	Currency              string    `json:"currency"`
+	AmountDelta           int64     `json:"amount_delta"`
+	BookedAt              time.Time `json:"booked_at"`
+}
 
 type LedgerAccountAggregate struct {
 	event.AggregateRoot
 
-	Entries []*entity.LedgerEntry
-}
-
-// RegisterEvents implements [event.BaseAggregate].
-func (l *LedgerAccountAggregate) RegisterEvents(event.RegisterEventsFunc) error {
-	panic("unimplemented")
+	AccountID          string                          `json:"account_id"`
+	Balances           map[string]int64                `json:"balances"`
+	PostedTransactions map[string]LedgerAccountPosting `json:"posted_transactions"`
 }
 
 func NewLedgerAccountAggregate(accountID string) (*LedgerAccountAggregate, error) {
 	agg := &LedgerAccountAggregate{}
-	agg.Root().SetAggregateType(reflect.TypeOf(agg).Elem().Name())
+	agg.SetAggregateType(reflect.TypeOf(agg).Elem().Name())
 	if err := agg.SetID(strings.TrimSpace(accountID)); err != nil {
 		return nil, stackErr.Error(err)
 	}
-
+	agg.ensureState()
 	return agg, nil
 }
 
-// func (a *LedgerAccountAggregate) Load
+func (a *LedgerAccountAggregate) RegisterEvents(register event.RegisterEventsFunc) error {
+	return register(
+		&EventLedgerAccountPaymentBooked{},
+		&EventLedgerAccountTransferredToAccount{},
+		&EventLedgerAccountReceivedTransfer{},
+	)
+}
+
+func (a *LedgerAccountAggregate) Transition(evt event.Event) error {
+	switch data := evt.EventData.(type) {
+	case *EventLedgerAccountPaymentBooked:
+		return a.onPaymentBooked(evt.AggregateID, data)
+	case *EventLedgerAccountTransferredToAccount:
+		return a.onTransferredToAccount(evt.AggregateID, data)
+	case *EventLedgerAccountReceivedTransfer:
+		return a.onReceivedTransfer(evt.AggregateID, data)
+	default:
+		return stackErr.Error(errors.New("unsupported event type"))
+	}
+}
+
+func (a *LedgerAccountAggregate) Balance(currency string) int64 {
+	if a == nil {
+		return 0
+	}
+	a.ensureState()
+	return a.Balances[strings.ToUpper(strings.TrimSpace(currency))]
+}
+
+func (a *LedgerAccountAggregate) BookPayment(
+	transactionID string,
+	paymentID string,
+	counterpartyAccountID string,
+	currency string,
+	amountDelta int64,
+	bookedAt time.Time,
+) (bool, error) {
+	if a == nil {
+		return false, stackErr.Error(ErrLedgerAccountAggregateRequired)
+	}
+	posting, err := newLedgerPosting(
+		transactionID,
+		"payment.succeeded",
+		paymentID,
+		counterpartyAccountID,
+		currency,
+		amountDelta,
+		bookedAt,
+	)
+	if err != nil {
+		return false, stackErr.Error(err)
+	}
+
+	existing, exists := a.lookupPosting(posting.TransactionID)
+	if exists {
+		if sameLedgerPosting(existing, posting) {
+			return false, nil
+		}
+		return false, stackErr.Error(fmt.Errorf("ledger payment booking mismatch for transaction_id=%s", posting.TransactionID))
+	}
+
+	if err := a.ApplyChange(a, &EventLedgerAccountPaymentBooked{
+		TransactionID:         posting.TransactionID,
+		PaymentID:             posting.ReferenceID,
+		CounterpartyAccountID: posting.CounterpartyAccountID,
+		Currency:              posting.Currency,
+		AmountDelta:           posting.AmountDelta,
+		BookedAt:              posting.BookedAt,
+	}); err != nil {
+		return false, stackErr.Error(err)
+	}
+
+	return true, nil
+}
+
+func (a *LedgerAccountAggregate) TransferToAccount(
+	transactionID string,
+	toAccountID string,
+	currency string,
+	amount int64,
+	bookedAt time.Time,
+) (bool, error) {
+	if a == nil {
+		return false, stackErr.Error(ErrLedgerAccountAggregateRequired)
+	}
+	posting, err := newLedgerPosting(
+		transactionID,
+		"ledger.transfer_to_account",
+		transactionID,
+		toAccountID,
+		currency,
+		-amount,
+		bookedAt,
+	)
+	if err != nil {
+		return false, stackErr.Error(err)
+	}
+
+	existing, exists := a.lookupPosting(posting.TransactionID)
+	if exists {
+		if sameLedgerPosting(existing, posting) {
+			return false, nil
+		}
+		return false, stackErr.Error(fmt.Errorf("ledger transfer mismatch for transaction_id=%s", posting.TransactionID))
+	}
+	if a.Balance(posting.Currency) < amount {
+		return false, stackErr.Error(fmt.Errorf(
+			"%v: account_id=%s currency=%s balance=%d amount=%d",
+			ErrLedgerAccountInsufficientFunds,
+			a.AggregateID(),
+			posting.Currency,
+			a.Balance(posting.Currency),
+			amount,
+		))
+	}
+
+	if err := a.ApplyChange(a, &EventLedgerAccountTransferredToAccount{
+		TransactionID: posting.TransactionID,
+		ToAccountID:   posting.CounterpartyAccountID,
+		Currency:      posting.Currency,
+		Amount:        amount,
+		BookedAt:      posting.BookedAt,
+	}); err != nil {
+		return false, stackErr.Error(err)
+	}
+
+	return true, nil
+}
+
+func (a *LedgerAccountAggregate) ReceiveTransfer(
+	transactionID string,
+	fromAccountID string,
+	currency string,
+	amount int64,
+	bookedAt time.Time,
+) (bool, error) {
+	if a == nil {
+		return false, stackErr.Error(ErrLedgerAccountAggregateRequired)
+	}
+	posting, err := newLedgerPosting(
+		transactionID,
+		"ledger.transfer_to_account",
+		transactionID,
+		fromAccountID,
+		currency,
+		amount,
+		bookedAt,
+	)
+	if err != nil {
+		return false, stackErr.Error(err)
+	}
+
+	existing, exists := a.lookupPosting(posting.TransactionID)
+	if exists {
+		if sameLedgerPosting(existing, posting) {
+			return false, nil
+		}
+		return false, stackErr.Error(fmt.Errorf("ledger transfer receive mismatch for transaction_id=%s", posting.TransactionID))
+	}
+
+	if err := a.ApplyChange(a, &EventLedgerAccountReceivedTransfer{
+		TransactionID: posting.TransactionID,
+		FromAccountID: posting.CounterpartyAccountID,
+		Currency:      posting.Currency,
+		Amount:        amount,
+		BookedAt:      posting.BookedAt,
+	}); err != nil {
+		return false, stackErr.Error(err)
+	}
+
+	return true, nil
+}
+
+func (a *LedgerAccountAggregate) onPaymentBooked(accountID string, data *EventLedgerAccountPaymentBooked) error {
+	if data == nil {
+		return stackErr.Error(errors.New("ledger payment booked event is nil"))
+	}
+
+	return a.applyPosting(accountID, LedgerAccountPosting{
+		TransactionID:         strings.TrimSpace(data.TransactionID),
+		ReferenceType:         "payment.succeeded",
+		ReferenceID:           strings.TrimSpace(data.PaymentID),
+		CounterpartyAccountID: strings.TrimSpace(data.CounterpartyAccountID),
+		Currency:              strings.ToUpper(strings.TrimSpace(data.Currency)),
+		AmountDelta:           data.AmountDelta,
+		BookedAt:              data.BookedAt.UTC(),
+	})
+}
+
+func (a *LedgerAccountAggregate) onTransferredToAccount(accountID string, data *EventLedgerAccountTransferredToAccount) error {
+	if data == nil {
+		return stackErr.Error(errors.New("ledger transfer to account event is nil"))
+	}
+
+	return a.applyPosting(accountID, LedgerAccountPosting{
+		TransactionID:         strings.TrimSpace(data.TransactionID),
+		ReferenceType:         "ledger.transfer_to_account",
+		ReferenceID:           strings.TrimSpace(data.TransactionID),
+		CounterpartyAccountID: strings.TrimSpace(data.ToAccountID),
+		Currency:              strings.ToUpper(strings.TrimSpace(data.Currency)),
+		AmountDelta:           -data.Amount,
+		BookedAt:              data.BookedAt.UTC(),
+	})
+}
+
+func (a *LedgerAccountAggregate) onReceivedTransfer(accountID string, data *EventLedgerAccountReceivedTransfer) error {
+	if data == nil {
+		return stackErr.Error(errors.New("ledger received transfer event is nil"))
+	}
+
+	return a.applyPosting(accountID, LedgerAccountPosting{
+		TransactionID:         strings.TrimSpace(data.TransactionID),
+		ReferenceType:         "ledger.transfer_to_account",
+		ReferenceID:           strings.TrimSpace(data.TransactionID),
+		CounterpartyAccountID: strings.TrimSpace(data.FromAccountID),
+		Currency:              strings.ToUpper(strings.TrimSpace(data.Currency)),
+		AmountDelta:           data.Amount,
+		BookedAt:              data.BookedAt.UTC(),
+	})
+}
+
+func (a *LedgerAccountAggregate) applyPosting(accountID string, posting LedgerAccountPosting) error {
+	a.ensureState()
+	a.AccountID = strings.TrimSpace(accountID)
+	a.Balances[posting.Currency] += posting.AmountDelta
+	a.PostedTransactions[posting.TransactionID] = posting
+	return nil
+}
+
+func (a *LedgerAccountAggregate) ensureState() {
+	if a.Balances == nil {
+		a.Balances = make(map[string]int64)
+	}
+	if a.PostedTransactions == nil {
+		a.PostedTransactions = make(map[string]LedgerAccountPosting)
+	}
+}
+
+func (a *LedgerAccountAggregate) lookupPosting(transactionID string) (LedgerAccountPosting, bool) {
+	if a == nil {
+		return LedgerAccountPosting{}, false
+	}
+	a.ensureState()
+	posting, ok := a.PostedTransactions[strings.TrimSpace(transactionID)]
+	return posting, ok
+}
+
+func newLedgerPosting(
+	transactionID string,
+	referenceType string,
+	referenceID string,
+	counterpartyAccountID string,
+	currency string,
+	amountDelta int64,
+	bookedAt time.Time,
+) (LedgerAccountPosting, error) {
+	transactionID = strings.TrimSpace(transactionID)
+	if transactionID == "" {
+		return LedgerAccountPosting{}, ErrLedgerAccountTransactionRequired
+	}
+	currency = strings.ToUpper(strings.TrimSpace(currency))
+	if currency == "" {
+		return LedgerAccountPosting{}, ErrLedgerAccountCurrencyRequired
+	}
+	if amountDelta == 0 {
+		return LedgerAccountPosting{}, ErrLedgerAccountAmountInvalid
+	}
+
+	return LedgerAccountPosting{
+		TransactionID:         transactionID,
+		ReferenceType:         strings.TrimSpace(referenceType),
+		ReferenceID:           strings.TrimSpace(referenceID),
+		CounterpartyAccountID: strings.TrimSpace(counterpartyAccountID),
+		Currency:              currency,
+		AmountDelta:           amountDelta,
+		BookedAt:              bookedAt.UTC(),
+	}, nil
+}
+
+func sameLedgerPosting(left LedgerAccountPosting, right LedgerAccountPosting) bool {
+	return left.TransactionID == right.TransactionID &&
+		left.ReferenceType == right.ReferenceType &&
+		left.ReferenceID == right.ReferenceID &&
+		left.CounterpartyAccountID == right.CounterpartyAccountID &&
+		left.Currency == right.Currency &&
+		left.AmountDelta == right.AmountDelta
+}

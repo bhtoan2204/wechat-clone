@@ -6,10 +6,10 @@ import (
 	ledgerrepo "go-socket/core/modules/ledger/infra/persistent/repository"
 )
 
-func BuildService(appContext *appCtx.AppContext) *service.LedgerService {
+func BuildService(appContext *appCtx.AppContext) service.LedgerService {
 	return service.NewLedgerService(ledgerrepo.NewRepoImpl(appContext))
 }
 
-func BuildQueryService(appContext *appCtx.AppContext) *service.LedgerQueryService {
+func BuildQueryService(appContext *appCtx.AppContext) service.LedgerQueryService {
 	return service.NewLedgerQueryService(ledgerrepo.NewRepoImpl(appContext))
 }
