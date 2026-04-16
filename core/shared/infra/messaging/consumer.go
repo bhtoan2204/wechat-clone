@@ -51,6 +51,8 @@ type consumer struct {
 
 	dlq          bool
 	retryBackoff time.Duration
+
+	producer Producer
 }
 
 func NewConsumer(cfg *Config) (Consumer, error) {
@@ -75,12 +77,18 @@ func NewConsumer(cfg *Config) (Consumer, error) {
 	if err := c.SubscribeTopics(cfg.ConsumeTopic, nil); err != nil {
 		return nil, stackErr.Error(err)
 	}
+
+	producer, err := NewProducer(cfg)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
 	return &consumer{
 		instance:     c,
 		chanStop:     make(chan bool, 1),
 		handlerName:  cfg.HandlerName,
 		dlq:          cfg.DLQ,
 		retryBackoff: time.Second,
+		producer:     producer,
 	}, nil
 }
 
@@ -176,8 +184,7 @@ func (c *consumer) handleMessage(log *zap.SugaredLogger, f CallBack, msg *kafka.
 	ctx, span := c.startSpan(msg)
 	defer span.End()
 
-	err := processMessageWithRetry(ctx, f, msg)
-	if err != nil {
+	if err := processMessageWithRetry(ctx, f, msg); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 
@@ -191,13 +198,13 @@ func (c *consumer) handleMessage(log *zap.SugaredLogger, f CallBack, msg *kafka.
 			c.StoreDLQ(ctx, msg)
 		}
 
-		// Rewind to the failed offset so later commits cannot skip an unprocessed message.
-		if rewindErr := c.rewindMessage(msg); rewindErr != nil {
-			span.RecordError(rewindErr)
-			log.Warnw("Failed to rewind offset after message processing error",
-				zap.Any("topic_partition", msg.TopicPartition),
-				zap.Error(rewindErr))
-		}
+		// // Rewind to the failed offset so later commits cannot skip an unprocessed message.
+		// if rewindErr := c.rewindMessage(msg); rewindErr != nil {
+		// 	span.RecordError(rewindErr)
+		// 	log.Warnw("Failed to rewind offset after message processing error",
+		// 		zap.Any("topic_partition", msg.TopicPartition),
+		// 		zap.Error(rewindErr))
+		// }
 
 		if c.retryBackoff > 0 {
 			time.Sleep(c.retryBackoff)
@@ -221,8 +228,8 @@ func (c *consumer) rewindMessage(msg *kafka.Message) error {
 const DLQSuffix = "dlq"
 
 func (c *consumer) StoreDLQ(ctx context.Context, msg *kafka.Message) {
-	// topic := *msg.TopicPartition.Topic
-	// c.producer.ProduceRawWithKey(ctx, GetDLQTopic(topic), msg.Key, msg.Value)
+	topic := *msg.TopicPartition.Topic
+	c.producer.Produce(ctx, GetDLQTopic(topic), string(msg.Key), msg.Value)
 }
 
 func GetDLQTopic(topic string) string {
