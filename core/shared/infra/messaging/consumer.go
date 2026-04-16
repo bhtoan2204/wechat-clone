@@ -229,7 +229,7 @@ const DLQSuffix = "dlq"
 
 func (c *consumer) StoreDLQ(ctx context.Context, msg *kafka.Message) {
 	topic := *msg.TopicPartition.Topic
-	c.producer.Produce(ctx, GetDLQTopic(topic), string(msg.Key), msg.Value)
+	c.producer.ProduceRawWithKey(ctx, GetDLQTopic(topic), msg.Key, msg.Value)
 }
 
 func GetDLQTopic(topic string) string {

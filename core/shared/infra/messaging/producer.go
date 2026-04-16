@@ -2,18 +2,18 @@ package messaging
 
 import (
 	"context"
-	"encoding/json"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
 	"sync"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"go.opentelemetry.io/otel/codes"
 	"go.uber.org/zap"
 )
 
 //go:generate mockgen -package=messaging -destination=producer_mock.go -source=producer.go
 type Producer interface {
-	Produce(ctx context.Context, topic string, key string, v interface{}) error
+	ProduceRawWithKey(ctx context.Context, topic string, key []byte, data []byte) error
 	Close(ctx context.Context)
 }
 
@@ -41,17 +41,30 @@ func NewProducer(cfg *Config) (Producer, error) {
 	return producer, nil
 }
 
-func (p *producer) Produce(ctx context.Context, topic string, key string, v interface{}) error {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return stackErr.Error(err)
+func (p *producer) ProduceRawWithKey(ctx context.Context, topic string, key []byte, data []byte) error {
+	log := logging.FromContext(ctx)
+
+	msg := &kafka.Message{
+		TopicPartition: kafka.TopicPartition{
+			Topic:     &topic,
+			Partition: kafka.PartitionAny,
+		},
+		Key:   key,
+		Value: data,
 	}
 
-	return p.instance.Produce(&kafka.Message{
-		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-		Key:            []byte(key),
-		Value:          data,
-	}, nil)
+	_, span := p.startSpan(ctx, msg)
+	defer span.End()
+
+	if err := p.instance.Produce(msg, nil); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		log.Errorw("producer ProduceRawWithKey got error",
+			zap.Error(err), zap.ByteString("key", key), zap.ByteString("body", data))
+		return err
+	}
+
+	return nil
 }
 
 func (p *producer) listenDefaultEvent() {

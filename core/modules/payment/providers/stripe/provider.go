@@ -13,6 +13,7 @@ import (
 	"go-socket/core/modules/payment/domain/entity"
 	"go-socket/core/modules/payment/providers"
 	"go-socket/core/shared/config"
+	"go-socket/core/shared/infra/xtracer"
 	"go-socket/core/shared/pkg/stackErr"
 
 	stripe "github.com/stripe/stripe-go/v75"
@@ -39,7 +40,8 @@ type Provider struct {
 
 func NewProvider(cfg config.LedgerStripeConfig) *Provider {
 	httpClient := &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout:   15 * time.Second,
+		Transport: xtracer.NewTransport(),
 	}
 
 	provider := &Provider{
@@ -51,7 +53,28 @@ func NewProvider(cfg config.LedgerStripeConfig) *Provider {
 		apiBaseURL:    stripe.APIURL,
 	}
 
-	provider.client = newStripeClient(provider.secretKey, provider.httpClient, provider.apiBaseURL)
+	provider.client = func(secretKey string, httpClient *http.Client, apiBaseURL string) *stripeclient.API {
+		baseURL := strings.TrimRight(strings.TrimSpace(apiBaseURL), "/")
+		if baseURL == "" {
+			baseURL = stripe.APIURL
+		}
+
+		backends := &stripe.Backends{
+			API: stripe.GetBackendWithConfig(stripe.APIBackend, &stripe.BackendConfig{
+				HTTPClient: httpClient,
+				URL:        stripe.String(baseURL),
+			}),
+			Connect: stripe.GetBackendWithConfig(stripe.ConnectBackend, &stripe.BackendConfig{
+				HTTPClient: httpClient,
+			}),
+			Uploads: stripe.GetBackendWithConfig(stripe.UploadsBackend, &stripe.BackendConfig{
+				HTTPClient: httpClient,
+			}),
+		}
+
+		return stripeclient.New(secretKey, backends)
+	}(provider.secretKey, provider.httpClient, provider.apiBaseURL)
+
 	return provider
 }
 
@@ -239,9 +262,6 @@ func (p *Provider) ParseEvent(_ context.Context, event *providers.WebhookEvent) 
 }
 
 func (p *Provider) stripeClient() *stripeclient.API {
-	if p.client == nil {
-		p.client = newStripeClient(p.secretKey, p.httpClient, p.apiBaseURL)
-	}
 	return p.client
 }
 
@@ -315,32 +335,4 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
-}
-
-func newStripeClient(secretKey string, httpClient *http.Client, apiBaseURL string) *stripeclient.API {
-	if httpClient == nil {
-		httpClient = &http.Client{
-			Timeout: 15 * time.Second,
-		}
-	}
-
-	baseURL := strings.TrimRight(strings.TrimSpace(apiBaseURL), "/")
-	if baseURL == "" {
-		baseURL = stripe.APIURL
-	}
-
-	backends := &stripe.Backends{
-		API: stripe.GetBackendWithConfig(stripe.APIBackend, &stripe.BackendConfig{
-			HTTPClient: httpClient,
-			URL:        stripe.String(baseURL),
-		}),
-		Connect: stripe.GetBackendWithConfig(stripe.ConnectBackend, &stripe.BackendConfig{
-			HTTPClient: httpClient,
-		}),
-		Uploads: stripe.GetBackendWithConfig(stripe.UploadsBackend, &stripe.BackendConfig{
-			HTTPClient: httpClient,
-		}),
-	}
-
-	return stripeclient.New(secretKey, backends)
 }
