@@ -17,11 +17,11 @@ import (
 
 type pinChatMessageHandler struct {
 	baseRepo roomrepos.Repos
-	services service.Service
+	realtime service.RealtimeService
 }
 
-func NewPinChatMessageHandler(baseRepo roomrepos.Repos, services service.Service) cqrs.Handler[*in.PinChatMessageRequest, *out.ChatConversationResponse] {
-	return &pinChatMessageHandler{baseRepo: baseRepo, services: services}
+func NewPinChatMessageHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.PinChatMessageRequest, *out.ChatConversationResponse] {
+	return &pinChatMessageHandler{baseRepo: baseRepo, realtime: realtime}
 }
 
 func (h *pinChatMessageHandler) Handle(ctx context.Context, req *in.PinChatMessageRequest) (*out.ChatConversationResponse, error) {
@@ -51,7 +51,7 @@ func (h *pinChatMessageHandler) Handle(ctx context.Context, req *in.PinChatMessa
 	}
 	out := roomsupport.ToConversationResponse(res)
 
-	h.services.EmitMessage(ctx, types.MessagePayload{
+	h.realtime.EmitMessage(ctx, types.MessagePayload{
 		RoomId:  out.RoomID,
 		Type:    reflect.TypeOf(out).Elem().Name(),
 		Payload: out,

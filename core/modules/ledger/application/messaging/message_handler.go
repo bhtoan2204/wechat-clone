@@ -12,8 +12,6 @@ import (
 	"go-socket/core/shared/config"
 	"go-socket/core/shared/infra/lock"
 	infraMessaging "go-socket/core/shared/infra/messaging"
-	"go-socket/core/shared/pkg/contxt"
-	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
 )
 
@@ -91,7 +89,7 @@ func NewMessageHandler(
 
 func (h *messageHandler) Start() error {
 	for _, consumer := range h.consumer {
-		consumer.Read(h.processMessage(consumer))
+		consumer.Read(infraMessaging.WrapConsumerCallback(consumer, "Handle ledger message failed"))
 	}
 	return nil
 }
@@ -99,33 +97,4 @@ func (h *messageHandler) Start() error {
 func (h *messageHandler) Stop() error {
 	infraMessaging.StopConsumers(h.consumer)
 	return nil
-}
-
-func (h *messageHandler) processMessage(consume infraMessaging.Consumer) infraMessaging.CallBack {
-	return func(ctx context.Context, _ string, vals []byte) (err error) {
-		ctx = contxt.SetRequestID(ctx)
-
-		logger := logging.FromContext(ctx)
-		if reqID := contxt.RequestIDFromCtx(ctx); reqID != "" {
-			logger = logger.With("request_id", reqID)
-		}
-		ctx = logging.WithLogger(ctx, logger)
-
-		defer func() {
-			if r := recover(); r != nil {
-				err = stackErr.Error(fmt.Errorf("panic recovered: %v", r))
-			}
-		}()
-
-		handler := consume.GetHandler()
-		if handler == nil {
-			return stackErr.Error(fmt.Errorf("consumer handler is nil"))
-		}
-
-		if err = handler(ctx, vals); err != nil {
-			return stackErr.Error(err)
-		}
-
-		return nil
-	}
 }

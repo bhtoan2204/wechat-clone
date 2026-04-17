@@ -1,12 +1,17 @@
 package aggregate
 
 import (
+	"errors"
+	"go-socket/core/modules/room/domain/entity"
 	"go-socket/core/modules/room/types"
 	"go-socket/core/shared/pkg/event"
+	"strings"
 	"time"
+)
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+var (
+	ErrRoomAggregateIDMismatch     = errors.New("room id mismatch")
+	ErrRoomEventOccurredAtRequired = errors.New("room event occurred_at is required")
 )
 
 type RoomAggregate struct {
@@ -34,19 +39,19 @@ func (r *RoomAggregate) RegisterEvents(register event.RegisterEventsFunc) error 
 func (r *RoomAggregate) Transition(e event.Event) error {
 	switch data := e.EventData.(type) {
 	case *EventRoomCreated:
-		return r.onRoomCreated(e.AggregateID, data)
+		return r.applyRoomCreated(e.AggregateID, data)
 	case *EventRoomMemberAdded:
-		return r.onRoomMemberAdded(data)
+		return r.applyRoomMemberAdded(data)
 	case *EventRoomMemberRemoved:
-		return r.onRoomMemberRemoved(data)
+		return r.applyRoomMemberRemoved(data)
 	case *EventRoomMessageCreated:
-		return r.onRoomMessageCreated(data)
+		return r.applyRoomMessageCreated(data)
 	default:
-		return status.Error(codes.InvalidArgument, "unsupported event type")
+		return event.ErrUnsupportedEventType
 	}
 }
 
-func (r *RoomAggregate) onRoomCreated(
+func (r *RoomAggregate) applyRoomCreated(
 	aggregateID string,
 	data *EventRoomCreated,
 ) error {
@@ -60,22 +65,22 @@ func (r *RoomAggregate) onRoomCreated(
 	return nil
 }
 
-func (r *RoomAggregate) onRoomMemberAdded(
+func (r *RoomAggregate) applyRoomMemberAdded(
 	data *EventRoomMemberAdded,
 ) error {
 	if err := r.ensureRoomID(data.RoomID); err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return err
 	}
 
 	r.MemberCount++
 	return nil
 }
 
-func (r *RoomAggregate) onRoomMemberRemoved(
+func (r *RoomAggregate) applyRoomMemberRemoved(
 	data *EventRoomMemberRemoved,
 ) error {
 	if err := r.ensureRoomID(data.RoomID); err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return err
 	}
 
 	if r.MemberCount > 0 {
@@ -84,11 +89,11 @@ func (r *RoomAggregate) onRoomMemberRemoved(
 	return nil
 }
 
-func (r *RoomAggregate) onRoomMessageCreated(
+func (r *RoomAggregate) applyRoomMessageCreated(
 	data *EventRoomMessageCreated,
 ) error {
 	if err := r.ensureRoomID(data.RoomID); err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return err
 	}
 
 	r.LastMessageID = data.MessageID
@@ -100,15 +105,16 @@ func (r *RoomAggregate) onRoomMessageCreated(
 }
 
 func (r *RoomAggregate) ensureRoomID(roomID string) error {
+	roomID = strings.TrimSpace(roomID)
 	if roomID == "" {
-		return status.Error(codes.InvalidArgument, "room id is required")
+		return entity.ErrRoomIDRequired
 	}
 	if r.RoomID == "" {
 		r.RoomID = roomID
 		return nil
 	}
 	if r.RoomID != roomID {
-		return status.Error(codes.InvalidArgument, "room id mismatch")
+		return ErrRoomAggregateIDMismatch
 	}
 	return nil
 }

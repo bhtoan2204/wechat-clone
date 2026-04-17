@@ -18,11 +18,11 @@ import (
 
 type removeChatMemberHandler struct {
 	baseRepo roomrepos.Repos
-	services service.Service
+	realtime service.RealtimeService
 }
 
-func NewRemoveChatMemberHandler(baseRepo roomrepos.Repos, services service.Service) cqrs.Handler[*in.RemoveChatMemberRequest, *out.ChatConversationResponse] {
-	return &removeChatMemberHandler{baseRepo: baseRepo, services: services}
+func NewRemoveChatMemberHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.RemoveChatMemberRequest, *out.ChatConversationResponse] {
+	return &removeChatMemberHandler{baseRepo: baseRepo, realtime: realtime}
 }
 func (h *removeChatMemberHandler) Handle(ctx context.Context, req *in.RemoveChatMemberRequest) (*out.ChatConversationResponse, error) {
 	accountID, err := roomsupport.AccountIDFromCtx(ctx)
@@ -53,7 +53,7 @@ func (h *removeChatMemberHandler) Handle(ctx context.Context, req *in.RemoveChat
 		return nil, stackErr.Error(err)
 	}
 	out := roomsupport.ToConversationResponse(res)
-	h.services.EmitMessage(ctx, types.MessagePayload{
+	h.realtime.EmitMessage(ctx, types.MessagePayload{
 		RoomId:  out.RoomID,
 		Type:    reflect.TypeOf(out).Elem().Name(),
 		Payload: out,

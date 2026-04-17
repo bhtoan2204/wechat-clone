@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"time"
 
 	appCtx "go-socket/core/context"
 	"go-socket/core/modules/account/application/dto/in"
@@ -41,7 +42,7 @@ func (u *updateProfileHandler) Handle(ctx context.Context, req *in.UpdateProfile
 		return nil, stackErr.Error(err)
 	}
 
-	updated, err := accountAggregate.UpdateProfile(req.DisplayName, req.Username, req.AvatarObjectKey)
+	updated, err := accountAggregate.UpdateProfile(req.DisplayName, req.Username, req.AvatarObjectKey, time.Now().UTC())
 	if err != nil {
 		log.Errorw("Failed to update account profile aggregate", zap.Error(err))
 		return nil, stackErr.Error(err)

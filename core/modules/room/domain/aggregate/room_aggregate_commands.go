@@ -3,14 +3,14 @@ package aggregate
 import (
 	"go-socket/core/modules/room/domain/valueobject"
 	roomtypes "go-socket/core/modules/room/types"
+	"go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/stackErr"
 	"time"
 )
 
 func NewRoomAggregate(roomID string) (*RoomAggregate, error) {
 	agg := &RoomAggregate{}
-	agg.SetAggregateType("RoomAggregate")
-	if err := agg.SetID(roomID); err != nil {
+	if err := event.InitAggregate(&agg.AggregateRoot, agg, roomID); err != nil {
 		return nil, stackErr.Error(err)
 	}
 	return agg, nil
@@ -25,6 +25,11 @@ func (r *RoomAggregate) RecordRoomCreated(roomType roomtypes.RoomType, memberCou
 }
 
 func (r *RoomAggregate) RecordMemberAdded(memberID string, memberRole roomtypes.RoomRole, joinedAt time.Time) error {
+	joinedAt, err := normalizeRoomEventOccurredAt(joinedAt)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+
 	return r.ApplyChange(r, &EventRoomMemberAdded{
 		RoomID:         r.AggregateID(),
 		MemberID:       memberID,
@@ -34,6 +39,11 @@ func (r *RoomAggregate) RecordMemberAdded(memberID string, memberRole roomtypes.
 }
 
 func (r *RoomAggregate) RecordMemberRemoved(memberID string, memberRole roomtypes.RoomRole, removedAt time.Time) error {
+	removedAt, err := normalizeRoomEventOccurredAt(removedAt)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+
 	return r.ApplyChange(r, &EventRoomMemberRemoved{
 		RoomID:         r.AggregateID(),
 		MemberID:       memberID,
@@ -52,6 +62,16 @@ func (r *RoomAggregate) RecordMessageCreated(
 	mentions valueobject.MessageMentions,
 	attachment *valueobject.FileAttachment,
 ) error {
+	sentAt, err := normalizeRoomEventOccurredAt(sentAt)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+
+	var normalizedAttachment valueobject.FileAttachment
+	if attachment != nil {
+		normalizedAttachment = *attachment
+	}
+
 	return r.ApplyChange(r, &EventRoomMessageCreated{
 		RoomID:                 r.AggregateID(),
 		RoomName:               r.RoomName,
@@ -61,10 +81,10 @@ func (r *RoomAggregate) RecordMessageCreated(
 		MessageType:            messageType,
 		ReplyToMessageID:       reference.ReplyToMessageID,
 		ForwardedFromMessageID: reference.ForwardedFromMessageID,
-		FileName:               attachment.FileName,
-		FileSize:               attachment.FileSize,
-		MimeType:               attachment.MimeType,
-		ObjectKey:              attachment.ObjectKey,
+		FileName:               normalizedAttachment.FileName,
+		FileSize:               normalizedAttachment.FileSize,
+		MimeType:               normalizedAttachment.MimeType,
+		ObjectKey:              normalizedAttachment.ObjectKey,
 		MessageSenderID:        sender.ID,
 		MessageSenderName:      sender.Name,
 		MessageSenderEmail:     sender.Email,
@@ -73,4 +93,11 @@ func (r *RoomAggregate) RecordMessageCreated(
 		MentionAll:             mentions.MentionAll,
 		MentionedAccountIDs:    mentions.AccountIDs,
 	})
+}
+
+func normalizeRoomEventOccurredAt(value time.Time) (time.Time, error) {
+	if value.IsZero() {
+		return time.Time{}, ErrRoomEventOccurredAtRequired
+	}
+	return value.UTC(), nil
 }

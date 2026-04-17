@@ -1,7 +1,6 @@
 package aggregate
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
@@ -31,7 +30,7 @@ func TestNewProviderTopUpAggregateQueuesCreatedEvent(t *testing.T) {
 	if outbox[0].AggregateID != "txn-1" {
 		t.Fatalf("unexpected aggregate id: %s", outbox[0].AggregateID)
 	}
-	if outbox[0].AggregateType != reflect.TypeOf(agg).Elem().Name() {
+	if outbox[0].AggregateType != AggregateTypePaymentIntent {
 		t.Fatalf("unexpected aggregate type: %s", outbox[0].AggregateType)
 	}
 	if outbox[0].Version != 1 {
@@ -54,7 +53,7 @@ func TestPaymentIntentAggregateApplySuccessQueuesProcessedAndOutbox(t *testing.T
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	agg, err := RehydratePaymentIntentAggregate(intent)
+	agg, err := RestorePaymentIntentAggregate(intent)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -93,7 +92,7 @@ func TestPaymentIntentAggregateApplySuccessQueuesProcessedAndOutbox(t *testing.T
 	if outbox[0].EventName != "payment.succeeded" {
 		t.Fatalf("unexpected event name: %s", outbox[0].EventName)
 	}
-	if outbox[0].AggregateType != reflect.TypeOf(agg).Elem().Name() {
+	if outbox[0].AggregateType != AggregateTypePaymentIntent {
 		t.Fatalf("unexpected aggregate type: %s", outbox[0].AggregateType)
 	}
 	if outbox[0].Version != 1 {
@@ -113,7 +112,7 @@ func TestPaymentIntentAggregateAssignsSequentialEnvelopeVersions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	agg, err := RehydratePaymentIntentAggregate(intent)
+	agg, err := RestorePaymentIntentAggregate(intent)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -153,7 +152,7 @@ func TestPaymentIntentAggregateIgnoresLateFailureAfterSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	agg, err := RehydratePaymentIntentAggregate(intent)
+	agg, err := RestorePaymentIntentAggregate(intent)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

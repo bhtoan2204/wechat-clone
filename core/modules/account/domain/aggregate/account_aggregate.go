@@ -9,9 +9,15 @@ import (
 	"go-socket/core/shared/pkg/event"
 	"go-socket/core/shared/pkg/stackErr"
 	"go-socket/core/shared/utils"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+)
+
+var (
+	ErrAccountOccurredAtRequired        = errors.New("occurred_at is required")
+	ErrAccountVerificationTokenRequired = errors.New("verification token is required")
 )
 
 type AccountAggregate struct {
@@ -49,25 +55,25 @@ func (a *AccountAggregate) RegisterEvents(register event.RegisterEventsFunc) err
 func (a *AccountAggregate) Transition(e event.Event) error {
 	switch data := e.EventData.(type) {
 	case *EventAccountCreated:
-		return a.onAccountCreated(e.AggregateID, data)
+		return a.applyAccountCreated(e.AggregateID, data)
 	case *EventAccountUpdated:
-		return a.onAccountUpdated(data)
+		return a.applyAccountUpdated(data)
 	case *EventAccountProfileUpdated:
-		return a.onAccountProfileUpdated(data)
+		return a.applyAccountProfileUpdated(data)
 	case *EventAccountEmailVerificationRequested:
-		return a.onAccountEmailVerificationRequested(data)
+		return a.applyAccountEmailVerificationRequested(data)
 	case *EventAccountEmailVerified:
-		return a.onAccountEmailVerified(data)
+		return a.applyAccountEmailVerified(data)
 	case *EventAccountPasswordChanged:
-		return a.onAccountPasswordChanged(data)
+		return a.applyAccountPasswordChanged(data)
 	case *EventAccountBanned:
-		return a.onAccountBanned(data)
+		return a.applyAccountBanned(data)
 	default:
-		return stackErr.Error(errors.New("unsupported event type"))
+		return event.ErrUnsupportedEventType
 	}
 }
 
-func (a *AccountAggregate) onAccountCreated(aggregateID string, data *EventAccountCreated) error {
+func (a *AccountAggregate) applyAccountCreated(aggregateID string, data *EventAccountCreated) error {
 	a.AccountID = aggregateID
 	a.Email = data.Email
 	a.PasswordHash = data.PasswordHash
@@ -78,13 +84,13 @@ func (a *AccountAggregate) onAccountCreated(aggregateID string, data *EventAccou
 	return nil
 }
 
-func (a *AccountAggregate) onAccountUpdated(data *EventAccountUpdated) error {
+func (a *AccountAggregate) applyAccountUpdated(data *EventAccountUpdated) error {
 	a.Email = data.Email
 	a.UpdatedAt = data.UpdatedAt
 	return nil
 }
 
-func (a *AccountAggregate) onAccountProfileUpdated(data *EventAccountProfileUpdated) error {
+func (a *AccountAggregate) applyAccountProfileUpdated(data *EventAccountProfileUpdated) error {
 	a.DisplayName = data.DisplayName
 	a.Username = data.Username
 	a.AvatarObjectKey = data.AvatarObjectKey
@@ -92,21 +98,21 @@ func (a *AccountAggregate) onAccountProfileUpdated(data *EventAccountProfileUpda
 	return nil
 }
 
-func (a *AccountAggregate) onAccountEmailVerificationRequested(data *EventAccountEmailVerificationRequested) error {
+func (a *AccountAggregate) applyAccountEmailVerificationRequested(data *EventAccountEmailVerificationRequested) error {
 	requestedAt := data.RequestedAt
 	a.LastEmailVerificationRequested = &requestedAt
 	a.UpdatedAt = requestedAt
 	return nil
 }
 
-func (a *AccountAggregate) onAccountEmailVerified(data *EventAccountEmailVerified) error {
+func (a *AccountAggregate) applyAccountEmailVerified(data *EventAccountEmailVerified) error {
 	verifiedAt := data.EmailVerifiedAt
 	a.EmailVerifiedAt = &verifiedAt
 	a.UpdatedAt = verifiedAt
 	return nil
 }
 
-func (a *AccountAggregate) onAccountPasswordChanged(data *EventAccountPasswordChanged) error {
+func (a *AccountAggregate) applyAccountPasswordChanged(data *EventAccountPasswordChanged) error {
 	changedAt := data.PasswordChangedAt
 	a.PasswordHash = data.PasswordHash
 	a.PasswordChangedAt = &changedAt
@@ -114,7 +120,7 @@ func (a *AccountAggregate) onAccountPasswordChanged(data *EventAccountPasswordCh
 	return nil
 }
 
-func (a *AccountAggregate) onAccountBanned(data *EventAccountBanned) error {
+func (a *AccountAggregate) applyAccountBanned(data *EventAccountBanned) error {
 	a.BannedReason = data.BanReason
 	a.BannedUntil = data.BanUntil
 	return nil
@@ -126,6 +132,10 @@ func (a *AccountAggregate) Register(
 	displayName string,
 	now time.Time,
 ) error {
+	now, err := normalizeAccountOccurredAt(now)
+	if err != nil {
+		return stackErr.Error(err)
+	}
 	if a.IsRegistered() {
 		return stackErr.Error(rules.ErrAccountAlreadyRegistered)
 	}
@@ -146,6 +156,10 @@ func (a *AccountAggregate) Register(
 }
 
 func (a *AccountAggregate) OpenRegister(email, displayName, avatarObjectKey string, now time.Time) error {
+	now, err := normalizeAccountOccurredAt(now)
+	if err != nil {
+		return stackErr.Error(err)
+	}
 	if a.IsRegistered() {
 		return stackErr.Error(rules.ErrAccountAlreadyRegistered)
 	}
@@ -169,6 +183,7 @@ func (a *AccountAggregate) OpenRegister(email, displayName, avatarObjectKey stri
 		AccountID:       a.AggregateID(),
 		DisplayName:     normalizedDisplayName,
 		AvatarObjectKey: &avatarObjectKey,
+		UpdatedAt:       now,
 	}); err != nil {
 		return stackErr.Error(err)
 	}
@@ -184,7 +199,11 @@ func (a *AccountAggregate) OpenRegister(email, displayName, avatarObjectKey stri
 	return nil
 }
 
-func (a *AccountAggregate) UpdateProfile(displayName string, username, avatarObjectKey *string) (bool, error) {
+func (a *AccountAggregate) UpdateProfile(displayName string, username, avatarObjectKey *string, updatedAt time.Time) (bool, error) {
+	updatedAt, err := normalizeAccountOccurredAt(updatedAt)
+	if err != nil {
+		return false, stackErr.Error(err)
+	}
 	if !a.IsRegistered() {
 		return false, stackErr.Error(rules.ErrAccountNotRegistered)
 	}
@@ -213,7 +232,7 @@ func (a *AccountAggregate) UpdateProfile(displayName string, username, avatarObj
 		DisplayName:     normalizedDisplayName,
 		Username:        normalizedUsername,
 		AvatarObjectKey: normalizedAvatarObjectKey,
-		UpdatedAt:       utils.NowUTC(),
+		UpdatedAt:       updatedAt,
 	}); err != nil {
 		return false, stackErr.Error(err)
 	}
@@ -221,7 +240,15 @@ func (a *AccountAggregate) UpdateProfile(displayName string, username, avatarObj
 	return true, nil
 }
 
-func (a *AccountAggregate) RequestEmailVerification(token string) error {
+func (a *AccountAggregate) RequestEmailVerification(token string, requestedAt time.Time) error {
+	requestedAt, err := normalizeAccountOccurredAt(requestedAt)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return stackErr.Error(ErrAccountVerificationTokenRequired)
+	}
 	if err := a.EnsureEmailVerificationAllowed(); err != nil {
 		return stackErr.Error(err)
 	}
@@ -230,7 +257,7 @@ func (a *AccountAggregate) RequestEmailVerification(token string) error {
 		AccountID:         a.AggregateID(),
 		Email:             a.Email,
 		VerificationToken: token,
-		RequestedAt:       utils.NowUTC(),
+		RequestedAt:       requestedAt,
 	})
 }
 
@@ -245,6 +272,10 @@ func (a *AccountAggregate) EnsureEmailVerificationAllowed() error {
 }
 
 func (a *AccountAggregate) ConfirmEmailVerified(email valueobject.Email, verifiedAt time.Time) error {
+	verifiedAt, err := normalizeAccountOccurredAt(verifiedAt)
+	if err != nil {
+		return stackErr.Error(err)
+	}
 	if !a.IsRegistered() {
 		return stackErr.Error(rules.ErrAccountNotRegistered)
 	}
@@ -262,6 +293,10 @@ func (a *AccountAggregate) ConfirmEmailVerified(email valueobject.Email, verifie
 }
 
 func (a *AccountAggregate) ChangePassword(passwordHash valueobject.HashedPassword, now time.Time) (bool, error) {
+	now, err := normalizeAccountOccurredAt(now)
+	if err != nil {
+		return false, stackErr.Error(err)
+	}
 	if !a.IsRegistered() {
 		return false, stackErr.Error(rules.ErrAccountNotRegistered)
 	}
@@ -397,4 +432,11 @@ func (a *AccountAggregate) IsEmailVerified() bool {
 
 func (a *AccountAggregate) HasChangePassword() bool {
 	return a.PasswordChangedAt != nil
+}
+
+func normalizeAccountOccurredAt(value time.Time) (time.Time, error) {
+	if value.IsZero() {
+		return time.Time{}, ErrAccountOccurredAtRequired
+	}
+	return value.UTC(), nil
 }

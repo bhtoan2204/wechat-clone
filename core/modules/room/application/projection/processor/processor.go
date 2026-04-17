@@ -63,7 +63,7 @@ func NewProcessor(cfg *config.Config, servingProjector roomprojection.ServingPro
 
 func (p *processor) Start() error {
 	for _, consumer := range p.consumer {
-		consumer.Read(p.processMessage(consumer))
+		consumer.Read(infraMessaging.WrapConsumerCallback(consumer, "Handle room projection message failed"))
 	}
 	return nil
 }

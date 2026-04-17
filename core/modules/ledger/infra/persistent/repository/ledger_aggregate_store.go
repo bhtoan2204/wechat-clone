@@ -29,7 +29,7 @@ func (s *aggregateStoreImpl) Get(ctx context.Context, aggregateID string, agg ev
 		return stackErr.Error(fmt.Errorf("aggregate must be a pointer"))
 	}
 
-	aggregateType := reflect.TypeOf(agg).Elem().Name()
+	aggregateType := eventpkg.AggregateTypeName(agg)
 	agg.Root().SetAggregateType(aggregateType)
 
 	hasSnapshot, err := s.repo.ReadSnapshot(ctx, aggregateID, aggregateType, agg)
@@ -49,7 +49,7 @@ func (s *aggregateStoreImpl) Save(ctx context.Context, agg eventpkg.Aggregate) e
 	}
 
 	root := agg.Root()
-	aggregateType := reflect.TypeOf(agg).Elem().Name()
+	aggregateType := eventpkg.AggregateTypeName(agg)
 	root.SetAggregateType(aggregateType)
 
 	events := root.CloneEvents()

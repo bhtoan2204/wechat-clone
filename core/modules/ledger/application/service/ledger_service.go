@@ -66,12 +66,12 @@ func (s *ledgerService) TransferToAccount(ctx context.Context, command TransferT
 		Amount:        command.Amount,
 	})
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("%v: %v", ErrValidation, err))
+		return nil, stackErr.Error(fmt.Errorf("%w: %w", ErrValidation, err))
 	}
 
 	transaction, err := entity.NewLedgerTransaction(strings.TrimSpace(command.TransactionID), booking.LedgerEntries())
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("%v: %v", ErrValidation, err))
+		return nil, stackErr.Error(fmt.Errorf("%w: %w", ErrValidation, err))
 	}
 
 	if err := s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
@@ -93,7 +93,7 @@ func (s *ledgerService) TransferToAccount(ctx context.Context, command TransferT
 		)
 		if err != nil {
 			if errors.Is(err, ledgeraggregate.ErrLedgerAccountInsufficientFunds) {
-				return stackErr.Error(fmt.Errorf("%v: %v", ErrInsufficientFunds, err))
+				return stackErr.Error(fmt.Errorf("%w: %w", ErrInsufficientFunds, err))
 			}
 			return stackErr.Error(err)
 		}
@@ -147,12 +147,12 @@ func (s *ledgerService) RecordPaymentSucceeded(ctx context.Context, command Reco
 		Amount:             command.Amount,
 	})
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("%v: %v", ErrValidation, err))
+		return stackErr.Error(fmt.Errorf("%w: %w", ErrValidation, err))
 	}
 
 	transaction, err := entity.NewLedgerTransaction(booking.LedgerTransactionID(), booking.LedgerEntries())
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("%v: %v", ErrValidation, err))
+		return stackErr.Error(fmt.Errorf("%w: %w", ErrValidation, err))
 	}
 
 	if err := s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
@@ -228,12 +228,12 @@ func (s *ledgerService) RecordPaymentReversed(ctx context.Context, command Recor
 		ReversalType:       command.ReversalType,
 	})
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("%v: %v", ErrValidation, err))
+		return stackErr.Error(fmt.Errorf("%w: %w", ErrValidation, err))
 	}
 
 	transaction, err := entity.NewLedgerTransaction(booking.LedgerTransactionID(), booking.LedgerEntries())
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("%v: %v", ErrValidation, err))
+		return stackErr.Error(fmt.Errorf("%w: %w", ErrValidation, err))
 	}
 
 	if err := s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {

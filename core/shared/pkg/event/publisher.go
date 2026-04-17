@@ -10,7 +10,6 @@ import (
 
 var (
 	ErrEventStoreNil    = errors.New("event store can not be nil")
-	ErrEventNameEmpty   = errors.New("event name can not be empty")
 	ErrAggregateNil     = errors.New("aggregate can not be nil")
 	ErrAggregateRootNil = errors.New("aggregate root can not be nil")
 )

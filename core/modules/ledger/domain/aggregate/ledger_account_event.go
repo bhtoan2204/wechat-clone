@@ -1,14 +1,15 @@
 package aggregate
 
 import (
-	"reflect"
 	"time"
+
+	"go-socket/core/shared/pkg/event"
 )
 
 var (
-	EventNameLedgerAccountPaymentBooked        = eventName((*EventLedgerAccountPaymentBooked)(nil))
-	EventNameLedgerAccountTransferredToAccount = eventName((*EventLedgerAccountTransferredToAccount)(nil))
-	EventNameLedgerAccountReceivedTransfer     = eventName((*EventLedgerAccountReceivedTransfer)(nil))
+	EventNameLedgerAccountPaymentBooked        = event.EventName((*EventLedgerAccountPaymentBooked)(nil))
+	EventNameLedgerAccountTransferredToAccount = event.EventName((*EventLedgerAccountTransferredToAccount)(nil))
+	EventNameLedgerAccountReceivedTransfer     = event.EventName((*EventLedgerAccountReceivedTransfer)(nil))
 )
 
 type EventLedgerAccountPaymentBooked struct {
@@ -35,15 +36,4 @@ type EventLedgerAccountReceivedTransfer struct {
 	Currency      string    `json:"currency"`
 	Amount        int64     `json:"amount"`
 	BookedAt      time.Time `json:"booked_at"`
-}
-
-func eventName(payload any) string {
-	typ := reflect.TypeOf(payload)
-	if typ == nil {
-		return ""
-	}
-	if typ.Kind() == reflect.Ptr {
-		typ = typ.Elem()
-	}
-	return typ.Name()
 }

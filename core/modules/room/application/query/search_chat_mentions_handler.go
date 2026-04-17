@@ -13,11 +13,11 @@ import (
 )
 
 type searchChatMentionsHandler struct {
-	chatService roomservice.Service
+	mentions roomservice.MentionQueryService
 }
 
-func NewSearchChatMentionsHandler(chatService roomservice.Service) cqrs.Handler[*in.SearchChatMentionsRequest, []*out.ChatMentionCandidateResponse] {
-	return &searchChatMentionsHandler{chatService: chatService}
+func NewSearchChatMentionsHandler(mentions roomservice.MentionQueryService) cqrs.Handler[*in.SearchChatMentionsRequest, []*out.ChatMentionCandidateResponse] {
+	return &searchChatMentionsHandler{mentions: mentions}
 }
 
 func (h *searchChatMentionsHandler) Handle(ctx context.Context, req *in.SearchChatMentionsRequest) ([]*out.ChatMentionCandidateResponse, error) {
@@ -26,7 +26,7 @@ func (h *searchChatMentionsHandler) Handle(ctx context.Context, req *in.SearchCh
 		return nil, stackErr.Error(err)
 	}
 
-	results, err := h.chatService.SearchMentionCandidates(ctx, accountID, apptypes.SearchMentionCandidatesQuery{
+	results, err := h.mentions.SearchMentionCandidates(ctx, accountID, apptypes.SearchMentionCandidatesQuery{
 		RoomID: req.RoomID,
 		Query:  req.Q,
 		Limit:  req.Limit,

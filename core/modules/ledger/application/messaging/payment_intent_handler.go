@@ -8,6 +8,7 @@ import (
 
 	ledgerservice "go-socket/core/modules/ledger/application/service"
 	ledgerentity "go-socket/core/modules/ledger/domain/entity"
+	"go-socket/core/shared/contracts"
 	sharedevents "go-socket/core/shared/contracts/events"
 	sharedlock "go-socket/core/shared/infra/lock"
 	"go-socket/core/shared/pkg/logging"
@@ -19,7 +20,7 @@ import (
 func (h *messageHandler) handlePaymentOutboxEvent(ctx context.Context, value []byte) error {
 	log := logging.FromContext(ctx).Named("LedgerPaymentEvent")
 
-	var event outboxMessage
+	var event contracts.OutboxMessage
 	if err := json.Unmarshal(value, &event); err != nil {
 		return stackErr.Error(fmt.Errorf("unmarshal payment outbox event failed: %v", err))
 	}
@@ -121,52 +122,25 @@ func (h *messageHandler) withLedgerAccountLocks(ctx context.Context, lockKeys []
 
 func unmarshalPaymentSucceededPayload(data json.RawMessage) (sharedevents.PaymentSucceededEvent, error) {
 	var payload sharedevents.PaymentSucceededEvent
-	if err := json.Unmarshal(data, &payload); err == nil {
-		return payload, nil
-	} else {
-		var raw string
-		if err2 := json.Unmarshal(data, &raw); err2 != nil {
-			return sharedevents.PaymentSucceededEvent{}, stackErr.Error(fmt.Errorf("unmarshal payment succeeded payload failed: %v", err))
-		}
-		if err2 := json.Unmarshal([]byte(raw), &payload); err2 != nil {
-			return sharedevents.PaymentSucceededEvent{}, stackErr.Error(fmt.Errorf("unmarshal inner payload failed: %v", err2))
-		}
+	if err := contracts.UnmarshalEventData(data, &payload); err != nil {
+		return sharedevents.PaymentSucceededEvent{}, stackErr.Error(fmt.Errorf("unmarshal payment succeeded payload failed: %v", err))
 	}
-
 	return payload, nil
 }
 
 func unmarshalPaymentRefundedPayload(data json.RawMessage) (sharedevents.PaymentRefundedEvent, error) {
 	var payload sharedevents.PaymentRefundedEvent
-	if err := json.Unmarshal(data, &payload); err == nil {
-		return payload, nil
-	} else {
-		var raw string
-		if err2 := json.Unmarshal(data, &raw); err2 != nil {
-			return sharedevents.PaymentRefundedEvent{}, stackErr.Error(fmt.Errorf("unmarshal payment refunded payload failed: %v", err))
-		}
-		if err2 := json.Unmarshal([]byte(raw), &payload); err2 != nil {
-			return sharedevents.PaymentRefundedEvent{}, stackErr.Error(fmt.Errorf("unmarshal inner payload failed: %v", err2))
-		}
+	if err := contracts.UnmarshalEventData(data, &payload); err != nil {
+		return sharedevents.PaymentRefundedEvent{}, stackErr.Error(fmt.Errorf("unmarshal payment refunded payload failed: %v", err))
 	}
-
 	return payload, nil
 }
 
 func unmarshalPaymentChargebackPayload(data json.RawMessage) (sharedevents.PaymentChargebackEvent, error) {
 	var payload sharedevents.PaymentChargebackEvent
-	if err := json.Unmarshal(data, &payload); err == nil {
-		return payload, nil
-	} else {
-		var raw string
-		if err2 := json.Unmarshal(data, &raw); err2 != nil {
-			return sharedevents.PaymentChargebackEvent{}, stackErr.Error(fmt.Errorf("unmarshal payment chargeback payload failed: %v", err))
-		}
-		if err2 := json.Unmarshal([]byte(raw), &payload); err2 != nil {
-			return sharedevents.PaymentChargebackEvent{}, stackErr.Error(fmt.Errorf("unmarshal inner payload failed: %v", err2))
-		}
+	if err := contracts.UnmarshalEventData(data, &payload); err != nil {
+		return sharedevents.PaymentChargebackEvent{}, stackErr.Error(fmt.Errorf("unmarshal payment chargeback payload failed: %v", err))
 	}
-
 	return payload, nil
 }
 

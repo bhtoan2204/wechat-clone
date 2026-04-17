@@ -21,11 +21,11 @@ import (
 
 type markChatMessageStatusHandler struct {
 	baseRepo roomrepos.Repos
-	services service.Service
+	realtime service.RealtimeService
 }
 
-func NewMarkChatMessageStatusHandler(baseRepo roomrepos.Repos, services service.Service) cqrs.Handler[*in.MarkChatMessageStatusRequest, *out.MarkChatMessageStatusResponse] {
-	return &markChatMessageStatusHandler{baseRepo: baseRepo, services: services}
+func NewMarkChatMessageStatusHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.MarkChatMessageStatusRequest, *out.MarkChatMessageStatusResponse] {
+	return &markChatMessageStatusHandler{baseRepo: baseRepo, realtime: realtime}
 }
 
 func (h *markChatMessageStatusHandler) Handle(ctx context.Context, req *in.MarkChatMessageStatusRequest) (*out.MarkChatMessageStatusResponse, error) {
@@ -59,7 +59,7 @@ func (h *markChatMessageStatusHandler) Handle(ctx context.Context, req *in.MarkC
 	}
 
 	out := &out.MarkChatMessageStatusResponse{Ok: true}
-	h.services.EmitMessage(ctx, types.MessagePayload{
+	h.realtime.EmitMessage(ctx, types.MessagePayload{
 		RoomId:  agg.Message().RoomID,
 		Type:    reflect.TypeOf(out).Elem().Name(),
 		Payload: out,

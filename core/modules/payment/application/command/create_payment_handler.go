@@ -13,9 +13,9 @@ type createPaymentHandler struct {
 	paymentCommandService paymentservice.PaymentCommandService
 }
 
-func NewCreatePayment(services paymentservice.Services) cqrs.Handler[*in.CreatePaymentRequest, *out.CreatePaymentResponse] {
+func NewCreatePayment(paymentCommandService paymentservice.PaymentCommandService) cqrs.Handler[*in.CreatePaymentRequest, *out.CreatePaymentResponse] {
 	return &createPaymentHandler{
-		paymentCommandService: services.PaymentCommandService(),
+		paymentCommandService: paymentCommandService,
 	}
 }
 

@@ -13,11 +13,11 @@ import (
 )
 
 type listChatMessagesHandler struct {
-	chatService roomservice.Service
+	messages roomservice.MessageQueryService
 }
 
-func NewListChatMessagesHandler(chatService roomservice.Service) cqrs.Handler[*in.ListChatMessagesRequest, []*out.ChatMessageResponse] {
-	return &listChatMessagesHandler{chatService: chatService}
+func NewListChatMessagesHandler(messages roomservice.MessageQueryService) cqrs.Handler[*in.ListChatMessagesRequest, []*out.ChatMessageResponse] {
+	return &listChatMessagesHandler{messages: messages}
 }
 
 func (h *listChatMessagesHandler) Handle(ctx context.Context, req *in.ListChatMessagesRequest) ([]*out.ChatMessageResponse, error) {
@@ -26,7 +26,7 @@ func (h *listChatMessagesHandler) Handle(ctx context.Context, req *in.ListChatMe
 		return nil, stackErr.Error(err)
 	}
 
-	res, err := h.chatService.ListMessages(ctx, accountID, apptypes.ListMessagesQuery{
+	res, err := h.messages.ListMessages(ctx, accountID, apptypes.ListMessagesQuery{
 		RoomID:    req.RoomID,
 		Limit:     req.Limit,
 		BeforeID:  req.BeforeID,

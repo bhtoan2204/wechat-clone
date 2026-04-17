@@ -35,7 +35,7 @@ func NewTransferTransaction(
 func (u *transferTransactionHandler) Handle(ctx context.Context, req *in.TransferTransactionRequest) (*out.TransactionTransactionResponse, error) {
 	fromAccountID, err := actorctx.AccountIDFromContext(ctx)
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("%v: %v", ledgerservice.ErrUnauthorized, err))
+		return nil, stackErr.Error(fmt.Errorf("%w: %w", ledgerservice.ErrUnauthorized, err))
 	}
 
 	transferFn := func() (*out.TransactionTransactionResponse, error) {

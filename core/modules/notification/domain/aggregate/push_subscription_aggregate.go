@@ -6,102 +6,127 @@ import (
 	"time"
 
 	"go-socket/core/modules/notification/domain/entity"
+	"go-socket/core/shared/pkg/stackErr"
 )
 
 var (
-	ErrPushSubscriptionIDRequired        = errors.New("push subscription id is required")
-	ErrPushSubscriptionAccountIDRequired = errors.New("push subscription account_id is required")
-	ErrPushSubscriptionEndpointRequired  = errors.New("push subscription endpoint is required")
-	ErrPushSubscriptionKeysRequired      = errors.New("push subscription keys are required")
+	ErrPushSubscriptionAggregateNotInitialized = errors.New("push subscription aggregate is not initialized")
+	ErrPushSubscriptionIDRequired              = errors.New("push subscription id is required")
+	ErrPushSubscriptionAccountIDRequired       = errors.New("push subscription account_id is required")
+	ErrPushSubscriptionEndpointRequired        = errors.New("push subscription endpoint is required")
+	ErrPushSubscriptionKeysRequired            = errors.New("push subscription keys are required")
+	ErrPushSubscriptionOccurredAtRequired      = errors.New("push subscription occurred_at is required")
 )
 
 type PushSubscriptionAggregate struct {
-	ID        string
-	AccountID string
-	Endpoint  string
-	Keys      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	subscription *entity.PushSubscription
 }
 
 func NewPushSubscriptionAggregate(id string) (*PushSubscriptionAggregate, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
-		return nil, ErrPushSubscriptionIDRequired
+		return nil, stackErr.Error(ErrPushSubscriptionIDRequired)
 	}
 
-	return &PushSubscriptionAggregate{ID: id}, nil
+	return &PushSubscriptionAggregate{
+		subscription: &entity.PushSubscription{ID: id},
+	}, nil
 }
 
 func (a *PushSubscriptionAggregate) Create(accountID, endpoint, keys string, now time.Time) error {
+	if a == nil || a.subscription == nil || strings.TrimSpace(a.subscription.ID) == "" {
+		return stackErr.Error(ErrPushSubscriptionAggregateNotInitialized)
+	}
+
 	accountID = strings.TrimSpace(accountID)
 	endpoint = strings.TrimSpace(endpoint)
 	keys = strings.TrimSpace(keys)
+	now, err := normalizePushSubscriptionTime(now)
+	if err != nil {
+		return stackErr.Error(err)
+	}
 
 	switch {
 	case accountID == "":
-		return ErrPushSubscriptionAccountIDRequired
+		return stackErr.Error(ErrPushSubscriptionAccountIDRequired)
 	case endpoint == "":
-		return ErrPushSubscriptionEndpointRequired
+		return stackErr.Error(ErrPushSubscriptionEndpointRequired)
 	case keys == "":
-		return ErrPushSubscriptionKeysRequired
+		return stackErr.Error(ErrPushSubscriptionKeysRequired)
 	}
 
-	normalizedNow := now.UTC()
-	a.AccountID = accountID
-	a.Endpoint = endpoint
-	a.Keys = keys
-	a.CreatedAt = normalizedNow
-	a.UpdatedAt = normalizedNow
+	a.subscription.AccountID = accountID
+	a.subscription.Endpoint = endpoint
+	a.subscription.Keys = keys
+	a.subscription.CreatedAt = now
+	a.subscription.UpdatedAt = now
 	return nil
 }
 
 func (a *PushSubscriptionAggregate) UpdateKeys(keys string, now time.Time) (bool, error) {
-	keys = strings.TrimSpace(keys)
-	if keys == "" {
-		return false, ErrPushSubscriptionKeysRequired
+	if a == nil || a.subscription == nil {
+		return false, stackErr.Error(ErrPushSubscriptionAggregateNotInitialized)
 	}
-	if a.Keys == keys {
+
+	keys = strings.TrimSpace(keys)
+	now, err := normalizePushSubscriptionTime(now)
+	if err != nil {
+		return false, stackErr.Error(err)
+	}
+
+	if keys == "" {
+		return false, stackErr.Error(ErrPushSubscriptionKeysRequired)
+	}
+	if a.subscription.Keys == keys {
 		return false, nil
 	}
 
-	a.Keys = keys
-	a.UpdatedAt = now.UTC()
+	a.subscription.Keys = keys
+	a.subscription.UpdatedAt = now
 	return true, nil
 }
 
 func (a *PushSubscriptionAggregate) Restore(subscription *entity.PushSubscription) error {
 	if subscription == nil {
-		return nil
+		return stackErr.Error(ErrPushSubscriptionAggregateNotInitialized)
 	}
 
-	a.ID = strings.TrimSpace(subscription.ID)
-	a.AccountID = strings.TrimSpace(subscription.AccountID)
-	a.Endpoint = strings.TrimSpace(subscription.Endpoint)
-	a.Keys = strings.TrimSpace(subscription.Keys)
-	a.CreatedAt = subscription.CreatedAt.UTC()
-	a.UpdatedAt = subscription.UpdatedAt.UTC()
+	a.subscription = &entity.PushSubscription{
+		ID:        strings.TrimSpace(subscription.ID),
+		AccountID: strings.TrimSpace(subscription.AccountID),
+		Endpoint:  strings.TrimSpace(subscription.Endpoint),
+		Keys:      strings.TrimSpace(subscription.Keys),
+		CreatedAt: subscription.CreatedAt.UTC(),
+		UpdatedAt: subscription.UpdatedAt.UTC(),
+	}
 	return nil
 }
 
 func (a *PushSubscriptionAggregate) Snapshot() (*entity.PushSubscription, error) {
-	switch {
-	case strings.TrimSpace(a.ID) == "":
-		return nil, ErrPushSubscriptionIDRequired
-	case strings.TrimSpace(a.AccountID) == "":
-		return nil, ErrPushSubscriptionAccountIDRequired
-	case strings.TrimSpace(a.Endpoint) == "":
-		return nil, ErrPushSubscriptionEndpointRequired
-	case strings.TrimSpace(a.Keys) == "":
-		return nil, ErrPushSubscriptionKeysRequired
+	if a == nil || a.subscription == nil {
+		return nil, stackErr.Error(ErrPushSubscriptionAggregateNotInitialized)
 	}
 
-	return &entity.PushSubscription{
-		ID:        a.ID,
-		AccountID: a.AccountID,
-		Endpoint:  a.Endpoint,
-		Keys:      a.Keys,
-		CreatedAt: a.CreatedAt.UTC(),
-		UpdatedAt: a.UpdatedAt.UTC(),
-	}, nil
+	switch {
+	case strings.TrimSpace(a.subscription.ID) == "":
+		return nil, stackErr.Error(ErrPushSubscriptionIDRequired)
+	case strings.TrimSpace(a.subscription.AccountID) == "":
+		return nil, stackErr.Error(ErrPushSubscriptionAccountIDRequired)
+	case strings.TrimSpace(a.subscription.Endpoint) == "":
+		return nil, stackErr.Error(ErrPushSubscriptionEndpointRequired)
+	case strings.TrimSpace(a.subscription.Keys) == "":
+		return nil, stackErr.Error(ErrPushSubscriptionKeysRequired)
+	}
+
+	clone := *a.subscription
+	clone.CreatedAt = a.subscription.CreatedAt.UTC()
+	clone.UpdatedAt = a.subscription.UpdatedAt.UTC()
+	return &clone, nil
+}
+
+func normalizePushSubscriptionTime(value time.Time) (time.Time, error) {
+	if value.IsZero() {
+		return time.Time{}, ErrPushSubscriptionOccurredAtRequired
+	}
+	return value.UTC(), nil
 }

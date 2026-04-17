@@ -22,11 +22,11 @@ import (
 
 type addChatMemberHandler struct {
 	baseRepo roomrepos.Repos
-	services service.Service
+	realtime service.RealtimeService
 }
 
-func NewAddChatMemberHandler(baseRepo roomrepos.Repos, svc service.Service) cqrs.Handler[*in.AddChatMemberRequest, *out.ChatConversationResponse] {
-	return &addChatMemberHandler{baseRepo: baseRepo, services: svc}
+func NewAddChatMemberHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.AddChatMemberRequest, *out.ChatConversationResponse] {
+	return &addChatMemberHandler{baseRepo: baseRepo, realtime: realtime}
 }
 
 func (h *addChatMemberHandler) Handle(ctx context.Context, req *in.AddChatMemberRequest) (*out.ChatConversationResponse, error) {
@@ -68,7 +68,7 @@ func (h *addChatMemberHandler) Handle(ctx context.Context, req *in.AddChatMember
 		return nil, stackErr.Error(err)
 	}
 	out := roomsupport.ToConversationResponse(res)
-	if err := h.services.EmitMessage(ctx, types.MessagePayload{
+	if err := h.realtime.EmitMessage(ctx, types.MessagePayload{
 		RoomId:  out.RoomID,
 		Type:    reflect.TypeOf(out).Elem().Name(),
 		Payload: out,

@@ -17,11 +17,11 @@ import (
 
 type deleteChatMessageHandler struct {
 	baseRepo roomrepos.Repos
-	services service.Service
+	realtime service.RealtimeService
 }
 
-func NewDeleteChatMessageHandler(baseRepo roomrepos.Repos, services service.Service) cqrs.Handler[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse] {
-	return &deleteChatMessageHandler{baseRepo: baseRepo, services: services}
+func NewDeleteChatMessageHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse] {
+	return &deleteChatMessageHandler{baseRepo: baseRepo, realtime: realtime}
 }
 
 func (h *deleteChatMessageHandler) Handle(ctx context.Context, req *in.DeleteChatMessageRequest) (*out.DeleteChatMessageResponse, error) {
@@ -45,7 +45,7 @@ func (h *deleteChatMessageHandler) Handle(ctx context.Context, req *in.DeleteCha
 	}
 
 	out := &out.DeleteChatMessageResponse{Ok: true}
-	h.services.EmitMessage(ctx, types.MessagePayload{
+	h.realtime.EmitMessage(ctx, types.MessagePayload{
 		RoomId:  agg.Message().RoomID,
 		Type:    reflect.TypeOf(out).Elem().Name(),
 		Payload: out,

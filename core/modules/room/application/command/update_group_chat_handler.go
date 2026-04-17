@@ -18,11 +18,11 @@ import (
 
 type updateGroupChatHandler struct {
 	baseRepo roomrepos.Repos
-	services service.Service
+	realtime service.RealtimeService
 }
 
-func NewUpdateGroupChatHandler(baseRepo roomrepos.Repos, services service.Service) cqrs.Handler[*in.UpdateGroupChatRequest, *out.ChatConversationResponse] {
-	return &updateGroupChatHandler{baseRepo: baseRepo, services: services}
+func NewUpdateGroupChatHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.UpdateGroupChatRequest, *out.ChatConversationResponse] {
+	return &updateGroupChatHandler{baseRepo: baseRepo, realtime: realtime}
 }
 func (h *updateGroupChatHandler) Handle(ctx context.Context, req *in.UpdateGroupChatRequest) (*out.ChatConversationResponse, error) {
 	accountID, err := roomsupport.AccountIDFromCtx(ctx)
@@ -60,7 +60,7 @@ func (h *updateGroupChatHandler) Handle(ctx context.Context, req *in.UpdateGroup
 	}
 	out := roomsupport.ToConversationResponse(res)
 
-	h.services.EmitMessage(ctx, types.MessagePayload{
+	h.realtime.EmitMessage(ctx, types.MessagePayload{
 		RoomId:  out.RoomID,
 		Type:    reflect.TypeOf(out).Elem().Name(),
 		Payload: out,

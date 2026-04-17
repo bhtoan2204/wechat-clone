@@ -70,7 +70,7 @@ func NewMessageHandler(cfg *config.Config, emailSender adapter.EmailSender, noti
 
 func (h *messageHandler) Start() error {
 	for _, consumer := range h.consumer {
-		consumer.Read(h.processMessage(consumer))
+		consumer.Read(infraMessaging.WrapConsumerCallback(consumer, "Handle notification message failed"))
 	}
 	return nil
 }

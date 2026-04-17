@@ -17,11 +17,11 @@ import (
 
 type editChatMessageHandler struct {
 	baseRepo roomrepos.Repos
-	services service.Service
+	realtime service.RealtimeService
 }
 
-func NewEditChatMessageHandler(baseRepo roomrepos.Repos, services service.Service) cqrs.Handler[*in.EditChatMessageRequest, *out.ChatMessageResponse] {
-	return &editChatMessageHandler{baseRepo: baseRepo, services: services}
+func NewEditChatMessageHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.EditChatMessageRequest, *out.ChatMessageResponse] {
+	return &editChatMessageHandler{baseRepo: baseRepo, realtime: realtime}
 }
 
 func (h *editChatMessageHandler) Handle(ctx context.Context, req *in.EditChatMessageRequest) (*out.ChatMessageResponse, error) {
@@ -49,7 +49,7 @@ func (h *editChatMessageHandler) Handle(ctx context.Context, req *in.EditChatMes
 		return nil, stackErr.Error(err)
 	}
 	out := roomsupport.ToMessageResponse(res)
-	h.services.EmitMessage(ctx, types.MessagePayload{
+	h.realtime.EmitMessage(ctx, types.MessagePayload{
 		RoomId:  out.RoomID,
 		Type:    reflect.TypeOf(out).Elem().Name(),
 		Payload: out,

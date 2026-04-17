@@ -68,11 +68,11 @@ func TestAccountAggregateUpdateProfileKeepsNilFieldsUntouched(t *testing.T) {
 
 	initialUsername := "first-user"
 	initialAvatar := "avatar/object"
-	if _, err := agg.UpdateProfile("User", &initialUsername, &initialAvatar); err != nil {
+	if _, err := agg.UpdateProfile("User", &initialUsername, &initialAvatar, time.Now().UTC()); err != nil {
 		t.Fatalf("UpdateProfile() setup error = %v", err)
 	}
 
-	updated, err := agg.UpdateProfile("Updated User", nil, nil)
+	updated, err := agg.UpdateProfile("Updated User", nil, nil, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("UpdateProfile() error = %v", err)
 	}
@@ -87,7 +87,7 @@ func TestAccountAggregateUpdateProfileKeepsNilFieldsUntouched(t *testing.T) {
 	}
 
 	empty := ""
-	updated, err = agg.UpdateProfile("Updated User", &empty, &empty)
+	updated, err = agg.UpdateProfile("Updated User", &empty, &empty, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("UpdateProfile() clear error = %v", err)
 	}

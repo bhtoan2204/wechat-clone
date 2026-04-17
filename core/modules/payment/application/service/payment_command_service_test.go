@@ -306,7 +306,7 @@ func mustRehydratePaymentAggregate(
 	if err != nil {
 		t.Fatalf("new provider top up intent: %v", err)
 	}
-	paymentAggregate, err := paymentaggregate.RehydratePaymentIntentAggregate(intent)
+	paymentAggregate, err := paymentaggregate.RestorePaymentIntentAggregate(intent)
 	if err != nil {
 		t.Fatalf("rehydrate payment aggregate: %v", err)
 	}

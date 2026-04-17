@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"go-socket/core/shared/pkg/stackErr"
 	"reflect"
-	"time"
 )
 
 var (
@@ -94,16 +93,15 @@ func (ar *AggregateRoot) ApplyChangeWithMetadata(agg Aggregate, data interface{}
 	if dataType.Kind() == reflect.Ptr {
 		dataType = dataType.Elem()
 	}
-	eventType := dataType.Name()
+	eventType := EventName(data)
 	if eventType == "" {
-		return stackErr.Error(errors.New("event name can not be empty"))
+		return stackErr.Error(ErrEventNameEmpty)
 	}
 	event := Event{
 		AggregateID:   ar.aggregateID,
 		AggregateType: ar.aggregateType,
 		Version:       ar.nextVersion(),
 		EventName:     eventType,
-		CreatedAt:     time.Now().Unix(),
 		EventData:     data,
 	}
 

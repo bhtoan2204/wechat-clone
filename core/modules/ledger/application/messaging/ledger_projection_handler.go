@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	ledgerprojection "go-socket/core/modules/ledger/application/projection"
+	"go-socket/core/shared/contracts"
 	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
 
@@ -19,7 +20,7 @@ func (h *messageHandler) handleLedgerOutboxEvent(ctx context.Context, value []by
 
 	log := logging.FromContext(ctx).Named("LedgerProjectionEvent")
 
-	var event outboxMessage
+	var event contracts.OutboxMessage
 	if err := json.Unmarshal(value, &event); err != nil {
 		return stackErr.Error(fmt.Errorf("unmarshal ledger outbox event failed: %v", err))
 	}
@@ -42,17 +43,8 @@ func (h *messageHandler) handleLedgerOutboxEvent(ctx context.Context, value []by
 
 func unmarshalLedgerTransactionProjectedPayload(data json.RawMessage) (ledgerprojection.LedgerTransactionProjected, error) {
 	var payload ledgerprojection.LedgerTransactionProjected
-	if err := json.Unmarshal(data, &payload); err == nil {
-		return payload, nil
-	} else {
-		var raw string
-		if err2 := json.Unmarshal(data, &raw); err2 != nil {
-			return ledgerprojection.LedgerTransactionProjected{}, stackErr.Error(fmt.Errorf("unmarshal ledger transaction projected payload failed: %v", err))
-		}
-		if err2 := json.Unmarshal([]byte(raw), &payload); err2 != nil {
-			return ledgerprojection.LedgerTransactionProjected{}, stackErr.Error(fmt.Errorf("unmarshal inner ledger transaction projected payload failed: %v", err2))
-		}
+	if err := contracts.UnmarshalEventData(data, &payload); err != nil {
+		return ledgerprojection.LedgerTransactionProjected{}, stackErr.Error(fmt.Errorf("unmarshal ledger transaction projected payload failed: %v", err))
 	}
-
 	return payload, nil
 }

@@ -68,7 +68,7 @@ func (s *paymentCommandService) CreatePayment(
 		now,
 	)
 	if err != nil {
-		return nil, stackErr.Error(fmt.Errorf("%v: %s", ErrValidation, err.Error()))
+		return nil, stackErr.Error(fmt.Errorf("%w: %w", ErrValidation, err))
 	}
 
 	provider, err := s.providerRegistry.Get(paymentAggregate.Provider())
@@ -80,7 +80,7 @@ func (s *paymentCommandService) CreatePayment(
 		return stackErr.Error(tx.ProviderPaymentRepository().Create(ctx, paymentAggregate))
 	}); err != nil {
 		if errors.Is(err, repos.ErrProviderPaymentDuplicateIntent) {
-			return nil, stackErr.Error(fmt.Errorf("%v: %s", ErrDuplicatePayment, paymentAggregate.TransactionID()))
+			return nil, stackErr.Error(fmt.Errorf("%w: %s", ErrDuplicatePayment, paymentAggregate.TransactionID()))
 		}
 		return nil, stackErr.Error(err)
 	}
@@ -148,16 +148,12 @@ func (s *paymentCommandService) ProcessWebhook(
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	if err := paymentAggregate.ValidateProviderResultForStatus(
-		webhook.Result.Status,
-		webhook.Result.Amount,
-		webhook.Result.Currency,
-	); err != nil {
-		return nil, stackErr.Error(fmt.Errorf("%v: %s", ErrValidation, err.Error()))
-	}
 
 	duplicate, err := s.applyProviderOutcome(ctx, paymentAggregate, webhook.Result, "", false)
 	if err != nil {
+		if isPaymentValidationError(err) {
+			return nil, stackErr.Error(fmt.Errorf("%w: %w", ErrValidation, err))
+		}
 		return nil, stackErr.Error(err)
 	}
 
@@ -265,8 +261,18 @@ func (s *paymentCommandService) resolveCreatePaymentCreditAccount(
 
 	requestedCreditAccountID := strings.TrimSpace(req.CreditAccountID)
 	if requestedCreditAccountID != "" && requestedCreditAccountID != actorAccountID {
-		return "", stackErr.Error((fmt.Errorf("%v: %s", ErrValidation, fmt.Errorf("credit_account_id must match authenticated account"))))
+		return "", stackErr.Error(fmt.Errorf("%w: credit_account_id must match authenticated account", ErrValidation))
 	}
 
 	return actorAccountID, nil
+}
+
+func isPaymentValidationError(err error) bool {
+	return errors.Is(err, entity.ErrPaymentTransactionIDRequired) ||
+		errors.Is(err, entity.ErrPaymentAmountInvalid) ||
+		errors.Is(err, entity.ErrPaymentCurrencyRequired) ||
+		errors.Is(err, entity.ErrPaymentStatusInvalid) ||
+		errors.Is(err, entity.ErrPaymentProviderAmountMismatch) ||
+		errors.Is(err, entity.ErrPaymentProviderCurrencyMismatch) ||
+		errors.Is(err, paymentaggregate.ErrPaymentIntentOccurredAtRequired)
 }

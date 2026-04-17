@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"go-socket/core/shared/pkg/stackErr"
-	"reflect"
 )
 
 type eventFunc = func() interface{}
@@ -44,7 +43,7 @@ func (s *serializer) ToEventsFunc(events ...interface{}) []eventFunc {
 }
 
 func (s *serializer) RegisterAggregate(agg BaseAggregate) error {
-	typ := reflect.TypeOf(agg).Elem().Name()
+	typ := AggregateTypeName(agg)
 	if typ == "" {
 		return stackErr.Error(fmt.Errorf("not found aggregate"))
 	}
@@ -53,7 +52,7 @@ func (s *serializer) RegisterAggregate(agg BaseAggregate) error {
 		listF := s.ToEventsFunc(events...)
 		for _, f := range listF {
 			event := f()
-			eName := reflect.TypeOf(event).Elem().Name()
+			eName := EventName(event)
 			if eName == "" {
 				return stackErr.Error(errors.New("name of event is missing"))
 			}
@@ -68,14 +67,14 @@ func (s *serializer) RegisterAggregate(agg BaseAggregate) error {
 }
 
 func (s *serializer) Register(agg Aggregate, eventsFunc []eventFunc) error {
-	typ := reflect.TypeOf(agg).Elem().Name()
+	typ := AggregateTypeName(agg)
 	if typ == "" {
 		return stackErr.Error(errors.New("not found aggregate"))
 	}
 
 	for _, f := range eventsFunc {
 		event := f()
-		eName := reflect.TypeOf(event).Elem().Name()
+		eName := EventName(event)
 		if eName == "" {
 			return stackErr.Error(errors.New("event name is missing"))
 		}

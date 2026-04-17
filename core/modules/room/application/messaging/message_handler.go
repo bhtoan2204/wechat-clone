@@ -7,6 +7,7 @@ import (
 	"go-socket/core/modules/room/application/service"
 	"go-socket/core/modules/room/domain/repos"
 	"go-socket/core/shared/config"
+	"go-socket/core/shared/contracts"
 	sharedevents "go-socket/core/shared/contracts/events"
 	infraMessaging "go-socket/core/shared/infra/messaging"
 	"go-socket/core/shared/pkg/logging"
@@ -26,59 +27,10 @@ type messageHandler struct {
 	consumer    []infraMessaging.Consumer
 	accountRepo repos.RoomAccountProjectionRepository
 	baseRepo    repos.Repos
-	svc         service.Service
+	svc         service.RealtimeService
 }
 
-type outboxMessage struct {
-	ID            int64           `json:"id"`
-	AggregateID   string          `json:"aggregate_id"`
-	AggregateType string          `json:"aggregate_type"`
-	Version       int64           `json:"version"`
-	EventName     string          `json:"event_name"`
-	MetaData      json.RawMessage `json:"metadata"`
-	EventData     json.RawMessage `json:"event_data"`
-	CreatedAt     string          `json:"created_at"`
-}
-
-func (m *outboxMessage) UnmarshalJSON(data []byte) error {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return stackErr.Error(err)
-	}
-
-	normalized := make(map[string]json.RawMessage, len(raw))
-
-	// Keep exact lowercase keys first if present.
-	for key, value := range raw {
-		lowerKey := strings.ToLower(key)
-		if key == lowerKey {
-			normalized[lowerKey] = value
-		}
-	}
-
-	// Fill remaining keys by case-insensitive mapping.
-	for key, value := range raw {
-		lowerKey := strings.ToLower(key)
-		if _, exists := normalized[lowerKey]; !exists {
-			normalized[lowerKey] = value
-		}
-	}
-
-	type alias outboxMessage
-	var aux alias
-	normalizedData, err := json.Marshal(normalized)
-	if err != nil {
-		return stackErr.Error(err)
-	}
-	if err := json.Unmarshal(normalizedData, &aux); err != nil {
-		return stackErr.Error(err)
-	}
-
-	*m = outboxMessage(aux)
-	return nil
-}
-
-func NewMessageHandler(cfg *config.Config, repos repos.Repos, svc service.Service) (MessageHandler, error) {
+func NewMessageHandler(cfg *config.Config, repos repos.Repos, svc service.RealtimeService) (MessageHandler, error) {
 	instance := &messageHandler{
 		consumer:    make([]infraMessaging.Consumer, 0),
 		accountRepo: repos.RoomAccountProjectionRepository(),
@@ -120,7 +72,7 @@ func NewMessageHandler(cfg *config.Config, repos repos.Repos, svc service.Servic
 
 func (h *messageHandler) Start() error {
 	for _, consumer := range h.consumer {
-		consumer.Read(h.processMessage(consumer))
+		consumer.Read(infraMessaging.WrapConsumerCallback(consumer, "Handle room message failed"))
 	}
 	return nil
 }
@@ -132,7 +84,7 @@ func (h *messageHandler) Stop() error {
 
 func (h *messageHandler) handleAccountEvent(ctx context.Context, value []byte) error {
 	log := logging.FromContext(ctx).Named("handleAccountEvent")
-	var event outboxMessage
+	var event contracts.OutboxMessage
 	if err := json.Unmarshal(value, &event); err != nil {
 		return stackErr.Error(fmt.Errorf("unmarshal account outbox event failed: %v", err))
 	}
@@ -153,7 +105,7 @@ func (h *messageHandler) handleAccountEvent(ctx context.Context, value []byte) e
 
 func (h *messageHandler) handleLedgerEvent(ctx context.Context, value []byte) error {
 	log := logging.FromContext(ctx).Named("handleLedgerEvent")
-	var event outboxMessage
+	var event contracts.OutboxMessage
 	if err := json.Unmarshal(value, &event); err != nil {
 		return stackErr.Error(fmt.Errorf("unmarshal account outbox event failed: %v", err))
 	}

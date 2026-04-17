@@ -19,6 +19,8 @@ var (
 	ErrNotificationTypeRequired            = errors.New("notification type is required")
 	ErrNotificationSubjectRequired         = errors.New("notification subject is required")
 	ErrNotificationBodyRequired            = errors.New("notification body is required")
+	ErrNotificationCreatedAtRequired       = errors.New("notification created_at is required")
+	ErrNotificationReadAtRequired          = errors.New("notification read_at is required")
 )
 
 type NotificationAggregate struct {
@@ -75,9 +77,9 @@ func (a *NotificationAggregate) Create(
 		return stackErr.Error(ErrNotificationBodyRequired)
 	}
 
-	normalizedCreatedAt := createdAt.UTC()
-	if normalizedCreatedAt.IsZero() {
-		normalizedCreatedAt = time.Now().UTC()
+	normalizedCreatedAt, err := normalizeNotificationTime(createdAt, ErrNotificationCreatedAtRequired)
+	if err != nil {
+		return stackErr.Error(err)
 	}
 
 	a.notification.AccountID = accountID
@@ -98,9 +100,9 @@ func (a *NotificationAggregate) MarkRead(now time.Time) (bool, error) {
 		return false, nil
 	}
 
-	readAt := now.UTC()
-	if readAt.IsZero() {
-		readAt = time.Now().UTC()
+	readAt, err := normalizeNotificationTime(now, ErrNotificationReadAtRequired)
+	if err != nil {
+		return false, stackErr.Error(err)
 	}
 
 	a.notification.IsRead = true
@@ -152,4 +154,11 @@ func normalizeNotificationType(value types.NotificationType) (types.Notification
 	default:
 		return "", stackErr.Error(ErrNotificationTypeRequired)
 	}
+}
+
+func normalizeNotificationTime(value time.Time, errRequired error) (time.Time, error) {
+	if value.IsZero() {
+		return time.Time{}, errRequired
+	}
+	return value.UTC(), nil
 }

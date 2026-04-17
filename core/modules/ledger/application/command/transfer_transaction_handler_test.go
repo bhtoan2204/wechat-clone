@@ -19,7 +19,7 @@ func TestTransferTransactionHandle(t *testing.T) {
 	t.Run("creates transfer transaction with sorted locks", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
-		ledgerService := service.NewMockServices(ctrl)
+		ledgerService := service.NewMockLedgerService(ctrl)
 		locker := lock.NewMockLock(ctrl)
 
 		handler := &transferTransactionHandler{
@@ -143,7 +143,7 @@ func TestTransferTransactionHandle(t *testing.T) {
 	t.Run("returns insufficient funds from service", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
-		ledgerService := service.NewMockServices(ctrl)
+		ledgerService := service.NewMockLedgerService(ctrl)
 		handler := &transferTransactionHandler{
 			ledgerService: ledgerService,
 		}

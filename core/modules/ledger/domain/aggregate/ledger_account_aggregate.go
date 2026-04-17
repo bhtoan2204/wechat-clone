@@ -3,7 +3,6 @@ package aggregate
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -14,9 +13,12 @@ import (
 
 var (
 	ErrLedgerAccountAggregateRequired   = errors.New("ledger account aggregate is required")
+	ErrLedgerAccountIDRequired          = errors.New("ledger account id is required")
+	ErrLedgerAccountIDMismatch          = errors.New("ledger account id mismatch")
 	ErrLedgerAccountTransactionRequired = errors.New("ledger transaction id is required")
 	ErrLedgerAccountCurrencyRequired    = errors.New("ledger currency is required")
 	ErrLedgerAccountAmountInvalid       = errors.New("ledger amount must be positive")
+	ErrLedgerAccountBookedAtRequired    = errors.New("ledger booked_at is required")
 	ErrLedgerAccountInsufficientFunds   = errors.New("ledger account has insufficient funds")
 )
 
@@ -40,8 +42,7 @@ type LedgerAccountAggregate struct {
 
 func NewLedgerAccountAggregate(accountID string) (*LedgerAccountAggregate, error) {
 	agg := &LedgerAccountAggregate{}
-	agg.SetAggregateType(reflect.TypeOf(agg).Elem().Name())
-	if err := agg.SetID(strings.TrimSpace(accountID)); err != nil {
+	if err := event.InitAggregate(&agg.AggregateRoot, agg, accountID); err != nil {
 		return nil, stackErr.Error(err)
 	}
 	agg.ensureState()
@@ -59,13 +60,13 @@ func (a *LedgerAccountAggregate) RegisterEvents(register event.RegisterEventsFun
 func (a *LedgerAccountAggregate) Transition(evt event.Event) error {
 	switch data := evt.EventData.(type) {
 	case *EventLedgerAccountPaymentBooked:
-		return a.onPaymentBooked(evt.AggregateID, data)
+		return a.applyPaymentBooked(evt.AggregateID, data)
 	case *EventLedgerAccountTransferredToAccount:
-		return a.onTransferredToAccount(evt.AggregateID, data)
+		return a.applyTransferredToAccount(evt.AggregateID, data)
 	case *EventLedgerAccountReceivedTransfer:
-		return a.onReceivedTransfer(evt.AggregateID, data)
+		return a.applyReceivedTransfer(evt.AggregateID, data)
 	default:
-		return stackErr.Error(errors.New("unsupported event type"))
+		return event.ErrUnsupportedEventType
 	}
 }
 
@@ -263,7 +264,7 @@ func (a *LedgerAccountAggregate) ReceiveTransfer(
 	return true, nil
 }
 
-func (a *LedgerAccountAggregate) onPaymentBooked(accountID string, data *EventLedgerAccountPaymentBooked) error {
+func (a *LedgerAccountAggregate) applyPaymentBooked(accountID string, data *EventLedgerAccountPaymentBooked) error {
 	if data == nil {
 		return stackErr.Error(errors.New("ledger payment booked event is nil"))
 	}
@@ -284,7 +285,7 @@ func (a *LedgerAccountAggregate) onPaymentBooked(accountID string, data *EventLe
 	})
 }
 
-func (a *LedgerAccountAggregate) onTransferredToAccount(accountID string, data *EventLedgerAccountTransferredToAccount) error {
+func (a *LedgerAccountAggregate) applyTransferredToAccount(accountID string, data *EventLedgerAccountTransferredToAccount) error {
 	if data == nil {
 		return stackErr.Error(errors.New("ledger transfer to account event is nil"))
 	}
@@ -300,7 +301,7 @@ func (a *LedgerAccountAggregate) onTransferredToAccount(accountID string, data *
 	})
 }
 
-func (a *LedgerAccountAggregate) onReceivedTransfer(accountID string, data *EventLedgerAccountReceivedTransfer) error {
+func (a *LedgerAccountAggregate) applyReceivedTransfer(accountID string, data *EventLedgerAccountReceivedTransfer) error {
 	if data == nil {
 		return stackErr.Error(errors.New("ledger received transfer event is nil"))
 	}
@@ -318,7 +319,14 @@ func (a *LedgerAccountAggregate) onReceivedTransfer(accountID string, data *Even
 
 func (a *LedgerAccountAggregate) applyPosting(accountID string, posting LedgerAccountPosting) error {
 	a.ensureState()
-	a.AccountID = strings.TrimSpace(accountID)
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return ErrLedgerAccountIDRequired
+	}
+	if a.AccountID != "" && a.AccountID != accountID {
+		return fmt.Errorf("%w: aggregate=%s event=%s", ErrLedgerAccountIDMismatch, a.AccountID, accountID)
+	}
+	a.AccountID = accountID
 	a.Balances[posting.Currency] += posting.AmountDelta
 	a.PostedTransactions[posting.TransactionID] = posting
 	return nil
@@ -335,7 +343,7 @@ func (a *LedgerAccountAggregate) ensurePostingAllowed(posting LedgerAccountPosti
 	nextBalance := a.Balance(posting.Currency) + posting.AmountDelta
 	if nextBalance < 0 {
 		return stackErr.Error(fmt.Errorf(
-			"%v: account_id=%s currency=%s balance=%d amount=%d",
+			"%w: account_id=%s currency=%s balance=%d amount=%d",
 			ErrLedgerAccountInsufficientFunds,
 			a.AggregateID(),
 			posting.Currency,
@@ -395,6 +403,9 @@ func newLedgerPosting(
 	}
 	if amountDelta == 0 {
 		return LedgerAccountPosting{}, ErrLedgerAccountAmountInvalid
+	}
+	if bookedAt.IsZero() {
+		return LedgerAccountPosting{}, ErrLedgerAccountBookedAtRequired
 	}
 
 	return LedgerAccountPosting{

@@ -1,52 +1,7 @@
 package messaging
 
 import (
-	"encoding/json"
-	"go-socket/core/shared/pkg/stackErr"
-	"strings"
+	"go-socket/core/shared/contracts"
 )
 
-type outboxMessage struct {
-	ID            json.RawMessage `json:"id"`
-	AggregateID   string          `json:"aggregate_id"`
-	AggregateType string          `json:"aggregate_type"`
-	Version       int64           `json:"version"`
-	EventName     string          `json:"event_name"`
-	EventData     json.RawMessage `json:"event_data"`
-	Metadata      json.RawMessage `json:"metadata"`
-	CreatedAt     string          `json:"created_at"`
-}
-
-func (m *outboxMessage) UnmarshalJSON(data []byte) error {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return stackErr.Error(err)
-	}
-
-	normalized := make(map[string]json.RawMessage, len(raw))
-	for key, value := range raw {
-		lowerKey := strings.ToLower(key)
-		if key == lowerKey {
-			normalized[lowerKey] = value
-		}
-	}
-	for key, value := range raw {
-		lowerKey := strings.ToLower(key)
-		if _, exists := normalized[lowerKey]; !exists {
-			normalized[lowerKey] = value
-		}
-	}
-
-	type alias outboxMessage
-	var aux alias
-	normalizedData, err := json.Marshal(normalized)
-	if err != nil {
-		return stackErr.Error(err)
-	}
-	if err := json.Unmarshal(normalizedData, &aux); err != nil {
-		return stackErr.Error(err)
-	}
-
-	*m = outboxMessage(aux)
-	return nil
-}
+type outboxMessage = contracts.OutboxMessage

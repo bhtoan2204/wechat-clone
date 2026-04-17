@@ -13,15 +13,15 @@ import (
 )
 
 type getChatPresenceHandler struct {
-	chatService roomservice.Service
+	presence roomservice.PresenceQueryService
 }
 
-func NewGetChatPresenceHandler(chatService roomservice.Service) cqrs.Handler[*in.GetChatPresenceRequest, *out.ChatPresenceResponse] {
-	return &getChatPresenceHandler{chatService: chatService}
+func NewGetChatPresenceHandler(presence roomservice.PresenceQueryService) cqrs.Handler[*in.GetChatPresenceRequest, *out.ChatPresenceResponse] {
+	return &getChatPresenceHandler{presence: presence}
 }
 
 func (h *getChatPresenceHandler) Handle(ctx context.Context, req *in.GetChatPresenceRequest) (*out.ChatPresenceResponse, error) {
-	res, err := h.chatService.GetPresence(ctx, apptypes.GetPresenceQuery{AccountID: req.AccountID})
+	res, err := h.presence.GetPresence(ctx, apptypes.GetPresenceQuery{AccountID: req.AccountID})
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

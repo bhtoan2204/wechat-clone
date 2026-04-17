@@ -13,11 +13,11 @@ import (
 )
 
 type getChatConversationHandler struct {
-	chatService roomservice.Service
+	conversations roomservice.ConversationQueryService
 }
 
-func NewGetChatConversationHandler(chatService roomservice.Service) cqrs.Handler[*in.GetChatConversationRequest, *out.ChatConversationResponse] {
-	return &getChatConversationHandler{chatService: chatService}
+func NewGetChatConversationHandler(conversations roomservice.ConversationQueryService) cqrs.Handler[*in.GetChatConversationRequest, *out.ChatConversationResponse] {
+	return &getChatConversationHandler{conversations: conversations}
 }
 
 func (h *getChatConversationHandler) Handle(ctx context.Context, req *in.GetChatConversationRequest) (*out.ChatConversationResponse, error) {
@@ -26,7 +26,7 @@ func (h *getChatConversationHandler) Handle(ctx context.Context, req *in.GetChat
 		return nil, stackErr.Error(err)
 	}
 
-	res, err := h.chatService.GetConversation(ctx, accountID, apptypes.GetConversationQuery{
+	res, err := h.conversations.GetConversation(ctx, accountID, apptypes.GetConversationQuery{
 		RoomID: req.RoomID,
 	})
 	if err != nil {

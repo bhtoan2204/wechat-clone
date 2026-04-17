@@ -17,11 +17,11 @@ import (
 
 type forwardChatMessageHandler struct {
 	baseRepo roomrepos.Repos
-	services service.Service
+	realtime service.RealtimeService
 }
 
-func NewForwardChatMessageHandler(baseRepo roomrepos.Repos, services service.Service) cqrs.Handler[*in.ForwardChatMessageRequest, *out.ChatMessageResponse] {
-	return &forwardChatMessageHandler{baseRepo: baseRepo, services: services}
+func NewForwardChatMessageHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.ForwardChatMessageRequest, *out.ChatMessageResponse] {
+	return &forwardChatMessageHandler{baseRepo: baseRepo, realtime: realtime}
 }
 
 func (h *forwardChatMessageHandler) Handle(ctx context.Context, req *in.ForwardChatMessageRequest) (*out.ChatMessageResponse, error) {
@@ -50,7 +50,7 @@ func (h *forwardChatMessageHandler) Handle(ctx context.Context, req *in.ForwardC
 	}
 
 	out := roomsupport.ToMessageResponse(res)
-	h.services.EmitMessage(ctx, types.MessagePayload{
+	h.realtime.EmitMessage(ctx, types.MessagePayload{
 		RoomId:  out.RoomID,
 		Type:    reflect.TypeOf(out).Elem().Name(),
 		Payload: out,

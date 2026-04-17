@@ -187,7 +187,7 @@ func toProviderPaymentAggregate(modelIntent *model.ProviderPaymentIntentModel) (
 		CreatedAt:          modelIntent.CreatedAt,
 		UpdatedAt:          modelIntent.UpdatedAt,
 	})
-	return paymentaggregate.RehydratePaymentIntentAggregate(intent)
+	return paymentaggregate.RestorePaymentIntentAggregate(intent)
 }
 
 func aggregateSnapshot(aggregate *paymentaggregate.PaymentIntentAggregate) *entity.PaymentIntent {

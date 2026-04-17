@@ -1,6 +1,7 @@
 package aggregate
 
 import (
+	"errors"
 	"time"
 
 	paymententity "go-socket/core/modules/payment/domain/entity"
@@ -9,7 +10,9 @@ import (
 	"go-socket/core/shared/pkg/stackErr"
 )
 
-const AggregateTypePaymentIntent = "PaymentIntentAggregate"
+var ErrPaymentIntentOccurredAtRequired = errors.New("occurred_at is required")
+
+var AggregateTypePaymentIntent = eventpkg.AggregateTypeName((*PaymentIntentAggregate)(nil))
 
 type PaymentIntentMutation struct {
 	Duplicate bool
@@ -17,8 +20,6 @@ type PaymentIntentMutation struct {
 }
 
 type PaymentIntentAggregate struct {
-	eventpkg.Aggregate
-
 	intent          *paymententity.PaymentIntent
 	processedEvents []*paymententity.ProcessedPaymentEvent
 	outboxEvents    []eventpkg.Event
@@ -34,6 +35,10 @@ func NewProviderTopUpAggregate(
 	metadata map[string]string,
 	now time.Time,
 ) (*PaymentIntentAggregate, error) {
+	now, err := normalizePaymentIntentOccurredAt(now)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
 	intent, err := paymententity.NewProviderTopUpIntent(
 		transactionID,
 		provider,
@@ -51,7 +56,7 @@ func NewProviderTopUpAggregate(
 	return agg, nil
 }
 
-func RehydratePaymentIntentAggregate(intent *paymententity.PaymentIntent) (*PaymentIntentAggregate, error) {
+func RestorePaymentIntentAggregate(intent *paymententity.PaymentIntent) (*PaymentIntentAggregate, error) {
 	if intent == nil {
 		return nil, stackErr.Error(paymententity.ErrPaymentTransactionIDRequired)
 	}
@@ -100,16 +105,6 @@ func (a *PaymentIntentAggregate) Status() string {
 	return a.intent.Status
 }
 
-func (a *PaymentIntentAggregate) ValidateProviderResultForStatus(status string, amount int64, currency string) error {
-	if a == nil || a.intent == nil {
-		return stackErr.Error(paymententity.ErrPaymentTransactionIDRequired)
-	}
-	if err := a.intent.ValidateProviderResultForStatus(status, amount, currency); err != nil {
-		return stackErr.Error(err)
-	}
-	return nil
-}
-
 func (a *PaymentIntentAggregate) PendingProcessedEvents() []*paymententity.ProcessedPaymentEvent {
 	if len(a.processedEvents) == 0 {
 		return nil
@@ -151,6 +146,10 @@ func (a *PaymentIntentAggregate) ApplyProviderOutcome(
 	if a == nil || a.intent == nil {
 		return PaymentIntentMutation{}, stackErr.Error(paymententity.ErrPaymentTransactionIDRequired)
 	}
+	occurredAt, err := normalizePaymentIntentOccurredAt(occurredAt)
+	if err != nil {
+		return PaymentIntentMutation{}, stackErr.Error(err)
+	}
 
 	switch paymententity.NormalizePaymentStatus(result.Status) {
 	case paymententity.PaymentStatusSuccess:
@@ -165,6 +164,10 @@ func (a *PaymentIntentAggregate) ApplyProviderOutcome(
 func (a *PaymentIntentAggregate) MarkCreateFailed(occurredAt time.Time) (PaymentIntentMutation, error) {
 	if a == nil || a.intent == nil {
 		return PaymentIntentMutation{}, stackErr.Error(paymententity.ErrPaymentTransactionIDRequired)
+	}
+	occurredAt, err := normalizePaymentIntentOccurredAt(occurredAt)
+	if err != nil {
+		return PaymentIntentMutation{}, stackErr.Error(err)
 	}
 
 	transition, err := a.intent.MarkCreateFailed(occurredAt)
@@ -299,7 +302,6 @@ func (a *PaymentIntentAggregate) recordOutboxEvent(eventName string, eventData i
 	if a == nil || a.intent == nil {
 		return
 	}
-	eventTime := normalizeAggregateEventTime(occurredAt)
 	a.version++
 	a.outboxEvents = append(a.outboxEvents, eventpkg.Event{
 		AggregateID:   a.intent.TransactionID,
@@ -307,7 +309,7 @@ func (a *PaymentIntentAggregate) recordOutboxEvent(eventName string, eventData i
 		Version:       a.version,
 		EventName:     eventName,
 		EventData:     eventData,
-		CreatedAt:     eventTime.Unix(),
+		CreatedAt:     occurredAt.Unix(),
 	})
 }
 
@@ -325,9 +327,9 @@ func (a *PaymentIntentAggregate) recordCheckoutSessionEvent(checkoutURL string, 
 	)
 }
 
-func normalizeAggregateEventTime(value time.Time) time.Time {
+func normalizePaymentIntentOccurredAt(value time.Time) (time.Time, error) {
 	if value.IsZero() {
-		return time.Now().UTC()
+		return time.Time{}, ErrPaymentIntentOccurredAtRequired
 	}
-	return value.UTC()
+	return value.UTC(), nil
 }

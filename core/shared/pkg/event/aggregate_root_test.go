@@ -2,7 +2,6 @@ package event
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 )
 
@@ -17,8 +16,7 @@ type testEvent struct {
 
 func newTestAggregate(id string) *testAggregate {
 	agg := &testAggregate{}
-	agg.SetAggregateType(reflect.TypeOf(agg).Elem().Name())
-	_ = agg.SetID(id)
+	_ = InitAggregate(&agg.AggregateRoot, agg, id)
 	return agg
 }
 

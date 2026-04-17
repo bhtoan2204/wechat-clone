@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"errors"
+	"time"
 
 	appCtx "go-socket/core/context"
 	"go-socket/core/modules/account/application/dto/in"
@@ -66,7 +67,7 @@ func (u *verifyEmailHandler) Handle(ctx context.Context, req *in.VerifyEmailRequ
 		log.Errorw("Failed to send verification email", zap.Error(err))
 		return nil, stackErr.Error(err)
 	}
-	if err := accountAggregate.RequestEmailVerification(token); err != nil {
+	if err := accountAggregate.RequestEmailVerification(token, time.Now().UTC()); err != nil {
 		log.Errorw("Failed to record verification request", zap.Error(err))
 		return nil, stackErr.Error(err)
 	}

@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"encoding/json"
+	"errors"
 	"go-socket/core/shared/pkg/stackErr"
 	"strings"
 )
@@ -49,4 +50,29 @@ func (m *OutboxMessage) UnmarshalJSON(data []byte) error {
 
 	*m = OutboxMessage(aux)
 	return nil
+}
+
+func UnmarshalEventData(raw []byte, target interface{}) error {
+	if target == nil {
+		return stackErr.Error(errors.New("event_data target is required"))
+	}
+	if len(raw) == 0 {
+		return stackErr.Error(errors.New("event_data is empty"))
+	}
+
+	if err := json.Unmarshal(raw, target); err == nil {
+		return nil
+	}
+
+	var encoded string
+	if err := json.Unmarshal(raw, &encoded); err != nil {
+		return stackErr.Error(err)
+	}
+
+	encoded = strings.TrimSpace(encoded)
+	if encoded == "" {
+		return stackErr.Error(errors.New("event_data is empty"))
+	}
+
+	return stackErr.Error(json.Unmarshal([]byte(encoded), target))
 }
