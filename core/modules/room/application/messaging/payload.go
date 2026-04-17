@@ -16,6 +16,8 @@ import (
 var eventPayloadTypes = map[string]reflect.Type{
 	sharedevents.EventAccountCreated:        reflect.TypeOf(sharedevents.AccountCreatedEvent{}),
 	sharedevents.EventAccountProfileUpdated: reflect.TypeOf(sharedevents.AccountProfileUpdatedEvent{}),
+
+	sharedevents.EventLedgerAccountTransferredToAccount: reflect.TypeOf(sharedevents.LedgerTransaction{}),
 }
 
 func decodeEventPayload(ctx context.Context, eventName string, raw []byte) (interface{}, error) {

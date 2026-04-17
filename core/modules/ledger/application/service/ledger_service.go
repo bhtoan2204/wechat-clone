@@ -11,10 +11,7 @@ import (
 	"go-socket/core/modules/ledger/domain/entity"
 	ledgerrepos "go-socket/core/modules/ledger/domain/repos"
 	eventpkg "go-socket/core/shared/pkg/event"
-	"go-socket/core/shared/pkg/logging"
 	"go-socket/core/shared/pkg/stackErr"
-
-	"go.uber.org/zap"
 )
 
 type TransferToAccountCommand struct {
@@ -125,6 +122,7 @@ func (s *ledgerService) TransferToAccount(ctx context.Context, command TransferT
 		}
 		if err := txRepos.LedgerOutboxEventsRepository().Append(ctx, newLedgerTransactionProjectedEvent(
 			transaction,
+			ledgeraggregate.EventNameLedgerAccountTransferredToAccount,
 			"ledger.transfer_to_account",
 			transaction.TransactionID,
 		)); err != nil {
@@ -140,7 +138,6 @@ func (s *ledgerService) TransferToAccount(ctx context.Context, command TransferT
 }
 
 func (s *ledgerService) RecordPaymentSucceeded(ctx context.Context, command RecordPaymentSucceededCommand) error {
-	log := logging.FromContext(ctx).Named("RecordPaymentSucceeded")
 	booking, err := entity.NewPaymentSucceededBooking(entity.PaymentSucceededBookingInput{
 		PaymentID:          command.PaymentID,
 		TransactionID:      command.TransactionID,
@@ -158,7 +155,6 @@ func (s *ledgerService) RecordPaymentSucceeded(ctx context.Context, command Reco
 		return stackErr.Error(fmt.Errorf("%v: %v", ErrValidation, err))
 	}
 
-	alreadyBooked := false
 	if err := s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
 		debitAgg, err := s.loadLedgerAccount(ctx, txRepos, booking.DebitAccountID)
 		if err != nil {
@@ -195,7 +191,6 @@ func (s *ledgerService) RecordPaymentSucceeded(ctx context.Context, command Reco
 			return stackErr.Error(fmt.Errorf("ledger payment booking became inconsistent for transaction_id=%s", transaction.TransactionID))
 		}
 		if !debitApplied {
-			alreadyBooked = true
 			return nil
 		}
 
@@ -207,6 +202,7 @@ func (s *ledgerService) RecordPaymentSucceeded(ctx context.Context, command Reco
 		}
 		if err := txRepos.LedgerOutboxEventsRepository().Append(ctx, newLedgerTransactionProjectedEvent(
 			transaction,
+			ledgeraggregate.EventNameLedgerAccountPaymentBooked,
 			entity.PaymentReferenceSucceeded,
 			booking.PaymentID,
 		)); err != nil {
@@ -218,17 +214,10 @@ func (s *ledgerService) RecordPaymentSucceeded(ctx context.Context, command Reco
 		return stackErr.Error(err)
 	}
 
-	log.Infow("payment booked into ledger",
-		zap.String("payment_id", booking.PaymentID),
-		zap.String("ledger_transaction_id", booking.LedgerTransactionID()),
-		zap.Bool("already_booked", alreadyBooked),
-	)
-
 	return nil
 }
 
 func (s *ledgerService) RecordPaymentReversed(ctx context.Context, command RecordPaymentReversedCommand) error {
-	log := logging.FromContext(ctx).Named("RecordPaymentReversed")
 	booking, err := entity.NewPaymentReversalBooking(entity.PaymentReversalBookingInput{
 		PaymentID:          command.PaymentID,
 		TransactionID:      command.TransactionID,
@@ -247,7 +236,6 @@ func (s *ledgerService) RecordPaymentReversed(ctx context.Context, command Recor
 		return stackErr.Error(fmt.Errorf("%v: %v", ErrValidation, err))
 	}
 
-	alreadyBooked := false
 	if err := s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
 		debitAgg, err := s.loadLedgerAccount(ctx, txRepos, booking.DebitAccountID)
 		if err != nil {
@@ -286,7 +274,6 @@ func (s *ledgerService) RecordPaymentReversed(ctx context.Context, command Recor
 			return stackErr.Error(fmt.Errorf("ledger payment reversal became inconsistent for transaction_id=%s", transaction.TransactionID))
 		}
 		if !debitApplied {
-			alreadyBooked = true
 			return nil
 		}
 
@@ -298,6 +285,7 @@ func (s *ledgerService) RecordPaymentReversed(ctx context.Context, command Recor
 		}
 		if err := txRepos.LedgerOutboxEventsRepository().Append(ctx, newLedgerTransactionProjectedEvent(
 			transaction,
+			ledgeraggregate.EventNameLedgerAccountPaymentBooked,
 			booking.ReversalType,
 			booking.PaymentID,
 		)); err != nil {
@@ -308,13 +296,6 @@ func (s *ledgerService) RecordPaymentReversed(ctx context.Context, command Recor
 	}); err != nil {
 		return stackErr.Error(err)
 	}
-
-	log.Infow("payment reversal booked into ledger",
-		zap.String("payment_id", booking.PaymentID),
-		zap.String("ledger_transaction_id", booking.LedgerTransactionID()),
-		zap.String("reversal_type", booking.ReversalType),
-		zap.Bool("already_booked", alreadyBooked),
-	)
 
 	return nil
 }
@@ -340,6 +321,7 @@ func (s *ledgerService) loadLedgerAccount(
 
 func newLedgerTransactionProjectedEvent(
 	transaction *entity.LedgerTransaction,
+	eventName string,
 	referenceType string,
 	referenceID string,
 ) eventpkg.Event {
@@ -360,7 +342,7 @@ func newLedgerTransactionProjectedEvent(
 		AggregateID:   transaction.TransactionID,
 		AggregateType: ledgerprojection.AggregateTypeLedgerTransactionProjection,
 		Version:       1,
-		EventName:     ledgerprojection.EventLedgerTransactionProjected,
+		EventName:     strings.TrimSpace(eventName),
 		EventData: &ledgerprojection.LedgerTransactionProjected{
 			TransactionID: transaction.TransactionID,
 			ReferenceType: strings.TrimSpace(referenceType),

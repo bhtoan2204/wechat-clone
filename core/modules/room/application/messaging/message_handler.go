@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"go-socket/core/modules/room/application/service"
 	"go-socket/core/modules/room/domain/repos"
 	"go-socket/core/shared/config"
 	sharedevents "go-socket/core/shared/contracts/events"
@@ -24,19 +25,22 @@ type MessageHandler interface {
 type messageHandler struct {
 	consumer    []infraMessaging.Consumer
 	accountRepo repos.RoomAccountProjectionRepository
+	baseRepo    repos.Repos
+	svc         service.Service
 }
 
-type accountOutboxMessage struct {
+type outboxMessage struct {
 	ID            int64           `json:"id"`
 	AggregateID   string          `json:"aggregate_id"`
 	AggregateType string          `json:"aggregate_type"`
 	Version       int64           `json:"version"`
 	EventName     string          `json:"event_name"`
+	MetaData      json.RawMessage `json:"metadata"`
 	EventData     json.RawMessage `json:"event_data"`
 	CreatedAt     string          `json:"created_at"`
 }
 
-func (m *accountOutboxMessage) UnmarshalJSON(data []byte) error {
+func (m *outboxMessage) UnmarshalJSON(data []byte) error {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return stackErr.Error(err)
@@ -60,7 +64,7 @@ func (m *accountOutboxMessage) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	type alias accountOutboxMessage
+	type alias outboxMessage
 	var aux alias
 	normalizedData, err := json.Marshal(normalized)
 	if err != nil {
@@ -70,20 +74,28 @@ func (m *accountOutboxMessage) UnmarshalJSON(data []byte) error {
 		return stackErr.Error(err)
 	}
 
-	*m = accountOutboxMessage(aux)
+	*m = outboxMessage(aux)
 	return nil
 }
 
-func NewMessageHandler(cfg *config.Config, accountRepo repos.RoomAccountProjectionRepository) (MessageHandler, error) {
+func NewMessageHandler(cfg *config.Config, repos repos.Repos, svc service.Service) (MessageHandler, error) {
 	instance := &messageHandler{
 		consumer:    make([]infraMessaging.Consumer, 0),
-		accountRepo: accountRepo,
+		accountRepo: repos.RoomAccountProjectionRepository(),
+		baseRepo:    repos,
+		svc:         svc,
 	}
 
-	consumeTopics := []string{cfg.KafkaConfig.KafkaRoomConsumer.AccountTopic}
+	consumeTopics := []string{
+		cfg.KafkaConfig.KafkaRoomConsumer.AccountTopic,
+		cfg.KafkaConfig.KafkaRoomConsumer.LedgerOutboxTopic,
+	}
 	mapHandler := map[string]infraMessaging.Handler{
 		fmt.Sprintf("room-%s-handler", strings.ToLower(cfg.KafkaConfig.KafkaRoomConsumer.AccountTopic)): func(ctx context.Context, value []byte) error {
 			return instance.handleAccountEvent(ctx, value)
+		},
+		fmt.Sprintf("room-%s-handler", strings.ToLower(cfg.KafkaConfig.KafkaRoomConsumer.LedgerOutboxTopic)): func(ctx context.Context, value []byte) error {
+			return instance.handleLedgerEvent(ctx, value)
 		},
 	}
 
@@ -120,7 +132,7 @@ func (h *messageHandler) Stop() error {
 
 func (h *messageHandler) handleAccountEvent(ctx context.Context, value []byte) error {
 	log := logging.FromContext(ctx).Named("handleAccountEvent")
-	var event accountOutboxMessage
+	var event outboxMessage
 	if err := json.Unmarshal(value, &event); err != nil {
 		return stackErr.Error(fmt.Errorf("unmarshal account outbox event failed: %v", err))
 	}
@@ -134,8 +146,23 @@ func (h *messageHandler) handleAccountEvent(ctx context.Context, value []byte) e
 		if err := h.handleAccountUpdatedEvent(ctx, event.EventData); err != nil {
 			return stackErr.Error(err)
 		}
-	default:
-		return nil
+	}
+
+	return nil
+}
+
+func (h *messageHandler) handleLedgerEvent(ctx context.Context, value []byte) error {
+	log := logging.FromContext(ctx).Named("handleLedgerEvent")
+	var event outboxMessage
+	if err := json.Unmarshal(value, &event); err != nil {
+		return stackErr.Error(fmt.Errorf("unmarshal account outbox event failed: %v", err))
+	}
+	log.Infow("handle ledger event", zap.String("event_name", event.EventName))
+	switch event.EventName {
+	case sharedevents.EventLedgerAccountTransferredToAccount:
+		if err := h.handleLedgerAccountTransferredToAccount(ctx, event.EventData); err != nil {
+			return stackErr.Error(err)
+		}
 	}
 
 	return nil

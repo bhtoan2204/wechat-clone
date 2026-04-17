@@ -29,16 +29,15 @@ func (h *messageHandler) handleLedgerOutboxEvent(ctx context.Context, value []by
 		zap.String("aggregate_id", event.AggregateID),
 	)
 
-	switch event.EventName {
-	case ledgerprojection.EventLedgerTransactionProjected:
-		payload, err := unmarshalLedgerTransactionProjectedPayload(event.EventData)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		return stackErr.Error(h.projector.ProjectTransaction(ctx, &payload))
-	default:
+	if !ledgerprojection.IsLedgerTransactionProjectionEvent(event.EventName) {
 		return nil
 	}
+
+	payload, err := unmarshalLedgerTransactionProjectedPayload(event.EventData)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+	return stackErr.Error(h.projector.ProjectTransaction(ctx, &payload))
 }
 
 func unmarshalLedgerTransactionProjectedPayload(data json.RawMessage) (ledgerprojection.LedgerTransactionProjected, error) {

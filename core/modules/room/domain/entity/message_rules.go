@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	MessageTypeText   = "text"
-	MessageTypeSystem = "system"
-	MessageTypeImage  = "image"
-	MessageTypeFile   = "file"
+	MessageTypeText     = "text"
+	MessageTypeSystem   = "system"
+	MessageTypeImage    = "image"
+	MessageTypeFile     = "file"
+	MessageTypeTransfer = "transfer"
 )
 
 var (
@@ -95,6 +96,8 @@ func NormalizeMessageType(value string) string {
 		return MessageTypeImage
 	case MessageTypeFile:
 		return MessageTypeFile
+	case MessageTypeTransfer:
+		return MessageTypeTransfer
 	default:
 		return ""
 	}

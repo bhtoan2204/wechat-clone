@@ -1,11 +1,20 @@
 package projection
 
-import "time"
+import (
+	"time"
+
+	ledgeraggregate "go-socket/core/modules/ledger/domain/aggregate"
+)
 
 const (
 	AggregateTypeLedgerTransactionProjection = "LedgerTransactionProjection"
-	EventLedgerTransactionProjected          = "ledger.transaction.projected"
 )
+
+var ledgerTransactionProjectionEventNames = map[string]struct{}{
+	ledgeraggregate.EventNameLedgerAccountPaymentBooked:        {},
+	ledgeraggregate.EventNameLedgerAccountTransferredToAccount: {},
+	ledgeraggregate.EventNameLedgerAccountReceivedTransfer:     {},
+}
 
 type LedgerTransactionEntry struct {
 	AccountID string    `json:"account_id"`
@@ -21,4 +30,9 @@ type LedgerTransactionProjected struct {
 	Currency      string                   `json:"currency"`
 	CreatedAt     time.Time                `json:"created_at"`
 	Entries       []LedgerTransactionEntry `json:"entries"`
+}
+
+func IsLedgerTransactionProjectionEvent(name string) bool {
+	_, ok := ledgerTransactionProjectionEventNames[name]
+	return ok
 }

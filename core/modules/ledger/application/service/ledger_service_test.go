@@ -55,7 +55,7 @@ func TestLedgerServiceTransferToAccount(t *testing.T) {
 		outboxRepo.EXPECT().
 			Append(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, evt eventpkg.Event) error {
-				if evt.EventName != ledgerprojection.EventLedgerTransactionProjected {
+				if evt.EventName != ledgeraggregate.EventNameLedgerAccountTransferredToAccount {
 					t.Fatalf("unexpected outbox event name: %s", evt.EventName)
 				}
 				payload, ok := evt.EventData.(*ledgerprojection.LedgerTransactionProjected)
@@ -148,6 +148,9 @@ func TestLedgerServiceRecordPaymentSucceeded(t *testing.T) {
 		outboxRepo.EXPECT().
 			Append(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, evt eventpkg.Event) error {
+				if evt.EventName != ledgeraggregate.EventNameLedgerAccountPaymentBooked {
+					t.Fatalf("unexpected outbox event name: %s", evt.EventName)
+				}
 				payload, ok := evt.EventData.(*ledgerprojection.LedgerTransactionProjected)
 				if !ok {
 					t.Fatalf("unexpected outbox payload type: %T", evt.EventData)
@@ -257,6 +260,9 @@ func TestLedgerServiceRecordPaymentReversed(t *testing.T) {
 		outboxRepo.EXPECT().
 			Append(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, evt eventpkg.Event) error {
+				if evt.EventName != ledgeraggregate.EventNameLedgerAccountPaymentBooked {
+					t.Fatalf("unexpected outbox event name: %s", evt.EventName)
+				}
 				payload, ok := evt.EventData.(*ledgerprojection.LedgerTransactionProjected)
 				if !ok {
 					t.Fatalf("unexpected outbox payload type: %T", evt.EventData)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	ledgerprojection "go-socket/core/modules/ledger/application/projection"
+	ledgeraggregate "go-socket/core/modules/ledger/domain/aggregate"
 
 	"go.uber.org/mock/gomock"
 )
@@ -23,7 +24,7 @@ func TestHandleLedgerOutboxEventProjectsTransactionFromNumericIDMessage(t *testi
 	messageValue := mustMarshalOutboxMessage(t, outboxMessage{
 		ID:          mustMarshalRawMessage(t, 101),
 		AggregateID: "tx-1",
-		EventName:   ledgerprojection.EventLedgerTransactionProjected,
+		EventName:   ledgeraggregate.EventNameLedgerAccountTransferredToAccount,
 		EventData: mustMarshalRawMessage(t, ledgerprojection.LedgerTransactionProjected{
 			TransactionID: "tx-1",
 			ReferenceType: "ledger.transfer_to_account",
@@ -113,7 +114,7 @@ func TestHandleLedgerOutboxEventSupportsStringEncodedPayload(t *testing.T) {
 	messageValue := mustMarshalOutboxMessage(t, outboxMessage{
 		ID:          mustMarshalRawMessage(t, 202),
 		AggregateID: "tx-2",
-		EventName:   ledgerprojection.EventLedgerTransactionProjected,
+		EventName:   ledgeraggregate.EventNameLedgerAccountReceivedTransfer,
 		EventData:   mustMarshalRawMessage(t, string(innerPayload)),
 	})
 
