@@ -38,20 +38,19 @@ func NewMessageHandler(cfg *config.Config, repos repos.Repos, svc service.Realti
 		svc:         svc,
 	}
 
-	consumeTopics := []string{
-		cfg.KafkaConfig.KafkaRoomConsumer.AccountTopic,
-		cfg.KafkaConfig.KafkaRoomConsumer.LedgerOutboxTopic,
-	}
-	mapHandler := map[string]infraMessaging.Handler{
-		fmt.Sprintf("room-%s-handler", strings.ToLower(cfg.KafkaConfig.KafkaRoomConsumer.AccountTopic)): func(ctx context.Context, value []byte) error {
+	topicHandlers := map[string]infraMessaging.Handler{}
+	if topic := strings.TrimSpace(cfg.KafkaConfig.KafkaRoomConsumer.AccountTopic); topic != "" {
+		topicHandlers[topic] = func(ctx context.Context, value []byte) error {
 			return instance.handleAccountEvent(ctx, value)
-		},
-		fmt.Sprintf("room-%s-handler", strings.ToLower(cfg.KafkaConfig.KafkaRoomConsumer.LedgerOutboxTopic)): func(ctx context.Context, value []byte) error {
+		}
+	}
+	if topic := strings.TrimSpace(cfg.KafkaConfig.KafkaRoomConsumer.LedgerOutboxTopic); topic != "" {
+		topicHandlers[topic] = func(ctx context.Context, value []byte) error {
 			return instance.handleLedgerEvent(ctx, value)
-		},
+		}
 	}
 
-	for _, topic := range consumeTopics {
+	for topic, handler := range topicHandlers {
 		consumer, err := infraMessaging.NewConsumer(&infraMessaging.Config{
 			Servers:      cfg.KafkaConfig.KafkaServers,
 			Group:        cfg.KafkaConfig.KafkaRoomConsumer.RoomMessagingGroup,
@@ -63,7 +62,7 @@ func NewMessageHandler(cfg *config.Config, repos repos.Repos, svc service.Realti
 		if err != nil {
 			return nil, stackErr.Error(err)
 		}
-		consumer.SetHandler(mapHandler[fmt.Sprintf("room-%s-handler", strings.ToLower(topic))])
+		consumer.SetHandler(handler)
 		instance.consumer = append(instance.consumer, consumer)
 	}
 

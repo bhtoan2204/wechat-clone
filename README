@@ -1,1 +1,183 @@
+# Wechat Clone
 
+Production-oriented backend for a WeChat-inspired chat system built in Go with strict DDD module boundaries.
+
+## 1. What This Project Is
+
+This repository is cloning the core communication layer of WeChat, not the entire super-app.
+
+What is already represented in the codebase:
+
+- account registration, login, refresh, logout, and Google login hooks
+- direct conversations and group chats
+- realtime chat delivery over WebSocket
+- message lifecycle flows: send, edit, delete, forward, pin, read status
+- notifications and web-push subscription endpoints
+- media upload flow via MinIO presigned URLs
+- wallet-style payment and ledger modules under active development
+
+What is not the focus yet:
+
+- Moments / social feed
+- mini programs
+- voice or video calling
+- large-scale social graph features
+
+If you want the shortest description: this is a backend-first WeChat clone focused on chat, realtime delivery, and future in-chat money movement.
+
+## 2. Architecture Overview
+
+The codebase is organized by bounded modules under `core/modules/*`:
+
+- `account`: identity, auth, profile, devices, sessions
+- `room`: conversations, messages, members, realtime chat, read-model projection
+- `notification`: notification intent and delivery orchestration
+- `payment`: provider-facing payment workflows
+- `ledger`: internal financial source of truth with CQRS and event-sourcing direction
+
+Shared runtime and wiring live in:
+
+- `core/context`: application context and dependency assembly
+- `core/shared`: shared infra, transport, config, contracts, runtime helpers
+- `cmd/main.go`: main API entrypoint
+- `gateway/`: optional Consul-aware reverse proxy entrypoint
+- `scaffold/`: route, DTO, handler, and OpenAPI generation support
+
+Write/read responsibilities are intentionally split:
+
+- OracleDB is the canonical transactional store
+- Cassandra serves chat timeline and conversation reads
+- Elasticsearch is a downstream search index
+- Redis supports cache, locks, presence, and session-adjacent concerns
+- Kafka + Debezium are used for event-driven projection and integration flows
+
+The important architectural point is that business rules are meant to live in domain code first, then application orchestration, then infra and transport.
+
+## 3. Main Stack
+
+- Go `1.24.1`
+- Gin for HTTP transport
+- Gorilla WebSocket for realtime chat
+- GORM + Oracle for transactional persistence
+- Redis for cache, locking, and presence-related state
+- Cassandra for chat serving projections
+- Elasticsearch for message search indexing
+- Kafka + Debezium for outbox / CDC style event propagation
+- MinIO for object storage and media upload URLs
+- Consul for service discovery in gateway / production-style setups
+- Stripe provider adapter for payment flows
+- OpenAPI generation served at `/swagger`
+
+## 4. Run Locally
+
+The repo now has two local infrastructure profiles:
+
+- `docker-compose.dev-min.yml`: first-run profile for core chat development
+- `docker-compose.full.yml`: overlay that adds Kafka, Debezium Connect, and Elasticsearch for projection / CDC work
+
+Recommended first run:
+
+```bash
+make up
+make bootstrap
+make migrate
+make run
+```
+
+What each step does:
+
+- `make up` starts the minimal local stack: Oracle, Redis, Cassandra, and MinIO
+- `make bootstrap` prepares derived infra needed for local dev, such as bootstrap storage and Cassandra setup
+- `make migrate` applies Oracle migrations without starting the HTTP server
+- `make run` starts the main API from `cmd/main.go` using the minimal dev profile
+
+Useful follow-ups:
+
+```bash
+make up-full
+make run-full
+make connector
+make run-gateway
+```
+
+- `make up-full` starts the full stack for Kafka / Debezium / Elasticsearch work
+- `make run-full` starts the API with the full local env profile
+- `make connector` registers the Debezium connector after the full stack is healthy
+- `make run-gateway` starts the optional reverse proxy in `gateway/`
+
+Default local URLs:
+
+- API: `http://localhost:35000`
+- Swagger UI: `http://localhost:35000/swagger`
+- MinIO API: `http://localhost:9001`
+- MinIO Console: `http://localhost:9002`
+- Kafka Connect: `http://localhost:8083` when using the full profile
+
+## 5. Roadmap
+
+Current feature clarity is more useful than a vague “coming soon”, so here is the repo status in plain language.
+
+Done:
+
+- account auth, session, and profile flows
+- direct chat and group chat APIs
+- realtime chat socket transport
+- message send / edit / delete / forward / pin / receipt flows
+- notification listing and push subscription APIs
+- media upload via presigned URLs
+- generated OpenAPI and Swagger serving
+
+In progress:
+
+- payment intent creation and provider webhook processing
+- ledger transfer and balance APIs
+- Oracle outbox -> projection pipeline for room and ledger modules
+- search indexing infrastructure around Elasticsearch
+
+Planned:
+
+- richer friend / contact system
+- message recall UX and moderation-oriented controls
+- stronger reconciliation and operator tooling for payment / ledger
+- voice / video and broader social-layer features
+
+## 6. API Sample
+
+Register a user:
+
+```bash
+curl -X POST http://localhost:35000/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -H 'X-Device-UID: dev-device-001' \
+  -d '{
+    "display_name": "Alice",
+    "email": "alice@example.com",
+    "password": "Secret123!"
+  }'
+```
+
+Create a direct conversation:
+
+```bash
+curl -X POST http://localhost:35000/api/v1/chat/direct \
+  -H 'Authorization: Bearer <access-token>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "peer_account_id": "<account-id>"
+  }'
+```
+
+Send a message:
+
+```bash
+curl -X POST http://localhost:35000/api/v1/chat/messages \
+  -H 'Authorization: Bearer <access-token>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "room_id": "<room-id>",
+    "message": "hello from local dev",
+    "message_type": "text"
+  }'
+```
+
+For the full route surface, open Swagger at `http://localhost:35000/swagger`.

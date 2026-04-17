@@ -1,0 +1,82 @@
+services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  cassandra:
+    image: cassandra:5.0
+    container_name: chat-cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: chat-cluster
+      CASSANDRA_DC: dc1
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+      MAX_HEAP_SIZE: 768M
+      HEAP_NEWSIZE: 256M
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "cqlsh localhost 9042 -e 'DESCRIBE KEYSPACES' >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 50s
+
+  minio:
+    image: minio/minio:latest
+    container_name: chat-minio
+    ports:
+      - "9001:9000"
+      - "9002:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://localhost:9000/minio/health/live >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  oracle-db:
+    image: gvenzl/oracle-free:23.4-slim
+    container_name: oracle23c-free
+    ports:
+      - "1521:1521"
+      - "5500:5500"
+    environment:
+      ORACLE_PASSWORD: Oracle123
+      APP_USER: appuser
+      APP_USER_PASSWORD: App123
+      ORACLE_ARCHIVE_LOG_DEST: ${ORACLE_ARCHIVE_LOG_DEST:-/opt/oracle/oradata/FREE/archivelog}
+      ORACLE_REDO_LOG_SIZE_MB: ${ORACLE_REDO_LOG_SIZE_MB:-1024}
+      ORACLE_REDO_LOG_GROUP_COUNT: ${ORACLE_REDO_LOG_GROUP_COUNT:-4}
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - ./oracle-init:/container-entrypoint-initdb.d
+      - ./oracle-startup:/container-entrypoint-startdb.d
+    shm_size: "1g"
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  cassandra_data:
+  minio_data:
+  oracle_data:
