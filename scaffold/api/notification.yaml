@@ -52,7 +52,11 @@ endpoints:
                 type: string
               - name: account_id
                 type: string
+              - name: kind
+                type: string
               - name: type
+                type: string
+              - name: group_key
                 type: string
               - name: subject
                 type: string
@@ -64,6 +68,26 @@ endpoints:
                 type: string
               - name: created_at
                 type: string
+              - name: updated_at
+                type: string
+              - name: sort_at
+                type: string
+              - name: room_id
+                type: string
+              - name: room_name
+                type: string
+              - name: sender_id
+                type: string
+              - name: sender_name
+                type: string
+              - name: message_count
+                type: int
+              - name: last_message_id
+                type: string
+              - name: last_message_preview
+                type: string
+              - name: last_message_at
+                type: string
         - name: next_cursor
           type: string
         - name: has_more
@@ -71,4 +95,65 @@ endpoints:
         - name: total
           type: int
         - name: limit
+          type: int
+        - name: unread_count
+          type: int
+
+  - name: NotificationMarkRead
+    method: PATCH
+    path: /notification/:notification_id/read
+    handler: MarkNotificationReadHandler
+    auth: true
+    usecase:
+      name: NotificationUsecase
+      method: MarkNotificationRead
+    request:
+      struct: MarkNotificationReadRequest
+      fields:
+        - name: notification_id
+          type: string
+          required: true
+    response:
+      struct: MarkNotificationReadResponse
+      fields:
+        - name: notification
+          type: object
+          struct: NotificationResponse
+        - name: unread_count
+          type: int
+
+  - name: NotificationMarkAllRead
+    method: PATCH
+    path: /notification/read-all
+    handler: MarkAllNotificationsReadHandler
+    auth: true
+    usecase:
+      name: NotificationUsecase
+      method: MarkAllNotificationsRead
+    request:
+      struct: MarkAllNotificationsReadRequest
+      fields: []
+    response:
+      struct: MarkAllNotificationsReadResponse
+      fields:
+        - name: updated_count
+          type: int
+        - name: unread_count
+          type: int
+
+  - name: NotificationUnreadCount
+    method: GET
+    path: /notification/unread-count
+    handler: GetUnreadNotificationCountHandler
+    auth: true
+    usecase:
+      name: NotificationUsecase
+      method: GetUnreadNotificationCount
+    request:
+      struct: GetUnreadNotificationCountRequest
+      fields: []
+    response:
+      struct: GetUnreadNotificationCountResponse
+      fields:
+        - name: unread_count
           type: int

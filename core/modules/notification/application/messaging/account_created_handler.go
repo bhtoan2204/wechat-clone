@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"wechat-clone/core/modules/notification/application/support"
 	"wechat-clone/core/modules/notification/domain/aggregate"
-	"wechat-clone/core/modules/notification/domain/repos"
-	"wechat-clone/core/modules/notification/types"
+	notificationrepos "wechat-clone/core/modules/notification/domain/repos"
+	notificationtypes "wechat-clone/core/modules/notification/types"
 	sharedevents "wechat-clone/core/shared/contracts/events"
 	"wechat-clone/core/shared/pkg/logging"
 	"wechat-clone/core/shared/pkg/stackErr"
@@ -31,9 +33,10 @@ func (h *messageHandler) handleAccountCreatedEvent(ctx context.Context, raw json
 	body := fmt.Sprintf("Welcome %s!", payload.Email)
 	notificationID := aggregate.WelcomeNotificationID(payload.AccountID)
 
-	if _, err := h.notificationRepo.Load(ctx, notificationID); err == nil {
+	notificationRepo := h.baseRepo.NotificationRepository()
+	if _, err := notificationRepo.Load(ctx, notificationID); err == nil {
 		return nil
-	} else if !errors.Is(err, repos.ErrNotificationNotFound) {
+	} else if !errors.Is(err, notificationrepos.ErrNotificationNotFound) {
 		log.Errorw("load notification failed", zap.Error(err))
 		return stackErr.Error(fmt.Errorf("load notification failed: %w", err))
 	}
@@ -44,17 +47,36 @@ func (h *messageHandler) handleAccountCreatedEvent(ctx context.Context, raw json
 	}
 	if err := notificationAgg.Create(
 		payload.AccountID,
-		types.NotificationTypeAccountCreated,
+		notificationtypes.NotificationTypeAccountCreated,
 		subject,
 		body,
 		payload.CreatedAt,
 	); err != nil {
 		return stackErr.Error(err)
 	}
-	if err := h.notificationRepo.Save(ctx, notificationAgg); err != nil {
+	if err := notificationRepo.Save(ctx, notificationAgg); err != nil {
 		log.Errorw("create notification failed", zap.Error(err))
 		return stackErr.Error(fmt.Errorf("create notification failed: %w", err))
 	}
 
-	return h.emailSender.Send(ctx, payload.Email, subject, body)
+	snapshot, err := notificationAgg.Snapshot()
+	if err != nil {
+		return stackErr.Error(err)
+	}
+	unreadCount, err := notificationRepo.CountUnread(ctx, payload.AccountID)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+	if h.realtime != nil {
+		if emitErr := h.realtime.EmitMessage(ctx, support.NewRealtimeNotificationPayload(notificationtypes.RealtimeEventNotificationUpsert, snapshot, unreadCount)); emitErr != nil {
+			return stackErr.Error(fmt.Errorf("emit account notification realtime failed: %w", emitErr))
+		}
+	}
+
+	if h.emailSender == nil {
+		return nil
+	}
+	return stackErr.Error(h.emailSender.SendTemplate(ctx, payload.Email, subject, "welcome.html", map[string]string{
+		"Email": payload.Email,
+	}))
 }

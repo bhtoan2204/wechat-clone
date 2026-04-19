@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xac thuc email</title>
+</head>
+
+<body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, Helvetica, sans-serif; color:#1f2937;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+    style="background-color:#f4f6f8; margin:0; padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+          style="max-width:600px; background-color:#ffffff; border-radius:12px; overflow:hidden;">
+          <tr>
+            <td style="padding:32px 32px 16px 32px; text-align:center; background-color:#111827;">
+              <h1 style="margin:0; font-size:24px; line-height:32px; color:#ffffff;">
+                Xac thuc email
+              </h1>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 16px 0; font-size:16px; line-height:24px;">
+                Xin chao {{.DisplayName}},
+              </p>
+
+              <p style="margin:0 0 16px 0; font-size:16px; line-height:24px;">
+                Chung toi da nhan yeu cau xac thuc email cho tai khoan <strong>{{.Email}}</strong>.
+              </p>
+
+              {{if .VerificationURL}}
+              <div style="margin:24px 0; text-align:center;">
+                <a href="{{.VerificationURL}}"
+                  style="display:inline-block; padding:14px 28px; background-color:#111827; color:#ffffff; text-decoration:none; border-radius:10px; font-size:16px; font-weight:700;">
+                  Xac thuc ngay
+                </a>
+              </div>
+              {{end}}
+
+              <p style="margin:0 0 12px 0; font-size:16px; line-height:24px;">
+                Ma xac thuc cua ban:
+              </p>
+
+              <div style="margin:20px 0; text-align:center;">
+                <span
+                  style="display:inline-block; padding:14px 20px; font-size:20px; line-height:28px; font-weight:700; letter-spacing:2px; color:#111827; background-color:#f3f4f6; border:1px dashed #d1d5db; border-radius:10px; word-break:break-all;">
+                  {{.Token}}
+                </span>
+              </div>
+
+              <p style="margin:0 0 16px 0; font-size:16px; line-height:24px;">
+                Link va ma nay se het han sau <strong>{{.ExpiresInMinutes}} phut</strong>, vao luc <strong>{{.ExpiresAt}}</strong>.
+              </p>
+
+              <p style="margin:0 0 16px 0; font-size:14px; line-height:22px; color:#6b7280;">
+                Neu ban khong thuc hien yeu cau nay, vui long bo qua email nay.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:20px 32px; background-color:#f9fafb; border-top:1px solid #e5e7eb; text-align:center;">
+              <p style="margin:0; font-size:12px; line-height:18px; color:#9ca3af;">
+                Day la email tu dong, vui long khong tra loi email nay.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+
+</html>

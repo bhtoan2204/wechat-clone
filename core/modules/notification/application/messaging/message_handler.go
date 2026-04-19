@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
 	"wechat-clone/core/modules/notification/application/adapter"
+	notificationservice "wechat-clone/core/modules/notification/application/service"
 	"wechat-clone/core/modules/notification/domain/repos"
 	"wechat-clone/core/shared/config"
 	"wechat-clone/core/shared/contracts"
@@ -26,15 +28,21 @@ type MessageHandler interface {
 type messageHandler struct {
 	consumer    []infraMessaging.Consumer
 	emailSender adapter.EmailSender
-
-	notificationRepo repos.NotificationRepository
+	baseRepo    repos.Repos
+	realtime    notificationservice.RealtimeService
 }
 
-func NewMessageHandler(cfg *config.Config, emailSender adapter.EmailSender, notificationRepo repos.NotificationRepository) (MessageHandler, error) {
+func NewMessageHandler(
+	cfg *config.Config,
+	emailSender adapter.EmailSender,
+	baseRepo repos.Repos,
+	realtime notificationservice.RealtimeService,
+) (MessageHandler, error) {
 	instance := &messageHandler{
-		consumer:         make([]infraMessaging.Consumer, 0),
-		emailSender:      emailSender,
-		notificationRepo: notificationRepo,
+		consumer:    make([]infraMessaging.Consumer, 0),
+		emailSender: emailSender,
+		baseRepo:    baseRepo,
+		realtime:    realtime,
 	}
 
 	topicHandlers := map[string]infraMessaging.Handler{}

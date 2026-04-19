@@ -50,6 +50,11 @@ func ensureCassandra(ctx context.Context, cfg *config.Config) error {
 
 	return retry.Do(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.Unrecoverable(ctx.Err())
+			default:
+			}
 			session, err := cassandraclient.NewSession(ctx, cfg.CassandraConfig)
 			if err != nil {
 				return err

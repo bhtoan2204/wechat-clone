@@ -33,6 +33,12 @@ func main() {
 	migrateTool := db.NewMigrateTool()
 	if err := retry.Do(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.Unrecoverable(ctx.Err())
+			default:
+			}
+
 			return migrateTool.Migrate("file://"+*pathMigration, cfg.DBConfig.ConnectionURL)
 		},
 		retry.Attempts(30),

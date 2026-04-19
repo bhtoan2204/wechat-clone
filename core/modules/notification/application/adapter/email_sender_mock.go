@@ -40,16 +40,16 @@ func (m *MockEmailSender) EXPECT() *MockEmailSenderMockRecorder {
 	return m.recorder
 }
 
-// Send mocks base method.
-func (m *MockEmailSender) Send(ctx context.Context, to, subject, body string) error {
+// SendTemplate mocks base method.
+func (m *MockEmailSender) SendTemplate(ctx context.Context, to, subject, templateName string, data any) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Send", ctx, to, subject, body)
+	ret := m.ctrl.Call(m, "SendTemplate", ctx, to, subject, templateName, data)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Send indicates an expected call of Send.
-func (mr *MockEmailSenderMockRecorder) Send(ctx, to, subject, body any) *gomock.Call {
+// SendTemplate indicates an expected call of SendTemplate.
+func (mr *MockEmailSenderMockRecorder) SendTemplate(ctx, to, subject, templateName, data any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockEmailSender)(nil).Send), ctx, to, subject, body)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendTemplate", reflect.TypeOf((*MockEmailSender)(nil).SendTemplate), ctx, to, subject, templateName, data)
 }

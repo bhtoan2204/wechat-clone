@@ -13,6 +13,7 @@ type Config struct {
 	StorageConfig       StorageConfig
 	CassandraConfig     CassandraConfig
 	ElasticsearchConfig ElasticsearchConfig
+	SMTPConfig          SMTPConfig
 }
 
 type ServerConfig struct {
@@ -47,6 +48,7 @@ type AuthConfig struct {
 	TokenIssuer            string `env:"AUTH_TOKEN_ISSUER"`
 	AccessTokenTTLSeconds  int64  `env:"AUTH_ACCESS_TOKEN_TTL_SECONDS"`
 	RefreshTokenTTLSeconds int64  `env:"AUTH_REFRESH_TOKEN_TTL_SECONDS"`
+	VerifyEmailURL         string `env:"AUTH_VERIFY_EMAIL_URL"`
 	GoogleConfig           GoogleConfig
 }
 
@@ -156,4 +158,13 @@ type ElasticsearchConfig struct {
 	RoomMessageIndex         string `env:"ELASTICSEARCH_ROOM_MESSAGE_INDEX,default=room_messages_v1"`
 	ConnectTimeoutSeconds    int    `env:"ELASTICSEARCH_CONNECT_TIMEOUT_SECONDS,default=10"`
 	ResponseHeaderTimeoutSec int    `env:"ELASTICSEARCH_RESPONSE_HEADER_TIMEOUT_SECONDS,default=10"`
+}
+
+type SMTPConfig struct {
+	Host   string `env:"SMTP_HOST"`
+	Port   int    `env:"SMTP_PORT"`
+	Secure bool   `env:"SMTP_SECURE"`
+	User   string `env:"SMTP_USER"`
+	Pass   string `env:"SMTP_PASS"`
+	From   string `env:"SMTP_FROM"`
 }

@@ -2,8 +2,12 @@ package query
 
 import (
 	"context"
+	"time"
+
 	"wechat-clone/core/modules/notification/application/dto/in"
 	"wechat-clone/core/modules/notification/application/dto/out"
+	notificationsupport "wechat-clone/core/modules/notification/application/support"
+	notificationrepos "wechat-clone/core/modules/notification/domain/repos"
 	"wechat-clone/core/shared/pkg/actorctx"
 	"wechat-clone/core/shared/pkg/cqrs"
 	"wechat-clone/core/shared/pkg/logging"
@@ -27,66 +31,63 @@ func (h *listNotificationHandler) Handle(ctx context.Context, req *in.ListNotifi
 	log := logging.FromContext(ctx).Named("ListNotification")
 	accountID, err := actorctx.AccountIDFromContext(ctx)
 	if err != nil {
-		log.Errorw("Account not found", zap.Error(err))
+		log.Errorw("account not found in context", zap.Error(err))
 		return nil, stackErr.Error(err)
 	}
-	options := utils.QueryOptions{
-		Conditions: []utils.Condition{
-			{
-				Field:    "account_id",
-				Value:    accountID,
-				Operator: utils.Equal,
-			},
-		},
-	}
+
+	var cursor *notificationrepos.NotificationListCursor
 	if req.Cursor != "" {
-		createdAt, id, err := utils.DecodeCursor(req.Cursor)
+		sortAt, notificationID, err := utils.DecodeCursor(req.Cursor)
 		if err != nil {
-			log.Errorw("Invalid cursor", zap.Error(err))
+			log.Errorw("decode notification cursor failed", zap.Error(err))
 			return nil, stackErr.Error(err)
 		}
-		options.Conditions = append(options.Conditions, utils.Condition{
-			Field:    "(created_at < ? OR (created_at = ? AND id < ?))",
-			Operator: utils.Raw,
-			Value:    []interface{}{createdAt, createdAt, id},
-		})
+		cursor = &notificationrepos.NotificationListCursor{
+			SortAt:         sortAt.UTC(),
+			NotificationID: notificationID,
+		}
 	}
+
 	limit := req.Limit
-	if limit > 0 {
-		queryLimit := limit + 1
-		options.Limit = &queryLimit
+	if limit <= 0 {
+		limit = 20
 	}
-	notifications, err := h.notificationRepo.ListNotifications(ctx, options)
+
+	items, err := h.notificationRepo.ListByAccountID(ctx, accountID, cursor, limit+1)
 	if err != nil {
-		log.Errorw("Failed to list notifications", zap.Error(err))
+		log.Errorw("list notifications failed", zap.Error(err))
+		return nil, stackErr.Error(err)
+	}
+
+	unreadCount, err := h.notificationRepo.CountUnread(ctx, accountID)
+	if err != nil {
+		log.Errorw("count unread notifications failed", zap.Error(err))
 		return nil, stackErr.Error(err)
 	}
 
 	hasMore := false
-	if limit > 0 && len(notifications) > limit {
+	if len(items) > limit {
 		hasMore = true
-		notifications = notifications[:limit]
+		items = items[:limit]
 	}
 
-	items := make([]out.NotificationResponse, 0, len(notifications))
-	for _, notification := range notifications {
-		if notification == nil {
-			continue
-		}
-		items = append(items, *notification)
+	responses := make([]out.NotificationResponse, 0, len(items))
+	for _, item := range items {
+		responses = append(responses, notificationsupport.ToNotificationResponse(item))
 	}
 
 	nextCursor := ""
 	if hasMore && len(items) > 0 {
 		last := items[len(items)-1]
-		nextCursor = utils.EncodeCursor(last.CreatedAt, last.ID)
+		nextCursor = utils.EncodeCursor(last.SortAt.UTC().Format(time.RFC3339Nano), last.ID)
 	}
 
 	return &out.ListNotificationResponse{
-		Notifications: items,
+		Notifications: responses,
 		NextCursor:    nextCursor,
 		HasMore:       hasMore,
-		Limit:         req.Limit,
-		Total:         len(items),
+		Total:         len(responses),
+		Limit:         limit,
+		UnreadCount:   unreadCount,
 	}, nil
 }

@@ -15,6 +15,7 @@ import (
 	"wechat-clone/core/shared/pkg/stackErr"
 	modruntime "wechat-clone/core/shared/runtime"
 	"wechat-clone/core/shared/transport/http"
+	sharedsocket "wechat-clone/core/shared/transport/websocket"
 )
 
 func buildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.HTTPServer, error) {
@@ -47,7 +48,7 @@ func buildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 	searchChatMentions := cqrs.NewDispatcher(roomquery.NewSearchChatMentionsHandler(roomService))
 	getChatPresence := cqrs.NewDispatcher(roomquery.NewGetChatPresenceHandler(roomService))
 	socketHub := roomsocket.NewHub(ctx, appContext)
-	socketUpgrader := roomsocket.NewUpgrader()
+	socketUpgrader := sharedsocket.NewUpgrader()
 	socketHandler := roomsocket.NewWSHandler(appContext, socketHub, socketUpgrader)
 	server, err := roomserver.NewHTTPServer(
 		createDirectConversation,

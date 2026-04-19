@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -30,6 +30,7 @@ type EmailVerificationTokenPayload struct {
 //go:generate mockgen -package=service -destination=email_verification_service_mock.go -source=email_verification_service.go
 type Mailer interface {
 	Send(ctx context.Context, to, subject, body string) error
+	SendTemplate(ctx context.Context, to, subject, templateName string, data any) error
 }
 
 //go:generate mockgen -package=service -destination=email_verification_service_mock.go -source=email_verification_service.go
@@ -39,14 +40,16 @@ type EmailVerificationService interface {
 }
 
 type emailVerificationService struct {
-	cache sharedcache.Cache
-	smtp  Mailer
+	cache          sharedcache.Cache
+	smtp           Mailer
+	verifyEmailURL string
 }
 
 func NewEmailVerificationService(appCtx *appCtx.AppContext) EmailVerificationService {
 	return &emailVerificationService{
-		cache: appCtx.GetCache(),
-		smtp:  appCtx.GetSMTP(),
+		cache:          appCtx.GetCache(),
+		smtp:           appCtx.GetSMTP(),
+		verifyEmailURL: strings.TrimSpace(appCtx.GetConfig().AuthConfig.VerifyEmailURL),
 	}
 }
 
@@ -70,8 +73,15 @@ func (s *emailVerificationService) SendVerificationEmail(ctx context.Context, ac
 	}
 
 	subject := "Verify your email"
-	body := fmt.Sprintf("Use this token to verify your email: %s\nExpires at: %s", token, expiresAt.Format(time.RFC3339))
-	if err := s.smtp.Send(ctx, account.Email.Value(), subject, body); err != nil {
+	templateData := verifyEmailTemplateData{
+		DisplayName:      account.DisplayName,
+		Email:            account.Email.Value(),
+		Token:            token,
+		ExpiresAt:        expiresAt.Format(time.RFC3339),
+		VerificationURL:  buildVerificationURL(s.verifyEmailURL, token),
+		ExpiresInMinutes: int(emailVerificationTTL / time.Minute),
+	}
+	if err := s.smtp.SendTemplate(ctx, account.Email.Value(), subject, "verify_email.html", templateData); err != nil {
 		return "", time.Time{}, stackErr.Error(err)
 	}
 
@@ -112,4 +122,31 @@ func (s *emailVerificationService) ConsumeVerificationToken(ctx context.Context,
 
 func emailVerificationCacheKey(token string) string {
 	return "account:verify_email:" + token
+}
+
+type verifyEmailTemplateData struct {
+	DisplayName      string
+	Email            string
+	Token            string
+	ExpiresAt        string
+	VerificationURL  string
+	ExpiresInMinutes int
+}
+
+func buildVerificationURL(baseURL, token string) string {
+	baseURL = strings.TrimSpace(baseURL)
+	token = strings.TrimSpace(token)
+	if baseURL == "" || token == "" {
+		return ""
+	}
+
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return ""
+	}
+
+	query := parsed.Query()
+	query.Set("token", token)
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }

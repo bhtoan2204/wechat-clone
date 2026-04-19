@@ -50,7 +50,7 @@ func LoadAppCtx(ctx context.Context, cfg *config.Config) (*AppContext, error) {
 	}
 	opts = append(opts, WithPaseto(paseto))
 
-	smtpClient := smtp.NewSMTP()
+	smtpClient := smtp.NewSMTP(cfg)
 	opts = append(opts, WithSMTP(smtpClient))
 
 	objectStorage, err := storage.NewMinIO(cfg.StorageConfig)

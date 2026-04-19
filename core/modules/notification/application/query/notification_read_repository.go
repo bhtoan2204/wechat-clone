@@ -3,11 +3,12 @@ package query
 import (
 	"context"
 
-	"wechat-clone/core/modules/notification/application/dto/out"
-	"wechat-clone/core/shared/utils"
+	"wechat-clone/core/modules/notification/domain/entity"
+	notificationrepos "wechat-clone/core/modules/notification/domain/repos"
 )
 
 //go:generate mockgen -package=query -destination=notification_read_repository_mock.go -source=notification_read_repository.go
 type NotificationReadRepository interface {
-	ListNotifications(ctx context.Context, options utils.QueryOptions) ([]*out.NotificationResponse, error)
+	ListByAccountID(ctx context.Context, accountID string, cursor *notificationrepos.NotificationListCursor, limit int) ([]*entity.NotificationEntity, error)
+	CountUnread(ctx context.Context, accountID string) (int, error)
 }
