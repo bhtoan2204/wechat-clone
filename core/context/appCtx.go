@@ -2,6 +2,7 @@ package appCtx
 
 import (
 	"context"
+	"os"
 	"wechat-clone/core/shared/config"
 	"wechat-clone/core/shared/infra/cache"
 	"wechat-clone/core/shared/infra/discovery"
@@ -139,7 +140,10 @@ func (appCtx *AppContext) GetConfig() *config.Config {
 }
 
 func (appCtx *AppContext) GetDB() *gorm.DB {
-	return appCtx.db.Debug()
+	if os.Getenv("ENVIRONMENT") != "production" {
+		return appCtx.db.Debug()
+	}
+	return appCtx.db
 }
 
 func (appCtx *AppContext) GetCache() cache.Cache {
