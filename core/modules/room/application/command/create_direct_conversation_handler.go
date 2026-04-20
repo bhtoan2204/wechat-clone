@@ -33,9 +33,9 @@ func (h *createDirectConversationHandler) Handle(ctx context.Context, req *in.Cr
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	if err := ensureProjectedAccountsExist(ctx, h.baseRepo, req.PeerAccountID); err != nil {
-		return nil, stackErr.Error(err)
-	}
+	// if err := ensureProjectedAccountsExist(ctx, h.baseRepo, accountID, req.PeerAccountID); err != nil {
+	// 	return nil, stackErr.Error(err)
+	// }
 
 	now := time.Now().UTC()
 	room, err := entity.NewDirectConversationRoom(uuid.NewString(), accountID, req.PeerAccountID, now)

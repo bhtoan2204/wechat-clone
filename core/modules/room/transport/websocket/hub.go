@@ -123,7 +123,6 @@ func (h *Hub) Unregister(ctx context.Context, client IClient) {
 }
 
 func (h *Hub) JoinRoom(ctx context.Context, client IClient, roomID string) error {
-	log := logging.FromContext(ctx)
 	if client == nil {
 		return stackErr.Error(errors.New("client is nil"))
 	}
@@ -161,12 +160,10 @@ func (h *Hub) JoinRoom(ctx context.Context, client IClient, roomID string) error
 		}
 	}
 
-	log.Infow("client joined room", "client_id", client.GetID(), "room_id", roomID)
 	return nil
 }
 
 func (h *Hub) LeaveRoom(ctx context.Context, client IClient, roomID string) error {
-	log := logging.FromContext(ctx)
 	if client == nil {
 		return stackErr.Error(errors.New("client is nil"))
 	}
@@ -199,7 +196,6 @@ func (h *Hub) LeaveRoom(ctx context.Context, client IClient, roomID string) erro
 		h.unsubscribeRoom(ctx, roomID)
 	}
 
-	log.Infow("client left room", "client_id", client.GetID(), "room_id", roomID)
 	return nil
 }
 
@@ -421,7 +417,7 @@ func (h *Hub) broadcastLocal(ctx context.Context, roomID string, payload []byte)
 	room.Broadcast(ctx, payload)
 }
 
-func (h *Hub) detachSubscription(ctx context.Context, roomID string) *roomSubscription {
+func (h *Hub) detachSubscription(_ context.Context, roomID string) *roomSubscription {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -430,7 +426,7 @@ func (h *Hub) detachSubscription(ctx context.Context, roomID string) *roomSubscr
 	return sub
 }
 
-func (h *Hub) removeSubscription(ctx context.Context, roomID string, expected *roomSubscription) {
+func (h *Hub) removeSubscription(_ context.Context, roomID string, expected *roomSubscription) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 

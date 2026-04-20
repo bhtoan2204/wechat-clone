@@ -630,6 +630,10 @@ func messageRowToEntity(row *messageProjectionRow) (*views.MessageView, error) {
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
+	reactions, err := unmarshalProjectionReactions(row.ReactionsJSON)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
 
 	return &views.MessageView{
 		ID:                     row.MessageID,
@@ -638,6 +642,7 @@ func messageRowToEntity(row *messageProjectionRow) (*views.MessageView, error) {
 		Message:                row.MessageContent,
 		MessageType:            row.MessageType,
 		Mentions:               mentions,
+		Reactions:              reactions,
 		MentionAll:             row.MentionAll,
 		ReplyToMessageID:       strings.TrimSpace(row.ReplyToMessageID),
 		ForwardedFromMessageID: strings.TrimSpace(row.ForwardedFromMessageID),
@@ -726,6 +731,7 @@ func messageViewToProjection(message *views.MessageView) *roomprojection.Message
 		MessageSenderID:        message.SenderID,
 		MessageSentAt:          message.CreatedAt.UTC(),
 		Mentions:               mentions,
+		Reactions:              mapProjectionReactionsFromView(message.Reactions),
 		MentionAll:             message.MentionAll,
 		MentionedAccountIDs:    mentionedAccountIDs,
 		EditedAt:               utils.ClonePtr(message.EditedAt),
@@ -855,4 +861,41 @@ func unmarshalProjectionMentions(raw string) ([]views.MessageMentionView, error)
 		})
 	}
 	return results, nil
+}
+
+func unmarshalProjectionReactions(raw string) ([]views.MessageReactionView, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, nil
+	}
+
+	var items []roomprojection.ProjectionReaction
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	results := make([]views.MessageReactionView, 0, len(items))
+	for _, item := range items {
+		results = append(results, views.MessageReactionView{
+			AccountID: strings.TrimSpace(item.AccountID),
+			Emoji:     strings.TrimSpace(item.Emoji),
+			ReactedAt: item.ReactedAt.UTC(),
+		})
+	}
+	return results, nil
+}
+
+func mapProjectionReactionsFromView(items []views.MessageReactionView) []roomprojection.ProjectionReaction {
+	if len(items) == 0 {
+		return nil
+	}
+
+	results := make([]roomprojection.ProjectionReaction, 0, len(items))
+	for _, item := range items {
+		results = append(results, roomprojection.ProjectionReaction{
+			AccountID: strings.TrimSpace(item.AccountID),
+			Emoji:     strings.TrimSpace(item.Emoji),
+			ReactedAt: item.ReactedAt.UTC(),
+		})
+	}
+	return results
 }

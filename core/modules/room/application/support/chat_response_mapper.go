@@ -49,6 +49,14 @@ func ToMessageResponse(res *apptypes.MessageResult) *out.ChatMessageResponse {
 			Username:    mention.Username,
 		}
 	})
+	reactions := lo.Map(res.Reactions, func(item apptypes.MessageReactionResult, _ int) out.ChatMessageReactionResponse {
+		return out.ChatMessageReactionResponse{
+			Emoji:       item.Emoji,
+			Count:       item.Count,
+			ReactedByMe: item.ReactedByMe,
+			AccountIDs:  item.AccountIDs,
+		}
+	})
 
 	return &out.ChatMessageResponse{
 		ID:                     res.ID,
@@ -58,6 +66,7 @@ func ToMessageResponse(res *apptypes.MessageResult) *out.ChatMessageResponse {
 		MessageType:            res.MessageType,
 		Status:                 res.Status,
 		Mentions:               mentions,
+		Reactions:              reactions,
 		MentionAll:             res.MentionAll,
 		ReplyToMessageID:       res.ReplyToMessageID,
 		ForwardedFromMessageID: res.ForwardedFromMessageID,

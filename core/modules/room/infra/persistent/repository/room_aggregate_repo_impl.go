@@ -133,6 +133,12 @@ func (r *roomAggregateRepoImpl) Save(ctx context.Context, agg *aggregate.RoomSta
 		if member == nil {
 			continue
 		}
+		if agg.IsNew() {
+			if err := r.roomMemberRepo.CreateRoomMember(ctx, member); err != nil {
+				return stackErr.Error(err)
+			}
+			continue
+		}
 		existing, err := r.roomMemberRepo.GetRoomMemberByAccount(ctx, member.RoomID, member.AccountID)
 		if err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {

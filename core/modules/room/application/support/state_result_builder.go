@@ -132,6 +132,7 @@ func BuildMessageResultFromState(
 		Message:                message.Message,
 		MessageType:            message.MessageType,
 		Status:                 status,
+		Reactions:              buildStateMessageReactionResults(viewerID, message.Reactions),
 		MentionAll:             message.MentionAll,
 		ReplyToMessageID:       message.ReplyToMessageID,
 		ForwardedFromMessageID: message.ForwardedFromMessageID,
@@ -185,4 +186,56 @@ func BuildMessageResultFromState(
 	}
 
 	return result, nil
+}
+
+func buildStateMessageReactionResults(viewerID string, items []entity.MessageReaction) []apptypes.MessageReactionResult {
+	if len(items) == 0 {
+		return nil
+	}
+
+	type groupedReaction struct {
+		emoji      string
+		accountIDs []string
+		byMe       bool
+	}
+
+	groups := make(map[string]*groupedReaction, len(items))
+	order := make([]string, 0, len(items))
+	for _, item := range items {
+		emoji := item.Emoji
+		accountID := item.AccountID
+		if emoji == "" || accountID == "" {
+			continue
+		}
+
+		group, exists := groups[emoji]
+		if !exists {
+			group = &groupedReaction{emoji: emoji}
+			groups[emoji] = group
+			order = append(order, emoji)
+		}
+
+		group.accountIDs = append(group.accountIDs, accountID)
+		if accountID == viewerID {
+			group.byMe = true
+		}
+	}
+
+	results := make([]apptypes.MessageReactionResult, 0, len(order))
+	for _, emoji := range order {
+		group := groups[emoji]
+		if group == nil || len(group.accountIDs) == 0 {
+			continue
+		}
+		results = append(results, apptypes.MessageReactionResult{
+			Emoji:       group.emoji,
+			Count:       len(group.accountIDs),
+			ReactedByMe: group.byMe,
+			AccountIDs:  group.accountIDs,
+		})
+	}
+	if len(results) == 0 {
+		return nil
+	}
+	return results
 }

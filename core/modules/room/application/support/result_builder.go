@@ -235,6 +235,7 @@ func (b *messageQueryBuilder) Build(ctx context.Context, input MessageBuildInput
 		MessageType:            input.Message.MessageType,
 		Status:                 status,
 		MentionAll:             input.Message.MentionAll,
+		Reactions:              buildMessageReactionResults(input.ViewerID, input.Message.Reactions),
 		ReplyToMessageID:       input.Message.ReplyToMessageID,
 		ForwardedFromMessageID: input.Message.ForwardedFromMessageID,
 		FileName:               input.Message.FileName,
@@ -328,4 +329,58 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func buildMessageReactionResults(viewerID string, items []views.MessageReactionView) []apptypes.MessageReactionResult {
+	if len(items) == 0 {
+		return nil
+	}
+
+	type groupedReaction struct {
+		emoji      string
+		accountIDs []string
+		byMe       bool
+	}
+
+	groups := make(map[string]*groupedReaction, len(items))
+	order := make([]string, 0, len(items))
+	trimmedViewerID := strings.TrimSpace(viewerID)
+
+	for _, item := range items {
+		emoji := strings.TrimSpace(item.Emoji)
+		accountID := strings.TrimSpace(item.AccountID)
+		if emoji == "" || accountID == "" {
+			continue
+		}
+
+		group, exists := groups[emoji]
+		if !exists {
+			group = &groupedReaction{emoji: emoji}
+			groups[emoji] = group
+			order = append(order, emoji)
+		}
+
+		group.accountIDs = append(group.accountIDs, accountID)
+		if accountID == trimmedViewerID {
+			group.byMe = true
+		}
+	}
+
+	results := make([]apptypes.MessageReactionResult, 0, len(order))
+	for _, emoji := range order {
+		group := groups[emoji]
+		if group == nil || len(group.accountIDs) == 0 {
+			continue
+		}
+		results = append(results, apptypes.MessageReactionResult{
+			Emoji:       group.emoji,
+			Count:       len(group.accountIDs),
+			ReactedByMe: group.byMe,
+			AccountIDs:  group.accountIDs,
+		})
+	}
+	if len(results) == 0 {
+		return nil
+	}
+	return results
 }

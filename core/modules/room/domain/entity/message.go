@@ -9,6 +9,7 @@ type MessageEntity struct {
 	Message                string
 	MessageType            string
 	Mentions               []MessageMention
+	Reactions              []MessageReaction
 	MentionAll             bool
 	ReplyToMessageID       string
 	ForwardedFromMessageID string

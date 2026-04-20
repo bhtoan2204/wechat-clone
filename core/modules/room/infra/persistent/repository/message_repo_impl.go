@@ -42,6 +42,7 @@ func (r *messageRepoImpl) UpdateMessage(ctx context.Context, message *entity.Mes
 		"message":                   m.Message,
 		"message_type":              m.MessageType,
 		"mentions_json":             m.MentionsJSON,
+		"reactions_json":            m.ReactionsJSON,
 		"mention_all":               m.MentionAll,
 		"reply_to_message_id":       m.ReplyToMessageID,
 		"forwarded_from_message_id": m.ForwardedFromMessageID,
@@ -91,6 +92,10 @@ func (r *messageRepoImpl) toModel(e *entity.MessageEntity) (*models.MessageModel
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
+	reactionsJSON, err := marshalMessageReactions(e.Reactions)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
 
 	return &models.MessageModel{
 		ID:                     e.ID,
@@ -99,6 +104,7 @@ func (r *messageRepoImpl) toModel(e *entity.MessageEntity) (*models.MessageModel
 		Message:                e.Message,
 		MessageType:            e.MessageType,
 		MentionsJSON:           mentionsJSON,
+		ReactionsJSON:          reactionsJSON,
 		MentionAll:             e.MentionAll,
 		ReplyToMessageID:       utils.NullableString(e.ReplyToMessageID),
 		ForwardedFromMessageID: utils.NullableString(e.ForwardedFromMessageID),
@@ -117,6 +123,10 @@ func (r *messageRepoImpl) toEntity(m *models.MessageModel) (*entity.MessageEntit
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
+	reactions, err := unmarshalMessageReactions(m.ReactionsJSON)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
 
 	var fileSize int64
 	if m.FileSize != nil {
@@ -130,6 +140,7 @@ func (r *messageRepoImpl) toEntity(m *models.MessageModel) (*entity.MessageEntit
 		Message:                m.Message,
 		MessageType:            m.MessageType,
 		Mentions:               mentions,
+		Reactions:              reactions,
 		MentionAll:             m.MentionAll,
 		ReplyToMessageID:       utils.StringValue(m.ReplyToMessageID),
 		ForwardedFromMessageID: utils.StringValue(m.ForwardedFromMessageID),

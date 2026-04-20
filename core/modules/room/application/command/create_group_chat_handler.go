@@ -31,7 +31,8 @@ func (h *createGroupChatHandler) Handle(ctx context.Context, req *in.CreateGroup
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	if err := ensureProjectedAccountsExist(ctx, h.baseRepo, req.MemberIDs...); err != nil {
+	accountIDs := append([]string{accountID}, req.MemberIDs...)
+	if err := ensureProjectedAccountsExist(ctx, h.baseRepo, accountIDs...); err != nil {
 		return nil, stackErr.Error(err)
 	}
 

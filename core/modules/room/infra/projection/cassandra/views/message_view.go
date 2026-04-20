@@ -9,6 +9,7 @@ type MessageView struct {
 	Message                string
 	MessageType            string
 	Mentions               []MessageMentionView
+	Reactions              []MessageReactionView
 	MentionAll             bool
 	ReplyToMessageID       string
 	ForwardedFromMessageID string
@@ -19,4 +20,10 @@ type MessageView struct {
 	EditedAt               *time.Time
 	DeletedForEveryoneAt   *time.Time
 	CreatedAt              time.Time
+}
+
+type MessageReactionView struct {
+	AccountID string
+	Emoji     string
+	ReactedAt time.Time
 }

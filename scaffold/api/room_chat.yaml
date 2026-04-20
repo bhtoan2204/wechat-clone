@@ -315,6 +315,19 @@ endpoints:
                 type: string
               - name: username
                 type: string
+        - name: reactions
+          type: array
+          items:
+            struct: ChatMessageReactionResponse
+            fields:
+              - name: emoji
+                type: string
+              - name: count
+                type: int
+              - name: reacted_by_me
+                type: bool
+              - name: account_ids
+                type: array
         - name: mention_all
           type: bool
         - name: reply_to_message_id
@@ -371,6 +384,65 @@ endpoints:
         - name: username
           type: string
         - name: avatar_object_key
+          type: string
+
+  - name: ChatCreateMessagePresignedUrl
+    method: POST
+    path: /chat/messages/presigned-url
+    handler: CreateChatMessagePresignedURLHandler
+    auth: true
+    usecase:
+      name: MessageUsecase
+      method: CreateChatMessagePresignedURL
+    request:
+      struct: CreateChatMessagePresignedURLRequest
+      fields:
+        - name: room_id
+          type: string
+          required: true
+        - name: message_type
+          type: string
+          required: true
+        - name: file_name
+          type: string
+          required: true
+        - name: mime_type
+          type: string
+    response:
+      struct: CreateChatMessagePresignedURLResponse
+      fields:
+        - name: presigned_url
+          type: string
+        - name: object_key
+          type: string
+        - name: expires_at
+          type: string
+        - name: method
+          type: string
+
+  - name: ChatGetMessageMedia
+    method: GET
+    path: /chat/messages/media
+    handler: GetChatMessageMediaHandler
+    auth: true
+    usecase:
+      name: MessageUsecase
+      method: GetChatMessageMedia
+    request:
+      struct: GetChatMessageMediaRequest
+      fields:
+        - name: room_id
+          type: string
+          required: true
+        - name: object_key
+          type: string
+          required: true
+    response:
+      struct: GetChatMessageMediaResponse
+      fields:
+        - name: url
+          type: string
+        - name: expires_at
           type: string
 
   - name: ChatSendMessage
@@ -438,6 +510,102 @@ endpoints:
                 type: string
               - name: username
                 type: string
+        - name: reactions
+          type: array
+          items:
+            struct: ChatMessageReactionResponse
+            fields:
+              - name: emoji
+                type: string
+              - name: count
+                type: int
+              - name: reacted_by_me
+                type: bool
+              - name: account_ids
+                type: array
+        - name: mention_all
+          type: bool
+        - name: reply_to_message_id
+          type: string
+        - name: forwarded_from_message_id
+          type: string
+        - name: file_name
+          type: string
+        - name: file_size
+          type: int64
+        - name: mime_type
+          type: string
+        - name: object_key
+          type: string
+        - name: edited_at
+          type: string
+        - name: deleted_for_everyone
+          type: bool
+        - name: created_at
+          type: string
+        - name: reply_to
+          type: object
+          struct: ChatMessagePreviewResponse
+        - name: forwarded_from
+          type: object
+          struct: ChatMessagePreviewResponse
+
+  - name: ChatToggleMessageReaction
+    method: POST
+    path: /chat/messages/:message_id/reactions
+    handler: ToggleChatMessageReactionHandler
+    auth: true
+    usecase:
+      name: MessageUsecase
+      method: ToggleChatMessageReaction
+    request:
+      struct: ToggleChatMessageReactionRequest
+      fields:
+        - name: message_id
+          type: string
+          required: true
+        - name: emoji
+          type: string
+          required: true
+    response:
+      struct: ChatMessageResponse
+      fields:
+        - name: id
+          type: string
+        - name: room_id
+          type: string
+        - name: sender_id
+          type: string
+        - name: message
+          type: string
+        - name: message_type
+          type: string
+        - name: status
+          type: string
+        - name: mentions
+          type: array
+          items:
+            struct: ChatMessageMentionResponse
+            fields:
+              - name: account_id
+                type: string
+              - name: display_name
+                type: string
+              - name: username
+                type: string
+        - name: reactions
+          type: array
+          items:
+            struct: ChatMessageReactionResponse
+            fields:
+              - name: emoji
+                type: string
+              - name: count
+                type: int
+              - name: reacted_by_me
+                type: bool
+              - name: account_ids
+                type: array
         - name: mention_all
           type: bool
         - name: reply_to_message_id
@@ -508,6 +676,19 @@ endpoints:
                 type: string
               - name: username
                 type: string
+        - name: reactions
+          type: array
+          items:
+            struct: ChatMessageReactionResponse
+            fields:
+              - name: emoji
+                type: string
+              - name: count
+                type: int
+              - name: reacted_by_me
+                type: bool
+              - name: account_ids
+                type: array
         - name: mention_all
           type: bool
         - name: reply_to_message_id
@@ -600,6 +781,19 @@ endpoints:
                 type: string
               - name: username
                 type: string
+        - name: reactions
+          type: array
+          items:
+            struct: ChatMessageReactionResponse
+            fields:
+              - name: emoji
+                type: string
+              - name: count
+                type: int
+              - name: reacted_by_me
+                type: bool
+              - name: account_ids
+                type: array
         - name: mention_all
           type: bool
         - name: reply_to_message_id

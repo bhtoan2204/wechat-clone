@@ -1,0 +1,1 @@
+ALTER TABLE messages MODIFY message VARCHAR2(4000) NULL;

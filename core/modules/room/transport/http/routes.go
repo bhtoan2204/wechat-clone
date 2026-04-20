@@ -21,7 +21,10 @@ func RegisterPrivateRoutes(
 	getChatConversation cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationResponse],
 	listChatMessages cqrs.Dispatcher[*in.ListChatMessagesRequest, []*out.ChatMessageResponse],
 	searchChatMentions cqrs.Dispatcher[*in.SearchChatMentionsRequest, []*out.ChatMentionCandidateResponse],
+	createChatMessagePresignedURL cqrs.Dispatcher[*in.CreateChatMessagePresignedURLRequest, *out.CreateChatMessagePresignedURLResponse],
+	getChatMessageMedia cqrs.Dispatcher[*in.GetChatMessageMediaRequest, *out.GetChatMessageMediaResponse],
 	sendChatMessage cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageResponse],
+	toggleChatMessageReaction cqrs.Dispatcher[*in.ToggleChatMessageReactionRequest, *out.ChatMessageResponse],
 	editChatMessage cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageResponse],
 	deleteChatMessage cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse],
 	forwardChatMessage cqrs.Dispatcher[*in.ForwardChatMessageRequest, *out.ChatMessageResponse],
@@ -38,7 +41,10 @@ func RegisterPrivateRoutes(
 	routes.GET("/chat/conversations/:room_id", httpx.Wrap(handler.NewGetChatConversationHandler(getChatConversation)))
 	routes.GET("/chat/conversations/:room_id/messages", httpx.Wrap(handler.NewListChatMessagesHandler(listChatMessages)))
 	routes.GET("/chat/rooms/:room_id/mentions/search", httpx.Wrap(handler.NewSearchChatMentionsHandler(searchChatMentions)))
+	routes.POST("/chat/messages/presigned-url", httpx.Wrap(handler.NewCreateChatMessagePresignedURLHandler(createChatMessagePresignedURL)))
+	routes.GET("/chat/messages/media", httpx.Wrap(handler.NewGetChatMessageMediaHandler(getChatMessageMedia)))
 	routes.POST("/chat/messages", httpx.Wrap(handler.NewSendChatMessageHandler(sendChatMessage)))
+	routes.POST("/chat/messages/:message_id/reactions", httpx.Wrap(handler.NewToggleChatMessageReactionHandler(toggleChatMessageReaction)))
 	routes.PATCH("/chat/messages/:message_id", httpx.Wrap(handler.NewEditChatMessageHandler(editChatMessage)))
 	routes.DELETE("/chat/messages/:message_id", httpx.Wrap(handler.NewDeleteChatMessageHandler(deleteChatMessage)))
 	routes.POST("/chat/messages/:message_id/forward", httpx.Wrap(handler.NewForwardChatMessageHandler(forwardChatMessage)))

@@ -47,6 +47,9 @@ func buildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 	listChatMessages := cqrs.NewDispatcher(roomquery.NewListChatMessagesHandler(roomService))
 	searchChatMentions := cqrs.NewDispatcher(roomquery.NewSearchChatMentionsHandler(roomService))
 	getChatPresence := cqrs.NewDispatcher(roomquery.NewGetChatPresenceHandler(roomService))
+	createChatMessagePresignedURL := cqrs.NewDispatcher(roomcommand.NewCreateChatMessagePresignedURLHandler(appContext, roomRepos))
+	getChatMessageMedia := cqrs.NewDispatcher(roomquery.NewGetChatMessageMediaHandler(appContext, roomRepos))
+	toggleChatMessageReaction := cqrs.NewDispatcher(roomcommand.NewToggleChatMessageReactionHandler(roomRepos, roomService))
 	socketHub := roomsocket.NewHub(ctx, appContext)
 	socketUpgrader := sharedsocket.NewUpgrader()
 	socketHandler := roomsocket.NewWSHandler(appContext, socketHub, socketUpgrader)
@@ -58,7 +61,10 @@ func buildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 		getChatConversation,
 		listChatMessages,
 		searchChatMentions,
+		createChatMessagePresignedURL,
+		getChatMessageMedia,
 		sendChatMessage,
+		toggleChatMessageReaction,
 		editChatMessage,
 		deleteChatMessage,
 		forwardChatMessage,

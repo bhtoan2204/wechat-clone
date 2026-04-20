@@ -299,11 +299,16 @@ func (r *accountRepoImpl) SearchUsers(ctx context.Context, q string, limit, offs
 	baseQuery := r.db.WithContext(ctx).
 		Model(&models.AccountModel{}).
 		Where("status = ?", accounttypes.AccountStatusActive.String()).
-		Where(`
-			USERNAME_NORM LIKE ?
-			OR DISPLAY_NAME_NORM LIKE ?
-			OR EMAIL_NORM LIKE ?
-		`, prefixQuery, containsQuery, prefixQuery)
+		Where(r.db.WithContext(ctx).Where(
+			"USERNAME_NORM LIKE ?",
+			prefixQuery,
+		).Or(
+			"DISPLAY_NAME_NORM LIKE ?",
+			containsQuery,
+		).Or(
+			"EMAIL_NORM LIKE ?",
+			prefixQuery,
+		))
 
 	var total int64
 	if err := baseQuery.Count(&total).Error; err != nil {

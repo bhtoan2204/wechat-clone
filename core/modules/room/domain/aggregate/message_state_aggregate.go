@@ -75,6 +75,20 @@ func (a *MessageStateAggregate) Edit(actorID, content string, editedAt time.Time
 	return nil
 }
 
+func (a *MessageStateAggregate) ToggleReaction(accountID, emoji string, reactedAt time.Time) error {
+	if a == nil || a.message == nil {
+		return stackErr.Error(ErrMessageAggregateNil)
+	}
+	changed, err := a.message.ToggleReaction(accountID, emoji, reactedAt)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+	if changed {
+		a.messageDirty = true
+	}
+	return nil
+}
+
 func (a *MessageStateAggregate) Delete(actorID, accountID, scope string, now time.Time) error {
 	if a == nil || a.message == nil {
 		return stackErr.Error(ErrMessageAggregateNil)

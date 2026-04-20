@@ -13,6 +13,7 @@ const (
 	MessageTypeSystem   = "system"
 	MessageTypeImage    = "image"
 	MessageTypeFile     = "file"
+	MessageTypeSticker  = "sticker"
 	MessageTypeTransfer = "transfer"
 )
 
@@ -64,7 +65,7 @@ func NewMessage(id, roomID, senderID string, params MessageParams, now time.Time
 		return nil, stackErr.Error(ErrMessageTypeInvalid)
 	case messageType == MessageTypeText && content == "":
 		return nil, stackErr.Error(ErrMessageBodyRequired)
-	case (messageType == MessageTypeImage || messageType == MessageTypeFile) && objectKey == "":
+	case (messageType == MessageTypeImage || messageType == MessageTypeFile || messageType == MessageTypeSticker) && objectKey == "":
 		return nil, stackErr.Error(ErrMessageObjectKeyRequired)
 	}
 
@@ -75,6 +76,7 @@ func NewMessage(id, roomID, senderID string, params MessageParams, now time.Time
 		Message:                content,
 		MessageType:            messageType,
 		Mentions:               mentions,
+		Reactions:              nil,
 		MentionAll:             params.MentionAll,
 		ReplyToMessageID:       strings.TrimSpace(params.ReplyToMessageID),
 		ForwardedFromMessageID: strings.TrimSpace(params.ForwardedFromMessageID),
@@ -96,6 +98,8 @@ func NormalizeMessageType(value string) string {
 		return MessageTypeImage
 	case MessageTypeFile:
 		return MessageTypeFile
+	case MessageTypeSticker:
+		return MessageTypeSticker
 	case MessageTypeTransfer:
 		return MessageTypeTransfer
 	default:

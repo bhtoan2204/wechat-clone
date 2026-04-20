@@ -2,7 +2,7 @@
 
 MIN_COMPOSE := docker compose -f docker-compose.dev-min.yml
 FULL_COMPOSE := docker compose -f docker-compose.dev-min.yml -f docker-compose.full.yml
-MIN_ENV_OVERLAY := APP_ENV_OVERLAY_FILE=secret/.env.dev-min
+MIN_ENV_OVERLAY := APP_ENV_OVERLAY_FILE=secret/.env
 
 ## Show available commands
 help:

@@ -191,11 +191,26 @@ func buildMessageProjection(payload messageProjectionPayload) *roomprojection.Me
 		MessageSenderEmail:     strings.TrimSpace(payload.Sender.Email),
 		MessageSentAt:          payload.Message.CreatedAt.UTC(),
 		Mentions:               mapProjectionMentions(payload.Message.Mentions),
+		Reactions:              mapProjectionReactions(payload.Message.Reactions),
 		MentionAll:             payload.Message.MentionAll,
 		MentionedAccountIDs:    mapMentionedAccountIDs(payload.Message.Mentions),
 		EditedAt:               cloneProjectionTime(payload.Message.EditedAt),
 		DeletedForEveryoneAt:   cloneProjectionTime(payload.Message.DeletedForEveryoneAt),
 	}
+}
+
+func mapProjectionReactions(items []entity.MessageReaction) []roomprojection.ProjectionReaction {
+	if len(items) == 0 {
+		return nil
+	}
+
+	return lo.Map(items, func(item entity.MessageReaction, _ int) roomprojection.ProjectionReaction {
+		return roomprojection.ProjectionReaction{
+			AccountID: strings.TrimSpace(item.AccountID),
+			Emoji:     strings.TrimSpace(item.Emoji),
+			ReactedAt: item.ReactedAt.UTC(),
+		}
+	})
 }
 
 func mapProjectionMentions(mentions []entity.MessageMention) []roomprojection.ProjectionMention {

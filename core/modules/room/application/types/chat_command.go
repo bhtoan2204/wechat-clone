@@ -63,3 +63,7 @@ type ForwardMessageCommand struct {
 type MarkMessageStatusCommand struct {
 	Status string
 }
+
+type ToggleMessageReactionCommand struct {
+	Emoji string
+}

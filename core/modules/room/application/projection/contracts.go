@@ -30,6 +30,12 @@ type ProjectionMention struct {
 	Username    string `json:"username"`
 }
 
+type ProjectionReaction struct {
+	AccountID string    `json:"account_id"`
+	Emoji     string    `json:"emoji"`
+	ReactedAt time.Time `json:"reacted_at"`
+}
+
 type RoomAggregateDeleted struct {
 	RoomID string `json:"room_id"`
 }
@@ -81,27 +87,28 @@ type MessageAggregateSync struct {
 }
 
 type MessageProjection struct {
-	RoomID                 string              `json:"room_id"`
-	RoomName               string              `json:"room_name"`
-	RoomType               string              `json:"room_type"`
-	MessageID              string              `json:"message_id"`
-	MessageContent         string              `json:"message_content"`
-	MessageType            string              `json:"message_type"`
-	ReplyToMessageID       string              `json:"reply_to_message_id"`
-	ForwardedFromMessageID string              `json:"forwarded_from_message_id"`
-	FileName               string              `json:"file_name"`
-	FileSize               int64               `json:"file_size"`
-	MimeType               string              `json:"mime_type"`
-	ObjectKey              string              `json:"object_key"`
-	MessageSenderID        string              `json:"message_sender_id"`
-	MessageSenderName      string              `json:"message_sender_name"`
-	MessageSenderEmail     string              `json:"message_sender_email"`
-	MessageSentAt          time.Time           `json:"message_sent_at"`
-	Mentions               []ProjectionMention `json:"mentions"`
-	MentionAll             bool                `json:"mention_all"`
-	MentionedAccountIDs    []string            `json:"mentioned_account_ids"`
-	EditedAt               *time.Time          `json:"edited_at,omitempty"`
-	DeletedForEveryoneAt   *time.Time          `json:"deleted_for_everyone_at,omitempty"`
+	RoomID                 string               `json:"room_id"`
+	RoomName               string               `json:"room_name"`
+	RoomType               string               `json:"room_type"`
+	MessageID              string               `json:"message_id"`
+	MessageContent         string               `json:"message_content"`
+	MessageType            string               `json:"message_type"`
+	ReplyToMessageID       string               `json:"reply_to_message_id"`
+	ForwardedFromMessageID string               `json:"forwarded_from_message_id"`
+	FileName               string               `json:"file_name"`
+	FileSize               int64                `json:"file_size"`
+	MimeType               string               `json:"mime_type"`
+	ObjectKey              string               `json:"object_key"`
+	MessageSenderID        string               `json:"message_sender_id"`
+	MessageSenderName      string               `json:"message_sender_name"`
+	MessageSenderEmail     string               `json:"message_sender_email"`
+	MessageSentAt          time.Time            `json:"message_sent_at"`
+	Mentions               []ProjectionMention  `json:"mentions"`
+	Reactions              []ProjectionReaction `json:"reactions"`
+	MentionAll             bool                 `json:"mention_all"`
+	MentionedAccountIDs    []string             `json:"mentioned_account_ids"`
+	EditedAt               *time.Time           `json:"edited_at,omitempty"`
+	DeletedForEveryoneAt   *time.Time           `json:"deleted_for_everyone_at,omitempty"`
 }
 
 type MessageReceiptProjection struct {

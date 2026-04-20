@@ -3,7 +3,6 @@ package socket
 import (
 	"context"
 	"sync"
-	"wechat-clone/core/shared/pkg/logging"
 )
 
 var _ IRoom = (*Room)(nil)
@@ -26,23 +25,15 @@ func (r *Room) GetID() string {
 }
 
 func (r *Room) AddClient(ctx context.Context, client IClient) {
-	log := logging.FromContext(ctx)
 	r.mu.Lock()
 	r.clients[client.GetID()] = client
-	total := len(r.clients)
 	r.mu.Unlock()
-
-	log.Warnw("client joined room", "room_id", r.id, "client_id", client.GetID(), "total_clients", total)
 }
 
 func (r *Room) RemoveClient(ctx context.Context, client IClient) {
-	log := logging.FromContext(ctx)
 	r.mu.Lock()
 	delete(r.clients, client.GetID())
-	total := len(r.clients)
 	r.mu.Unlock()
-
-	log.Warnw("client left room", "room_id", r.id, "client_id", client.GetID(), "total_clients", total)
 }
 
 func (r *Room) Broadcast(ctx context.Context, message []byte) {

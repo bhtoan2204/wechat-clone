@@ -26,6 +26,13 @@ type MessageMentionResult struct {
 	Username    string
 }
 
+type MessageReactionResult struct {
+	Emoji       string
+	Count       int
+	ReactedByMe bool
+	AccountIDs  []string
+}
+
 type MentionCandidateResult struct {
 	AccountID       string
 	DisplayName     string
@@ -41,6 +48,7 @@ type MessageResult struct {
 	MessageType            string
 	Status                 string
 	Mentions               []MessageMentionResult
+	Reactions              []MessageReactionResult
 	MentionAll             bool
 	ReplyToMessageID       string
 	ForwardedFromMessageID string
