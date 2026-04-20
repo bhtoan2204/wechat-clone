@@ -2,16 +2,12 @@ package command
 
 import (
 	"context"
-	"time"
 	appCtx "wechat-clone/core/context"
 	"wechat-clone/core/modules/relationship/application/dto/in"
 	"wechat-clone/core/modules/relationship/application/dto/out"
-	"wechat-clone/core/modules/relationship/domain/aggregate"
 	repos "wechat-clone/core/modules/relationship/domain/repos"
-	"wechat-clone/core/modules/relationship/support"
 	"wechat-clone/core/shared/pkg/cqrs"
 	"wechat-clone/core/shared/pkg/stackErr"
-	"wechat-clone/core/shared/utils"
 
 	"github.com/google/uuid"
 )
@@ -30,32 +26,36 @@ func NewSendFriendRequest(
 }
 
 func (u *sendFriendRequestHandler) Handle(ctx context.Context, req *in.SendFriendRequestRequest) (*out.SendFriendRequestResponse, error) {
-	accountID, err := support.AccountIDFromCtx(ctx)
+	accountID, err := currentAccountID(ctx)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	// TODO: check if the target user exists?
-	// TODO: check have user send request yet?
-	// TODO: check have they become friends yet?
-	newFriendRequestAggregate, err := aggregate.NewFriendRequest(uuid.NewString())
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
+
+	requestID := uuid.NewString()
+	now := nowUTC()
+
+	response := &out.SendFriendRequestResponse{}
 	if err := u.baseRepo.WithTransaction(ctx, func(txRepos repos.Repos) error {
-		if err := newFriendRequestAggregate.Create(accountID, req.TargetUserID, utils.NullableString("I wanna be friend with you <3"), time.Now()); err != nil {
+		pairAgg, err := txRepos.RelationshipPairAggregateRepository().LoadForUpdate(ctx, accountID, req.TargetUserID)
+		if err != nil {
 			return stackErr.Error(err)
 		}
-		if err := txRepos.FriendRequestAggregateRepository().Save(ctx, newFriendRequestAggregate); err != nil {
+		if err := pairAgg.SendFriendRequest(requestID, now); err != nil {
+			return stackErr.Error(err)
+		}
+		friendRequest := pairAgg.FriendRequest()
+		response.RequestID = friendRequest.AggregateID()
+		response.RequesterID = friendRequest.RequesterID
+		response.AddresseeID = friendRequest.AddresseeID
+		response.Status = friendRequest.Status.String()
+
+		if err := txRepos.RelationshipPairAggregateRepository().Save(ctx, pairAgg); err != nil {
 			return stackErr.Error(err)
 		}
 		return nil
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
-	return &out.SendFriendRequestResponse{
-		RequestID:   newFriendRequestAggregate.AggregateID(),
-		RequesterID: newFriendRequestAggregate.RequesterID,
-		AddresseeID: newFriendRequestAggregate.AddresseeID,
-		Status:      newFriendRequestAggregate.Status.String(),
-	}, nil
+
+	return response, nil
 }

@@ -1,4 +1,3 @@
-// CODE_GENERATOR: application-handler
 package query
 
 import (

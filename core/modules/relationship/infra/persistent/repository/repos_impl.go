@@ -17,7 +17,14 @@ type repoImpl struct {
 	appCtx *appCtx.AppContext
 	db     *gorm.DB
 
-	friendRequestAggregateRepo repos.FriendRequestAggregateRepository
+	relationshipPairAggregateRepo  repos.RelationshipPairAggregateRepository
+	friendRequestAggregateRepo     repos.FriendRequestAggregateRepository
+	friendshipRepo                 repos.FriendshipRepository
+	followRelationRepo             repos.FollowRelationRepository
+	blockRelationRepo              repos.BlockRelationRepository
+	userRelationshipCounterRepo    repos.UserRelationshipCounterRepository
+	relationshipAccountProjectRepo repos.RelationshipAccountProjectionRepository
+	relationshipPairGuardRepo      repos.RelationshipPairGuardRepository
 }
 
 func NewRepoImpl(appCtx *appCtx.AppContext) repos.Repos {
@@ -25,17 +32,60 @@ func NewRepoImpl(appCtx *appCtx.AppContext) repos.Repos {
 }
 
 func newRepoImplWithDB(appCtx *appCtx.AppContext, db *gorm.DB) repos.Repos {
+	relationshipPairAggregateRepo := newRelationshipPairAggregateRepo(db)
 	friendRequestAggregateRepo := newFriendRequestAggregateRepo(db)
+	friendshipRepo := newFriendshipRepo(db)
+	followRelationRepo := newFollowRelationRepo(db)
+	blockRelationRepo := newBlockRelationRepo(db)
+	userRelationshipCounterRepo := newUserRelationshipCounterRepo(db)
+	relationshipAccountProjectRepo := newRelationshipAccountProjectionRepo(db)
+	relationshipPairGuardRepo := newRelationshipPairGuardRepo(db)
 	return &repoImpl{
-		appCtx:                     appCtx,
-		db:                         db,
-		friendRequestAggregateRepo: friendRequestAggregateRepo,
+		appCtx:                         appCtx,
+		db:                             db,
+		relationshipPairAggregateRepo:  relationshipPairAggregateRepo,
+		friendRequestAggregateRepo:     friendRequestAggregateRepo,
+		friendshipRepo:                 friendshipRepo,
+		followRelationRepo:             followRelationRepo,
+		blockRelationRepo:              blockRelationRepo,
+		userRelationshipCounterRepo:    userRelationshipCounterRepo,
+		relationshipAccountProjectRepo: relationshipAccountProjectRepo,
+		relationshipPairGuardRepo:      relationshipPairGuardRepo,
 	}
+}
+
+func (r *repoImpl) RelationshipPairAggregateRepository() repos.RelationshipPairAggregateRepository {
+	return r.relationshipPairAggregateRepo
+
 }
 
 func (r *repoImpl) FriendRequestAggregateRepository() repos.FriendRequestAggregateRepository {
 	return r.friendRequestAggregateRepo
 
+}
+
+func (r *repoImpl) FriendshipRepository() repos.FriendshipRepository {
+	return r.friendshipRepo
+}
+
+func (r *repoImpl) FollowRelationRepository() repos.FollowRelationRepository {
+	return r.followRelationRepo
+}
+
+func (r *repoImpl) BlockRelationRepository() repos.BlockRelationRepository {
+	return r.blockRelationRepo
+}
+
+func (r *repoImpl) UserRelationshipCounterRepository() repos.UserRelationshipCounterRepository {
+	return r.userRelationshipCounterRepo
+}
+
+func (r *repoImpl) RelationshipAccountProjectionRepository() repos.RelationshipAccountProjectionRepository {
+	return r.relationshipAccountProjectRepo
+}
+
+func (r *repoImpl) RelationshipPairGuardRepository() repos.RelationshipPairGuardRepository {
+	return r.relationshipPairGuardRepo
 }
 
 func (r *repoImpl) WithTransaction(ctx context.Context, fn func(repos.Repos) error) (err error) {

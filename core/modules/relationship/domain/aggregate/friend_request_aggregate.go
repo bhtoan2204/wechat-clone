@@ -1,6 +1,7 @@
 package aggregate
 
 import (
+	"fmt"
 	"time"
 	"wechat-clone/core/modules/relationship/domain"
 	"wechat-clone/core/modules/relationship/domain/entity"
@@ -87,6 +88,34 @@ func (a *FriendRequestAggregate) Create(
 		AddresseeID: addresseeID,
 		Message:     msg,
 		CreatedAt:   now,
+	}))
+}
+
+func (a *FriendRequestAggregate) AcceptRequest(now time.Time) error {
+	if a.FriendRequest == nil {
+		return stackErr.Error(fmt.Errorf("friend request entity is required"))
+	}
+	return stackErr.Error(a.ApplyChange(a, &EventFriendRequestAccept{
+		AcceptedAt: now,
+	}))
+}
+
+func (a *FriendRequestAggregate) RejectRequest(reason *string, now time.Time) error {
+	if a.FriendRequest == nil {
+		return stackErr.Error(fmt.Errorf("friend request entity is required"))
+	}
+	return stackErr.Error(a.ApplyChange(a, &EventFriendRequestReject{
+		Reason:     reason,
+		RejectedAt: now,
+	}))
+}
+
+func (a *FriendRequestAggregate) CancelRequest(now time.Time) error {
+	if a.FriendRequest == nil {
+		return stackErr.Error(fmt.Errorf("friend request entity is required"))
+	}
+	return stackErr.Error(a.ApplyChange(a, &EventFriendRequestCancel{
+		CancelAt: now,
 	}))
 }
 

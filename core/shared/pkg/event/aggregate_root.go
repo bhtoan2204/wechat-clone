@@ -119,6 +119,7 @@ func (ar *AggregateRoot) LoadFromHistory(agg Aggregate, events []Event) error {
 }
 
 func (ar *AggregateRoot) Update() {
+	// mark persisted, clear events and update version
 	if len(ar.events) > 0 {
 		lastEvent := ar.events[len(ar.events)-1]
 		ar.version = lastEvent.Version

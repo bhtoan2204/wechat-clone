@@ -65,6 +65,7 @@ type KafkaConfig struct {
 	KafkaPaymentConsumer      KafkaPaymentConsumer
 	KafkaLedgerConsumer       KafkaLedgerConsumer
 	KafkaRoomConsumer         KafkaRoomConsumer
+	KafkaRelationshipConsumer KafkaRelationshipConsumer
 }
 
 type KafkaNotificationConsumer struct {
@@ -95,6 +96,11 @@ type KafkaLedgerConsumer struct {
 
 	PaymentOutboxTopic string `env:"KAFKA_CONSUMER_PAYMENT_OUTBOX_TOPIC"`
 	LedgerOutboxTopic  string `env:"KAFKA_CONSUMER_LEDGER_OUTBOX_TOPIC"`
+}
+
+type KafkaRelationshipConsumer struct {
+	RelationshipProjectionGroup string `env:"KAFKA_RELATIONSHIP_CONSUMER_PROJECTION_GROUP"`
+	AccountTopic                string `env:"KAFKA_CONSUMER_ACCOUNT_TOPIC"`
 }
 
 type SecurityConfig struct {

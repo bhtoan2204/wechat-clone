@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"wechat-clone/core/modules/relationship/domain/aggregate"
 	"wechat-clone/core/modules/relationship/domain/entity"
 	"wechat-clone/core/modules/relationship/domain/repos"
@@ -45,9 +46,46 @@ func (f *friendRequestAggregateRepo) Load(ctx context.Context, friendRequestID s
 		return nil, stackErr.Error(err)
 	}
 
-	friendRequestEntity := toFriendRequestEntity(&friendRequestModel)
+	return f.loadAggregateFromModel(&friendRequestModel)
+}
 
-	agg, err := aggregate.NewFriendRequest(friendRequestID)
+func (f *friendRequestAggregateRepo) LoadPendingByUsers(ctx context.Context, requesterID, addresseeID string) (*aggregate.FriendRequestAggregate, error) {
+	var friendRequestModel models.FriendRequest
+	err := f.db.WithContext(ctx).
+		Where("requester_id = ? AND addressee_id = ? AND status = ?", requesterID, addresseeID, models.FriendRequestStatusPending).
+		Order("created_at DESC").
+		First(&friendRequestModel).Error
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	return f.loadAggregateFromModel(&friendRequestModel)
+}
+
+func (f *friendRequestAggregateRepo) LoadPendingBetween(ctx context.Context, userA, userB string) (*aggregate.FriendRequestAggregate, error) {
+	var friendRequestModel models.FriendRequest
+	err := f.db.WithContext(ctx).
+		Where(
+			"status = ? AND ((requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?))",
+			models.FriendRequestStatusPending,
+			userA,
+			userB,
+			userB,
+			userA,
+		).
+		Order("created_at DESC").
+		First(&friendRequestModel).Error
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	return f.loadAggregateFromModel(&friendRequestModel)
+}
+
+func (f *friendRequestAggregateRepo) loadAggregateFromModel(friendRequestModel *models.FriendRequest) (*aggregate.FriendRequestAggregate, error) {
+	friendRequestEntity := toFriendRequestEntity(friendRequestModel)
+
+	agg, err := aggregate.NewFriendRequest(friendRequestEntity.ID)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -55,6 +93,12 @@ func (f *friendRequestAggregateRepo) Load(ctx context.Context, friendRequestID s
 	if err := agg.SetFriendRequest(friendRequestEntity); err != nil {
 		return nil, stackErr.Error(err)
 	}
+
+	aggregateVersion, err := f.loadAggregateVersion(friendRequestEntity.ID)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	agg.Root().SetInternal(friendRequestEntity.ID, aggregateVersion, aggregateVersion)
 
 	return agg, nil
 }
@@ -79,57 +123,23 @@ func (f *friendRequestAggregateRepo) Save(ctx context.Context, agg *aggregate.Fr
 		return stackErr.Error(fmt.Errorf("friend request model is nil"))
 	}
 
-	return f.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Save(friendRequestModel).Error; err != nil {
+	if err := f.db.WithContext(ctx).Save(friendRequestModel).Error; err != nil {
+		return stackErr.Error(err)
+	}
+
+	events := agg.Events()
+	if len(events) > 0 {
+		if err := persistRelationOutboxEvents(ctx, f.db, f.serializer, events); err != nil {
 			return stackErr.Error(err)
 		}
+	}
 
-		events := agg.Events()
-		if len(events) > 0 {
-			outboxModels := make([]models.RelationOutboxEvent, 0, len(events))
-
-			for _, ev := range events {
-				eventData, err := f.serializeEventData(ev.EventData)
-				if err != nil {
-					return stackErr.Error(err)
-				}
-
-				outboxModels = append(outboxModels, models.RelationOutboxEvent{
-					AggregateID:   ev.AggregateID,
-					AggregateType: ev.AggregateType,
-					Version:       int64(ev.Version),
-					EventName:     ev.EventName,
-					EventData:     eventData,
-				})
-			}
-
-			if err := tx.Create(&outboxModels).Error; err != nil {
-				return stackErr.Error(err)
-			}
-		}
-
-		agg.Update()
-		return nil
-	})
+	agg.Update()
+	return nil
 }
 
-func (f *friendRequestAggregateRepo) serializeEventData(data interface{}) (string, error) {
-	if data == nil {
-		return "", stackErr.Error(fmt.Errorf("event data is nil"))
-	}
-
-	switch v := data.(type) {
-	case string:
-		return v, nil
-	case []byte:
-		return string(v), nil
-	default:
-		b, err := f.serializer.Marshal(data)
-		if err != nil {
-			return "", stackErr.Error(err)
-		}
-		return string(b), nil
-	}
+func (f *friendRequestAggregateRepo) loadAggregateVersion(friendRequestID string) (int, error) {
+	return loadRelationOutboxAggregateVersion(f.db, friendRequestID, eventpkg.AggregateTypeName(&aggregate.FriendRequestAggregate{}))
 }
 
 func toFriendRequestModel(e *entity.FriendRequest) *models.FriendRequest {
@@ -200,4 +210,11 @@ func toFriendRequestModelStatus(s entity.FriendRequestStatus) models.FriendReque
 
 func toFriendRequestEntityStatus(s models.FriendRequestStatus) entity.FriendRequestStatus {
 	return entity.FriendRequestStatus(s)
+}
+
+func normalizePair(a, b string) (string, string) {
+	if strings.Compare(a, b) < 0 {
+		return a, b
+	}
+	return b, a
 }
