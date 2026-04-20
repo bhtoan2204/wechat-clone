@@ -72,17 +72,20 @@ services:
       PGTZ: ${PGTZ:-Asia/Ho_Chi_Minh}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
     command:
       [
         "postgres",
         "-c",
-        "wal_level=logical",
+        "wal_level=${POSTGRES_WAL_LEVEL:-logical}",
         "-c",
-        "max_wal_senders=10",
+        "max_wal_senders=${POSTGRES_MAX_WAL_SENDERS:-10}",
         "-c",
-        "max_replication_slots=10",
+        "max_replication_slots=${POSTGRES_MAX_REPLICATION_SLOTS:-10}",
+        "-c",
+        "max_slot_wal_keep_size=${POSTGRES_MAX_SLOT_WAL_KEEP_SIZE:-1GB}",
         "-c",
         "timezone=Asia/Ho_Chi_Minh",
         "-c",

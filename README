@@ -45,7 +45,7 @@ Shared runtime and wiring live in:
 
 Write/read responsibilities are intentionally split:
 
-- OracleDB is the canonical transactional store
+- PostgreSQL is the canonical transactional store
 - Cassandra serves chat timeline and conversation reads
 - Elasticsearch is a downstream search index
 - Redis supports cache, locks, presence, and session-adjacent concerns
@@ -81,6 +81,7 @@ Recommended first run:
 make up
 make bootstrap
 make migrate
+make connector
 make run
 ```
 
@@ -89,6 +90,7 @@ What each step does:
 - `make up` starts the full local stack: PostgreSQL, Redis, Cassandra, MinIO, Kafka, Debezium Connect, and Elasticsearch
 - `make bootstrap` prepares derived infra needed for local dev, such as bootstrap storage and Cassandra setup
 - `make migrate` applies PostgreSQL migrations without starting the HTTP server
+- `make connector` registers the PostgreSQL Debezium connectors after the outbox/event tables exist
 - `make run` starts the main API from `cmd/main.go` using the default full local profile
 
 Useful follow-ups:
@@ -102,7 +104,7 @@ make run-gateway
 
 - `make up-full` is an alias of `make up`
 - `make run-full` is an alias of `make run`
-- `make connector` registers the Debezium connector after the full stack is healthy
+- `make connector` registers the PostgreSQL Debezium connectors after the full stack is healthy
 - `make run-gateway` starts the optional reverse proxy in `gateway/`
 
 Default local URLs:
@@ -112,6 +114,12 @@ Default local URLs:
 - MinIO API: `http://localhost:9001`
 - MinIO Console: `http://localhost:9002`
 - Kafka Connect: `http://localhost:8083`
+
+CDC notes:
+
+- local PostgreSQL is started with `wal_level=logical`
+- the container init script grants replication capability to the local app role for Debezium `pgoutput`
+- connector definitions live in `connector/connector_config.json` and currently track account, room, payment, and ledger outbox/event tables
 
 ## 5. Roadmap
 

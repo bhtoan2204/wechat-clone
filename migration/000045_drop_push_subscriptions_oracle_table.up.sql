@@ -1,1 +1,1 @@
-DROP TABLE push_subscriptions CASCADE CONSTRAINTS;
+DROP TABLE IF EXISTS push_subscriptions CASCADE;
