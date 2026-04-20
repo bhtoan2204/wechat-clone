@@ -52,12 +52,12 @@ func TestParseAccessToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	email, err := valueobject.NewEmail("hoangtudaden@gmail.com")
+	email, err := valueobject.NewEmail("banhhaotoan2002@gmail.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 	account := &entity.Account{
-		ID:    "409c52ea-71a3-4513-9340-e947aa741273",
+		ID:    "81636f7a-e0af-4ab2-a749-604bdd5a5cd4",
 		Email: email,
 	}
 
@@ -65,6 +65,8 @@ func TestParseAccessToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	t.Log(token)
 
 	claims, err := pasetoSvc.ParseAccessToken(context.Background(), token)
 	if err != nil {

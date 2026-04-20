@@ -2,15 +2,18 @@
 
 MIN_COMPOSE := docker compose -f docker-compose.dev-min.yml
 FULL_COMPOSE := docker compose -f docker-compose.dev-min.yml -f docker-compose.full.yml
-MIN_ENV_OVERLAY := APP_ENV_OVERLAY_FILE=secret/.env.dev-min
+
+BASE_ENV_FILE := secret/.env
+MIN_ENV_OVERLAY := secret/.env
 
 define LOAD_BASE_ENV
-set -a; . ./secret/.env; set +a;
+set -a; . ./$(BASE_ENV_FILE); set +a;
 endef
 
 define LOAD_MIN_ENV
-set -a; . ./secret/.env; \
-if [ -f "$(MIN_ENV_OVERLAY)" ]; then . ./$(MIN_ENV_OVERLAY); fi; \
+set -a; . ./$(BASE_ENV_FILE); \
+export APP_ENV_OVERLAY_FILE=$(MIN_ENV_OVERLAY); \
+if [ -f "./$(MIN_ENV_OVERLAY)" ]; then . ./$(MIN_ENV_OVERLAY); fi; \
 set +a;
 endef
 
@@ -19,7 +22,7 @@ help:
 	@printf "Available targets:\n"
 	@printf "  make up             Start the minimal local stack\n"
 	@printf "  make up-full        Start the full local stack with Kafka and Elasticsearch\n"
-	@printf "  make down           Stop and remove the full local stack\n"
+	@printf "  make down           Stop and remove local containers\n"
 	@printf "  make bootstrap      Prepare local Cassandra and MinIO dependencies\n"
 	@printf "  make migrate        Apply Oracle migrations without starting the API\n"
 	@printf "  make run            Run the API with the minimal local profile\n"
@@ -45,22 +48,22 @@ up-full:
 
 ## Stop and remove local containers from either profile
 down:
-	@$(FULL_COMPOSE) down --remove-orphans
+	@bash -c '$(LOAD_MIN_ENV) $(FULL_COMPOSE) down --remove-orphans'
 .PHONY: down
 
 ## Prepare Cassandra keyspace and MinIO bucket for local development
 bootstrap:
-	@$(MIN_ENV_OVERLAY) ./script/bin.sh bootstrap
+	@APP_ENV_OVERLAY_FILE=$(MIN_ENV_OVERLAY) ./script/bin.sh bootstrap
 .PHONY: bootstrap
 
 ## Apply Oracle migrations without starting the HTTP server
 migrate:
-	@$(MIN_ENV_OVERLAY) ./script/bin.sh migrate
+	@APP_ENV_OVERLAY_FILE=$(MIN_ENV_OVERLAY) ./script/bin.sh migrate
 .PHONY: migrate
 
 ## Run the API server with the minimal local development profile
 run:
-	@$(MIN_ENV_OVERLAY) ./script/bin.sh run
+	@APP_ENV_OVERLAY_FILE=$(MIN_ENV_OVERLAY) ./script/bin.sh run
 .PHONY: run
 
 ## Run the API server with the full local development profile
