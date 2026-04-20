@@ -4,6 +4,16 @@ MIN_COMPOSE := docker compose -f docker-compose.dev-min.yml
 FULL_COMPOSE := docker compose -f docker-compose.dev-min.yml -f docker-compose.full.yml
 MIN_ENV_OVERLAY := APP_ENV_OVERLAY_FILE=secret/.env.dev-min
 
+define LOAD_BASE_ENV
+set -a; . ./secret/.env; set +a;
+endef
+
+define LOAD_MIN_ENV
+set -a; . ./secret/.env; \
+if [ -f "$(MIN_ENV_OVERLAY)" ]; then . ./$(MIN_ENV_OVERLAY); fi; \
+set +a;
+endef
+
 ## Show available commands
 help:
 	@printf "Available targets:\n"
@@ -25,12 +35,12 @@ help:
 
 ## Start the minimal local stack for first-run chat development
 up:
-	@$(MIN_COMPOSE) up -d
+	@bash -c '$(LOAD_MIN_ENV) $(MIN_COMPOSE) up -d'
 .PHONY: up
 
 ## Start the full local stack with Kafka, Debezium, and Elasticsearch
 up-full:
-	@$(FULL_COMPOSE) up -d
+	@bash -c '$(LOAD_BASE_ENV) $(FULL_COMPOSE) up -d'
 .PHONY: up-full
 
 ## Stop and remove local containers from either profile

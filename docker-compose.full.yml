@@ -1,13 +1,13 @@
 services:
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
-    container_name: chat-elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION}
+    container_name: ${ELASTICSEARCH_CONTAINER_NAME}
     ports:
-      - "9200:9200"
+      - "${ELASTICSEARCH_PORT}:9200"
     environment:
-      discovery.type: single-node
-      xpack.security.enabled: "false"
-      ES_JAVA_OPTS: -Xms512m -Xmx512m
+      discovery.type: ${ELASTICSEARCH_DISCOVERY_TYPE}
+      xpack.security.enabled: "${ELASTICSEARCH_XPACK_SECURITY_ENABLED}"
+      ES_JAVA_OPTS: ${ELASTICSEARCH_JAVA_OPTS}
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     restart: unless-stopped
@@ -23,28 +23,28 @@ services:
       start_period: 40s
 
   kafka:
-    image: confluentinc/cp-kafka:7.3.2
-    container_name: kafka
+    image: confluentinc/cp-kafka:${KAFKA_VERSION}
+    container_name: ${KAFKA_CONTAINER_NAME}
     ports:
-      - "9092:9092"
-      - "29092:29092"
+      - "${KAFKA_INTERNAL_PORT}:9092"
+      - "${KAFKA_EXTERNAL_PORT}:29092"
     environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_LOG_DIRS: /var/lib/kafka/data
-      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: ${KAFKA_NODE_ID}
+      KAFKA_PROCESS_ROLES: ${KAFKA_PROCESS_ROLES}
+      KAFKA_CONTROLLER_QUORUM_VOTERS: ${KAFKA_CONTROLLER_QUORUM_VOTERS}
+      KAFKA_LISTENERS: ${KAFKA_LISTENERS}
+      KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
+      KAFKA_INTER_BROKER_LISTENER_NAME: ${KAFKA_INTER_BROKER_LISTENER_NAME}
+      KAFKA_CONTROLLER_LISTENER_NAMES: ${KAFKA_CONTROLLER_LISTENER_NAMES}
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR}
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: ${KAFKA_TRANSACTION_STATE_LOG_MIN_ISR}
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: ${KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS}
+      KAFKA_LOG_DIRS: ${KAFKA_LOG_DIRS}
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}
     volumes:
-      - kafka_kraft_data:/var/lib/kafka/data
+      - kafka_kraft_data:${KAFKA_DATA_PATH}
       - ./script/start-kafka-kraft.sh:/usr/local/bin/start-kafka-kraft.sh:ro
     entrypoint: ["/bin/bash", "/usr/local/bin/start-kafka-kraft.sh"]
     healthcheck:
@@ -55,23 +55,23 @@ services:
       start_period: 40s
 
   connect:
-    image: debezium/connect:2.6
-    container_name: debezium-connect
+    image: debezium/connect:${DEBEZIUM_CONNECT_VERSION}
+    container_name: ${CONNECT_CONTAINER_NAME}
     ports:
-      - "8083:8083"
+      - "${CONNECT_PORT}:8083"
     environment:
-      BOOTSTRAP_SERVERS: kafka:9092
-      GROUP_ID: 1
-      CONFIG_STORAGE_TOPIC: connect_configs
-      OFFSET_STORAGE_TOPIC: connect_offsets
-      STATUS_STORAGE_TOPIC: connect_status
-      CONFIG_STORAGE_REPLICATION_FACTOR: 1
-      OFFSET_STORAGE_REPLICATION_FACTOR: 1
-      STATUS_STORAGE_REPLICATION_FACTOR: 1
-      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
-      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      BOOTSTRAP_SERVERS: ${CONNECT_BOOTSTRAP_SERVERS}
+      GROUP_ID: ${CONNECT_GROUP_ID}
+      CONFIG_STORAGE_TOPIC: ${CONNECT_CONFIG_STORAGE_TOPIC}
+      OFFSET_STORAGE_TOPIC: ${CONNECT_OFFSET_STORAGE_TOPIC}
+      STATUS_STORAGE_TOPIC: ${CONNECT_STATUS_STORAGE_TOPIC}
+      CONFIG_STORAGE_REPLICATION_FACTOR: ${CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR}
+      OFFSET_STORAGE_REPLICATION_FACTOR: ${CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR}
+      STATUS_STORAGE_REPLICATION_FACTOR: ${CONNECT_STATUS_STORAGE_REPLICATION_FACTOR}
+      KEY_CONVERTER: ${CONNECT_KEY_CONVERTER}
+      VALUE_CONVERTER: ${CONNECT_VALUE_CONVERTER}
+      KEY_CONVERTER_SCHEMAS_ENABLE: "${CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE}"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "${CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE}"
     depends_on:
       kafka:
         condition: service_healthy
@@ -89,18 +89,18 @@ services:
       start_period: 30s
 
   kafka-ui:
-    image: ghcr.io/kafbat/kafka-ui:latest
-    container_name: kafka-ui
+    image: ghcr.io/kafbat/kafka-ui:${KAFKA_UI_VERSION}
+    container_name: ${KAFKA_UI_CONTAINER_NAME}
     ports:
-      - "9000:8080"
+      - "${KAFKA_UI_PORT}:8080"
     environment:
-      DYNAMIC_CONFIG_ENABLED: "true"
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: "${KAFKA_UI_DYNAMIC_CONFIG_ENABLED}"
+      KAFKA_CLUSTERS_0_NAME: ${KAFKA_UI_CLUSTER_NAME}
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_UI_BOOTSTRAP_SERVERS}
     depends_on:
       kafka:
         condition: service_healthy
-        
+
 volumes:
   elasticsearch_data:
   kafka_kraft_data:
