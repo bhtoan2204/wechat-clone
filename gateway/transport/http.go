@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strings"
+	"sync/atomic"
 
 	"github.com/hashicorp/consul/api"
 )
@@ -18,6 +19,7 @@ type HTTPTransport struct {
 	cfg          *config.Config
 	server       *http.Server
 	consulClient *api.Client
+	nextBackend  atomic.Uint64
 }
 
 func NewHTTPTransport(ctx context.Context, cfg *config.Config) (*HTTPTransport, error) {
@@ -42,6 +44,32 @@ func normalizeListenAddr(value string) string {
 	return value
 }
 
+func (t *HTTPTransport) nextTargetHost(services []*api.ServiceEntry) (string, bool) {
+	if len(services) == 0 {
+		return "", false
+	}
+
+	start := t.nextBackend.Add(1) - 1
+	for offset := range len(services) {
+		entry := services[(int(start)+offset)%len(services)]
+		if entry == nil || entry.Service == nil {
+			continue
+		}
+
+		address := strings.TrimSpace(entry.Service.Address)
+		if address == "" && entry.Node != nil {
+			address = strings.TrimSpace(entry.Node.Address)
+		}
+		if address == "" || entry.Service.Port == 0 {
+			continue
+		}
+
+		return fmt.Sprintf("%s:%d", address, entry.Service.Port), true
+	}
+
+	return "", false
+}
+
 func (t *HTTPTransport) Start() error {
 	addr := normalizeListenAddr(t.cfg.HTTP.Port)
 
@@ -49,14 +77,14 @@ func (t *HTTPTransport) Start() error {
 	proxy := &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 			services, _, err := t.consulClient.Health().Service("wechat-clone", "", true, nil)
-			if err != nil || len(services) == 0 {
+			targetHost, ok := t.nextTargetHost(services)
+			if err != nil || !ok {
 				// Cố tình trỏ đến một host lỗi để ErrorHandler phía dưới bắt được
 				req.URL.Scheme = "http"
 				req.URL.Host = "service-not-found"
 				return
 			}
-			service := services[0].Service
-			targetHost := fmt.Sprintf("%s:%d", service.Address, service.Port)
+
 			req.URL.Scheme = "http"
 			req.URL.Host = targetHost
 			req.Host = targetHost
