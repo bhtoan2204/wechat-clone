@@ -6,14 +6,16 @@ import (
 	"strings"
 
 	appCtx "wechat-clone/core/context"
-	ledgerprojection "wechat-clone/core/modules/ledger/application/projection"
 	"wechat-clone/core/modules/ledger/application/service"
 	ledgerrepo "wechat-clone/core/modules/ledger/infra/persistent/repository"
 	"wechat-clone/core/shared/config"
+	"wechat-clone/core/shared/contracts"
 	"wechat-clone/core/shared/infra/lock"
 	infraMessaging "wechat-clone/core/shared/infra/messaging"
 	"wechat-clone/core/shared/pkg/stackErr"
 )
+
+type paymentOutboxMessage = contracts.OutboxMessage
 
 //go:generate mockgen -package=messaging -destination=message_handler_mock.go -source=message_handler.go
 type MessageHandler interface {
@@ -24,7 +26,6 @@ type MessageHandler interface {
 type messageHandler struct {
 	consumer      []infraMessaging.Consumer
 	ledgerService service.LedgerService
-	projector     ledgerprojection.Projector
 	locker        lock.Lock
 }
 
@@ -33,12 +34,10 @@ func NewMessageHandler(
 	appCtx *appCtx.AppContext,
 ) (MessageHandler, error) {
 	ledgerSvc := service.NewLedgerService(ledgerrepo.NewRepoImpl(appCtx))
-	projector := ledgerrepo.NewLedgerProjectionRepoImpl(appCtx.GetDB())
 
 	instance := &messageHandler{
 		consumer:      make([]infraMessaging.Consumer, 0, 1),
 		ledgerService: ledgerSvc,
-		projector:     projector,
 		locker:        appCtx.Locker(),
 	}
 
@@ -59,30 +58,11 @@ func NewMessageHandler(
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
+
 	consumer.SetHandler(func(ctx context.Context, value []byte) error {
 		return instance.handlePaymentOutboxEvent(ctx, value)
 	})
 	instance.consumer = append(instance.consumer, consumer)
-
-	ledgerOutboxTopic := strings.TrimSpace(cfg.KafkaConfig.KafkaLedgerConsumer.LedgerOutboxTopic)
-	if ledgerOutboxTopic != "" && projector != nil {
-		handlerName := fmt.Sprintf("ledger-%s-projection-handler", strings.ToLower(ledgerOutboxTopic))
-		projectionConsumer, err := infraMessaging.NewConsumer(&infraMessaging.Config{
-			Servers:      cfg.KafkaConfig.KafkaServers,
-			Group:        cfg.KafkaConfig.KafkaLedgerConsumer.LedgerProjectionGroup,
-			OffsetReset:  cfg.KafkaConfig.KafkaOffsetReset,
-			ConsumeTopic: []string{ledgerOutboxTopic},
-			HandlerName:  handlerName,
-			DLQ:          true,
-		})
-		if err != nil {
-			return nil, stackErr.Error(err)
-		}
-		projectionConsumer.SetHandler(func(ctx context.Context, value []byte) error {
-			return instance.handleLedgerOutboxEvent(ctx, value)
-		})
-		instance.consumer = append(instance.consumer, projectionConsumer)
-	}
 
 	return instance, nil
 }

@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	aggregate "wechat-clone/core/modules/ledger/domain/aggregate"
+	ledgerprojection "wechat-clone/core/modules/ledger/application/projection"
 	"wechat-clone/core/modules/ledger/domain/entity"
-	ledgerrepos "wechat-clone/core/modules/ledger/domain/repos"
 	"wechat-clone/core/shared/utils"
 
 	"go.uber.org/mock/gomock"
@@ -17,13 +16,11 @@ import (
 func TestLedgerQueryServiceListTransactions(t *testing.T) {
 	t.Run("maps paginated account transactions", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		baseRepo := ledgerrepos.NewMockRepos(ctrl)
-		ledgerRepo := ledgerrepos.NewMockLedgerRepository(ctrl)
+		readRepo := ledgerprojection.NewMockReadRepository(ctrl)
 
-		baseRepo.EXPECT().LedgerRepository().Return(ledgerRepo).Times(2)
-		ledgerRepo.EXPECT().CountTransactions(gomock.Any(), "acc-1", "VND").Return(int64(3), nil)
-		ledgerRepo.EXPECT().
-			ListTransactions(gomock.Any(), ledgerrepos.ListTransactionsFilter{
+		readRepo.EXPECT().CountTransactions(gomock.Any(), "acc-1", "VND").Return(int64(3), nil)
+		readRepo.EXPECT().
+			ListTransactions(gomock.Any(), ledgerprojection.ListTransactionsFilter{
 				AccountID: "acc-1",
 				Currency:  "VND",
 				Limit:     3,
@@ -55,7 +52,7 @@ func TestLedgerQueryServiceListTransactions(t *testing.T) {
 				},
 			}, nil)
 
-		queryService := NewLedgerQueryService(baseRepo)
+		queryService := NewLedgerQueryService(readRepo)
 		response, err := queryService.ListTransactions(context.Background(), "acc-1", "", "vnd", 2)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
@@ -111,21 +108,13 @@ func TestLedgerQueryServiceListTransactions(t *testing.T) {
 	})
 }
 
-func TestLedgerQueryServiceGetAccountBalanceReadsCanonicalAggregate(t *testing.T) {
+func TestLedgerQueryServiceGetAccountBalanceReadsProjectedBalance(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	baseRepo := ledgerrepos.NewMockRepos(ctrl)
-	accountRepo := ledgerrepos.NewMockLedgerAccountAggregateRepository(ctrl)
+	readRepo := ledgerprojection.NewMockReadRepository(ctrl)
 
-	aggregate, err := aggregate.NewLedgerAccountAggregate("acc-1")
-	if err != nil {
-		t.Fatalf("NewLedgerAccountAggregate() error = %v", err)
-	}
-	aggregate.Balances["VND"] = 777
+	readRepo.EXPECT().GetBalance(gomock.Any(), "acc-1", "VND").Return(int64(777), nil)
 
-	baseRepo.EXPECT().LedgerAccountAggregateRepository().Return(accountRepo)
-	accountRepo.EXPECT().Load(gomock.Any(), "acc-1").Return(aggregate, nil)
-
-	queryService := NewLedgerQueryService(baseRepo)
+	queryService := NewLedgerQueryService(readRepo)
 	response, err := queryService.GetAccountBalance(context.Background(), " acc-1 ", " vnd ")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)

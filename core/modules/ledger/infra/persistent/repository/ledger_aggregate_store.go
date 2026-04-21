@@ -6,25 +6,22 @@ import (
 	"fmt"
 	"reflect"
 
-	ledgeraggregate "wechat-clone/core/modules/ledger/domain/aggregate"
+	appprojection "wechat-clone/core/modules/ledger/application/projection"
+	"wechat-clone/core/modules/ledger/domain/eventstore"
 	ledgerrepos "wechat-clone/core/modules/ledger/domain/repos"
 	eventpkg "wechat-clone/core/shared/pkg/event"
 	"wechat-clone/core/shared/pkg/stackErr"
 )
 
-type aggregateStore interface {
-	Get(ctx context.Context, aggregateID string, agg eventpkg.Aggregate) error
-	FindPostedTransaction(ctx context.Context, aggregateID, aggregateType, transactionID string) (*ledgeraggregate.LedgerAccountPosting, error)
-	Save(ctx context.Context, agg eventpkg.Aggregate) error
-}
-
 type aggregateStoreImpl struct {
-	repo ledgerEventStore
+	repo       eventstore.LedgerEventStore
+	outboxRepo ledgerrepos.LedgerOutboxEventsRepository
 }
 
-func newAggregateStore(dbTX dbTX, serializer eventpkg.Serializer) aggregateStore {
+func newAggregateStore(dbTX dbTX, serializer eventpkg.Serializer) eventstore.AggregateStore {
 	return &aggregateStoreImpl{
-		repo: newLedgerEventStore(dbTX, serializer),
+		repo:       newLedgerEventStore(dbTX, serializer),
+		outboxRepo: NewLedgerOutboxEventsRepoImpl(dbTX),
 	}
 }
 
@@ -45,15 +42,6 @@ func (s *aggregateStoreImpl) Get(ctx context.Context, aggregateID string, agg ev
 	}
 
 	return stackErr.Error(s.repo.Get(ctx, aggregateID, aggregateType, agg.Root().BaseVersion(), agg))
-}
-
-func (s *aggregateStoreImpl) FindPostedTransaction(
-	ctx context.Context,
-	aggregateID string,
-	aggregateType string,
-	transactionID string,
-) (*ledgeraggregate.LedgerAccountPosting, error) {
-	return s.repo.FindPostedTransaction(ctx, aggregateID, aggregateType, transactionID)
 }
 
 func (s *aggregateStoreImpl) Save(ctx context.Context, agg eventpkg.Aggregate) error {
@@ -101,6 +89,13 @@ func (s *aggregateStoreImpl) Save(ctx context.Context, agg eventpkg.Aggregate) e
 		if err := s.repo.Append(ctx, evt); err != nil {
 			return stackErr.Error(fmt.Errorf("append ledger event #%d failed: %w", idx, err))
 		}
+		// Ledger events are the aggregate history. Projection consumption gets the same
+		// internal event copied to outbox so rebuild and downstream projection stay aligned.
+		if projectionEvent, ok := ledgerProjectionOutboxEvent(evt); ok && s.outboxRepo != nil {
+			if err := s.outboxRepo.Append(ctx, projectionEvent); err != nil {
+				return stackErr.Error(fmt.Errorf("append ledger projection outbox event #%d failed: %w", idx, err))
+			}
+		}
 		if evt.Version%100 == 0 {
 			if err := s.repo.CreateSnapshot(ctx, agg); err != nil {
 				return stackErr.Error(fmt.Errorf("create ledger snapshot failed: %w", err))
@@ -110,4 +105,11 @@ func (s *aggregateStoreImpl) Save(ctx context.Context, agg eventpkg.Aggregate) e
 
 	root.Update()
 	return nil
+}
+
+func ledgerProjectionOutboxEvent(evt eventpkg.Event) (eventpkg.Event, bool) {
+	if !appprojection.IsLedgerTransactionProjectionEvent(evt.EventName) {
+		return eventpkg.Event{}, false
+	}
+	return evt, true
 }

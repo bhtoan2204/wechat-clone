@@ -1,6 +1,12 @@
-package model
+package views
 
 import "time"
+
+type LedgerTransactionListRow struct {
+	TransactionID string
+	Currency      string
+	CreatedAt     time.Time
+}
 
 type LedgerTransactionModel struct {
 	TransactionID string    `gorm:"primaryKey"`

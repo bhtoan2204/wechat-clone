@@ -16,7 +16,6 @@ type repoImpl struct {
 	appCtx *appCtx.AppContext
 	db     *gorm.DB
 
-	ledgerRepo                 ledgerrepos.LedgerRepository
 	ledgerAccountAggregateRepo ledgerrepos.LedgerAccountAggregateRepository
 	ledgerOutboxEventsRepo     ledgerrepos.LedgerOutboxEventsRepository
 }
@@ -26,17 +25,13 @@ func NewRepoImpl(appCtx *appCtx.AppContext) ledgerrepos.Repos {
 }
 
 func newRepoImplWithDB(appCtx *appCtx.AppContext, db *gorm.DB) ledgerrepos.Repos {
+	ledgerAccountRepo := newLedgerAccountAggregateRepoImpl(db)
 	return &repoImpl{
 		appCtx:                     appCtx,
 		db:                         db,
-		ledgerRepo:                 NewLedgerRepoImpl(db),
-		ledgerAccountAggregateRepo: NewLedgerAccountAggregateRepoImpl(db),
+		ledgerAccountAggregateRepo: ledgerAccountRepo,
 		ledgerOutboxEventsRepo:     NewLedgerOutboxEventsRepoImpl(db),
 	}
-}
-
-func (r *repoImpl) LedgerRepository() ledgerrepos.LedgerRepository {
-	return r.ledgerRepo
 }
 
 func (r *repoImpl) LedgerAccountAggregateRepository() ledgerrepos.LedgerAccountAggregateRepository {

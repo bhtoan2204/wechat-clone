@@ -23,7 +23,7 @@ func TestHandlePaymentOutboxEventLocksPaymentSucceededByAffectedAccounts(t *test
 		locker:        locker,
 	}
 
-	messageValue := mustMarshalOutboxMessage(t, outboxMessage{
+	messageValue := mustMarshalOutboxMessage(t, paymentOutboxMessage{
 		AggregateID: "pay-aggregate",
 		EventName:   sharedevents.EventPaymentSucceeded,
 		EventData: mustMarshalRawMessage(t, sharedevents.PaymentSucceededEvent{
@@ -87,7 +87,7 @@ func TestHandlePaymentOutboxEventFallsBackToAggregateIDForCommandPaymentID(t *te
 		t.Fatalf("marshal inner payload failed: %v", err)
 	}
 
-	messageValue := mustMarshalOutboxMessage(t, outboxMessage{
+	messageValue := mustMarshalOutboxMessage(t, paymentOutboxMessage{
 		AggregateID: "pay-aggregate-2",
 		EventName:   sharedevents.EventPaymentSucceeded,
 		EventData:   mustMarshalRawMessage(t, string(innerPayload)),
@@ -133,7 +133,7 @@ func TestHandlePaymentOutboxEventLocksPaymentRefundedByAffectedAccounts(t *testi
 		locker:        locker,
 	}
 
-	messageValue := mustMarshalOutboxMessage(t, outboxMessage{
+	messageValue := mustMarshalOutboxMessage(t, paymentOutboxMessage{
 		AggregateID: "pay-aggregate",
 		EventName:   sharedevents.EventPaymentRefunded,
 		EventData: mustMarshalRawMessage(t, sharedevents.PaymentRefundedEvent{
@@ -187,7 +187,7 @@ func TestHandlePaymentOutboxEventLocksPaymentChargebackByAffectedAccounts(t *tes
 		locker:        locker,
 	}
 
-	messageValue := mustMarshalOutboxMessage(t, outboxMessage{
+	messageValue := mustMarshalOutboxMessage(t, paymentOutboxMessage{
 		AggregateID: "pay-aggregate",
 		EventName:   sharedevents.EventPaymentChargeback,
 		EventData: mustMarshalRawMessage(t, sharedevents.PaymentChargebackEvent{
@@ -231,7 +231,7 @@ func TestHandlePaymentOutboxEventLocksPaymentChargebackByAffectedAccounts(t *tes
 	}
 }
 
-func mustMarshalOutboxMessage(t *testing.T, message outboxMessage) []byte {
+func mustMarshalOutboxMessage(t *testing.T, message paymentOutboxMessage) []byte {
 	t.Helper()
 
 	value, err := json.Marshal(message)

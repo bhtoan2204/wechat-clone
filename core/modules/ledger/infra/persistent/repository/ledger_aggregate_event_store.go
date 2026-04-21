@@ -8,6 +8,8 @@ import (
 	"time"
 
 	ledgeraggregate "wechat-clone/core/modules/ledger/domain/aggregate"
+	"wechat-clone/core/modules/ledger/domain/entity"
+	"wechat-clone/core/modules/ledger/domain/eventstore"
 	ledgerrepos "wechat-clone/core/modules/ledger/domain/repos"
 	"wechat-clone/core/modules/ledger/infra/persistent/model"
 	eventpkg "wechat-clone/core/shared/pkg/event"
@@ -22,23 +24,12 @@ type dbTX interface {
 	WithContext(ctx context.Context) *gorm.DB
 }
 
-type ledgerEventStore interface {
-	CreateIfNotExist(ctx context.Context, aggregateID, aggregateType string) error
-	CheckAndUpdateVersion(ctx context.Context, aggregateID, aggregateType string, baseVersion, newVersion int) (bool, error)
-	FindPostedTransaction(ctx context.Context, aggregateID, aggregateType, transactionID string) (*ledgeraggregate.LedgerAccountPosting, error)
-	ReservePostedTransaction(ctx context.Context, evt eventpkg.Event) error
-	Append(ctx context.Context, evt eventpkg.Event) error
-	Get(ctx context.Context, aggregateID, aggregateType string, afterVersion int, agg eventpkg.Aggregate) error
-	CreateSnapshot(ctx context.Context, agg eventpkg.Aggregate) error
-	ReadSnapshot(ctx context.Context, aggregateID, aggregateType string, agg eventpkg.Aggregate) (bool, error)
-}
-
 type ledgerEventStoreImpl struct {
 	db         dbTX
 	serializer eventpkg.Serializer
 }
 
-func newLedgerEventStore(dbTX dbTX, serializer eventpkg.Serializer) ledgerEventStore {
+func newLedgerEventStore(dbTX dbTX, serializer eventpkg.Serializer) eventstore.LedgerEventStore {
 	return &ledgerEventStoreImpl{
 		db:         dbTX,
 		serializer: serializer,
@@ -87,12 +78,12 @@ func (s *ledgerEventStoreImpl) CheckAndUpdateVersion(
 	return result.RowsAffected == 1, nil
 }
 
-func (s *ledgerEventStoreImpl) FindPostedTransaction(
+func (s *ledgerEventStoreImpl) findPostedTransaction(
 	ctx context.Context,
 	aggregateID string,
 	aggregateType string,
 	transactionID string,
-) (*ledgeraggregate.LedgerAccountPosting, error) {
+) (*entity.LedgerAccountPosting, error) {
 	var postingModel model.LedgerPostedTransactionModel
 	result := s.db.WithContext(ctx).
 		Where("aggregate_id = ? AND aggregate_type = ? AND transaction_id = ?", aggregateID, aggregateType, transactionID).
@@ -105,7 +96,7 @@ func (s *ledgerEventStoreImpl) FindPostedTransaction(
 		return nil, nil
 	}
 
-	return &ledgeraggregate.LedgerAccountPosting{
+	return &entity.LedgerAccountPosting{
 		TransactionID:         postingModel.TransactionID,
 		ReferenceType:         postingModel.ReferenceType,
 		ReferenceID:           postingModel.ReferenceID,
@@ -125,7 +116,7 @@ func (s *ledgerEventStoreImpl) ReservePostedTransaction(ctx context.Context, evt
 		return nil
 	}
 
-	err = mapError(s.db.WithContext(ctx).Create(&model.LedgerPostedTransactionModel{
+	if err := mapError(s.db.WithContext(ctx).Create(&model.LedgerPostedTransactionModel{
 		ID:                    uuid.NewString(),
 		AggregateID:           evt.AggregateID,
 		AggregateType:         evt.AggregateType,
@@ -137,15 +128,14 @@ func (s *ledgerEventStoreImpl) ReservePostedTransaction(ctx context.Context, evt
 		AmountDelta:           posting.AmountDelta,
 		BookedAt:              posting.BookedAt.UTC(),
 		CreatedAt:             time.Now().UTC(),
-	}).Error)
-	if err == nil {
+	}).Error); err == nil {
 		return nil
 	}
 	if !errors.Is(err, ErrDuplicate) {
 		return stackErr.Error(err)
 	}
 
-	existing, loadErr := s.FindPostedTransaction(ctx, evt.AggregateID, evt.AggregateType, posting.TransactionID)
+	existing, loadErr := s.findPostedTransaction(ctx, evt.AggregateID, evt.AggregateType, posting.TransactionID)
 	if loadErr != nil {
 		return stackErr.Error(loadErr)
 	}

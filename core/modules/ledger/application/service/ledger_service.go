@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	ledgerprojection "wechat-clone/core/modules/ledger/application/projection"
 	ledgeraggregate "wechat-clone/core/modules/ledger/domain/aggregate"
 	"wechat-clone/core/modules/ledger/domain/entity"
 	ledgerrepos "wechat-clone/core/modules/ledger/domain/repos"
-	eventpkg "wechat-clone/core/shared/pkg/event"
 	"wechat-clone/core/shared/pkg/stackErr"
 )
 
@@ -56,7 +54,7 @@ type ledgerService struct {
 
 type expectedLedgerPosting struct {
 	accountID string
-	posting   ledgeraggregate.LedgerAccountPosting
+	posting   entity.LedgerAccountPosting
 }
 
 func NewLedgerService(baseRepo ledgerrepos.Repos) *ledgerService {
@@ -163,15 +161,6 @@ func (s *ledgerService) TransferToAccount(ctx context.Context, command TransferT
 		} else if alreadyApplied {
 			return stackErr.Error(fmt.Errorf("ledger transfer duplicate state became inconsistent for transaction_id=%s", transaction.TransactionID))
 		}
-		if err := txRepos.LedgerOutboxEventsRepository().Append(ctx, newLedgerTransactionProjectedEvent(
-			transaction,
-			ledgeraggregate.EventNameLedgerAccountTransferredToAccount,
-			"ledger.transfer_to_account",
-			transaction.TransactionID,
-		)); err != nil {
-			return stackErr.Error(err)
-		}
-
 		return nil
 	}); err != nil {
 		return nil, stackErr.Error(err)
@@ -285,15 +274,6 @@ func (s *ledgerService) RecordPaymentSucceeded(ctx context.Context, command Reco
 		} else if alreadyApplied {
 			return stackErr.Error(fmt.Errorf("ledger payment duplicate state became inconsistent for transaction_id=%s", transaction.TransactionID))
 		}
-		if err := txRepos.LedgerOutboxEventsRepository().Append(ctx, newLedgerTransactionProjectedEvent(
-			transaction,
-			ledgeraggregate.EventNameLedgerAccountPaymentBooked,
-			entity.PaymentReferenceSucceeded,
-			booking.PaymentID,
-		)); err != nil {
-			return stackErr.Error(err)
-		}
-
 		return nil
 	}); err != nil {
 		return stackErr.Error(err)
@@ -410,15 +390,6 @@ func (s *ledgerService) RecordPaymentReversed(ctx context.Context, command Recor
 		} else if alreadyApplied {
 			return stackErr.Error(fmt.Errorf("ledger payment reversal duplicate state became inconsistent for transaction_id=%s", transaction.TransactionID))
 		}
-		if err := txRepos.LedgerOutboxEventsRepository().Append(ctx, newLedgerTransactionProjectedEvent(
-			transaction,
-			ledgeraggregate.EventNameLedgerAccountPaymentBooked,
-			booking.ReversalType,
-			booking.PaymentID,
-		)); err != nil {
-			return stackErr.Error(err)
-		}
-
 		return nil
 	}); err != nil {
 		return stackErr.Error(err)
@@ -453,11 +424,18 @@ func (s *ledgerService) ensureLedgerPostingsState(
 ) (bool, error) {
 	matchedCount := 0
 	for _, item := range expected {
-		existing, err := repos.LedgerAccountAggregateRepository().FindPostedTransaction(ctx, item.accountID, item.posting.TransactionID)
+		account, err := repos.LedgerAccountAggregateRepository().Load(ctx, item.accountID)
 		if err != nil {
 			return false, stackErr.Error(err)
 		}
+		if account == nil {
+			continue
+		}
+		existing, ok := account.PostedTransaction(item.posting.TransactionID)
 		if existing == nil {
+			continue
+		}
+		if !ok {
 			continue
 		}
 		if !ledgeraggregate.SameLedgerAccountPosting(*existing, item.posting) {
@@ -496,40 +474,4 @@ func (s *ledgerService) saveLedgerAccount(
 		return true, nil
 	}
 	return false, stackErr.Error(err)
-}
-
-func newLedgerTransactionProjectedEvent(
-	transaction *entity.LedgerTransaction,
-	eventName string,
-	referenceType string,
-	referenceID string,
-) eventpkg.Event {
-	entries := make([]ledgerprojection.LedgerTransactionEntry, 0, len(transaction.Entries))
-	for _, entry := range transaction.Entries {
-		if entry == nil {
-			continue
-		}
-		entries = append(entries, ledgerprojection.LedgerTransactionEntry{
-			AccountID: entry.AccountID,
-			Currency:  entry.Currency,
-			Amount:    entry.Amount,
-			CreatedAt: entry.CreatedAt.UTC(),
-		})
-	}
-
-	return eventpkg.Event{
-		AggregateID:   transaction.TransactionID,
-		AggregateType: ledgerprojection.AggregateTypeLedgerTransactionProjection,
-		Version:       1,
-		EventName:     strings.TrimSpace(eventName),
-		EventData: &ledgerprojection.LedgerTransactionProjected{
-			TransactionID: transaction.TransactionID,
-			ReferenceType: strings.TrimSpace(referenceType),
-			ReferenceID:   strings.TrimSpace(referenceID),
-			Currency:      transaction.Currency,
-			CreatedAt:     transaction.CreatedAt.UTC(),
-			Entries:       entries,
-		},
-		CreatedAt: transaction.CreatedAt.Unix(),
-	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	ledgerout "wechat-clone/core/modules/ledger/application/dto/out"
+	ledgerprojection "wechat-clone/core/modules/ledger/application/projection"
 	"wechat-clone/core/modules/ledger/domain/entity"
 	ledgerrepos "wechat-clone/core/modules/ledger/domain/repos"
 )
@@ -19,9 +20,9 @@ type services struct {
 	ledgerService      LedgerService
 }
 
-func NewServices(baseRepo ledgerrepos.Repos) Services {
+func NewServices(baseRepo ledgerrepos.Repos, readRepo ledgerprojection.ReadRepository) Services {
 	ledgerService := NewLedgerService(baseRepo)
-	ledgerQueryService := NewLedgerQueryService(baseRepo)
+	ledgerQueryService := NewLedgerQueryService(readRepo)
 
 	return &services{
 		ledgerQueryService: ledgerQueryService,

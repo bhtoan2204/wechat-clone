@@ -8,16 +8,21 @@ import (
 	"strings"
 
 	ledgeraggregate "wechat-clone/core/modules/ledger/domain/aggregate"
+	"wechat-clone/core/modules/ledger/domain/eventstore"
 	ledgerrepos "wechat-clone/core/modules/ledger/domain/repos"
 	eventpkg "wechat-clone/core/shared/pkg/event"
 	"wechat-clone/core/shared/pkg/stackErr"
 )
 
 type ledgerAccountAggregateRepositoryImpl struct {
-	store aggregateStore
+	store eventstore.AggregateStore
 }
 
 func NewLedgerAccountAggregateRepoImpl(dbTX dbTX) ledgerrepos.LedgerAccountAggregateRepository {
+	return newLedgerAccountAggregateRepoImpl(dbTX)
+}
+
+func newLedgerAccountAggregateRepoImpl(dbTX dbTX) *ledgerAccountAggregateRepositoryImpl {
 	serializer := eventpkg.NewSerializer()
 	if err := serializer.RegisterAggregate(&ledgeraggregate.LedgerAccountAggregate{}); err != nil {
 		panic(fmt.Sprintf("register ledger account aggregate serializer failed: %v", err))
@@ -47,23 +52,6 @@ func (r *ledgerAccountAggregateRepositoryImpl) Load(ctx context.Context, account
 	}
 
 	return agg, nil
-}
-
-func (r *ledgerAccountAggregateRepositoryImpl) FindPostedTransaction(
-	ctx context.Context,
-	accountID string,
-	transactionID string,
-) (*ledgeraggregate.LedgerAccountPosting, error) {
-	accountID = strings.TrimSpace(accountID)
-	if accountID == "" {
-		return nil, stackErr.Error(fmt.Errorf("account id is required"))
-	}
-	transactionID = strings.TrimSpace(transactionID)
-	if transactionID == "" {
-		return nil, stackErr.Error(fmt.Errorf("transaction id is required"))
-	}
-
-	return r.store.FindPostedTransaction(ctx, accountID, eventpkg.AggregateTypeName(&ledgeraggregate.LedgerAccountAggregate{}), transactionID)
 }
 
 func (r *ledgerAccountAggregateRepositoryImpl) Save(ctx context.Context, aggregate *ledgeraggregate.LedgerAccountAggregate) error {

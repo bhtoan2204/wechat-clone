@@ -17,3 +17,12 @@ func buildMessagingRuntime(cfg *config.Config, appCtx *appCtx.AppContext) (modru
 
 	return ledgerserver.NewServer(messageHandler)
 }
+
+func buildProjectionRuntime(cfg *config.Config, appContext *appCtx.AppContext) (modruntime.Module, error) {
+	servingProjection, err := buildServingProjectionProcessor(cfg, appContext)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	return modruntime.NewComposite(servingProjection), nil
+}

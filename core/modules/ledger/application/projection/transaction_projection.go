@@ -6,14 +6,15 @@ import (
 	ledgeraggregate "wechat-clone/core/modules/ledger/domain/aggregate"
 )
 
-const (
-	AggregateTypeLedgerTransactionProjection = "LedgerTransactionProjection"
-)
-
 var ledgerTransactionProjectionEventNames = map[string]struct{}{
-	ledgeraggregate.EventNameLedgerAccountPaymentBooked:        {},
-	ledgeraggregate.EventNameLedgerAccountTransferredToAccount: {},
-	ledgeraggregate.EventNameLedgerAccountReceivedTransfer:     {},
+	ledgeraggregate.EventNameLedgerAccountDepositFromIntent:      {},
+	ledgeraggregate.EventNameLedgerAccountWithdrawFromIntent:     {},
+	ledgeraggregate.EventNameLedgerAccountDepositFromRefund:      {},
+	ledgeraggregate.EventNameLedgerAccountWithdrawFromRefund:     {},
+	ledgeraggregate.EventNameLedgerAccountDepositFromChargeback:  {},
+	ledgeraggregate.EventNameLedgerAccountWithdrawFromChargeback: {},
+	ledgeraggregate.EventNameLedgerAccountTransferredToAccount:   {},
+	ledgeraggregate.EventNameLedgerAccountReceivedTransfer:       {},
 }
 
 type LedgerTransactionEntry struct {

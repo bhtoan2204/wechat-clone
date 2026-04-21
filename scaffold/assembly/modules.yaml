@@ -7,6 +7,7 @@ modules:
     kinds:
       - http
       - messaging
+      - projection
 
   - name: notification
     kinds:

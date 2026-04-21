@@ -56,21 +56,6 @@ func (mr *MockLedgerAccountAggregateRepositoryMockRecorder) Load(ctx, accountID 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockLedgerAccountAggregateRepository)(nil).Load), ctx, accountID)
 }
 
-// FindPostedTransaction mocks base method.
-func (m *MockLedgerAccountAggregateRepository) FindPostedTransaction(ctx context.Context, accountID, transactionID string) (*aggregate.LedgerAccountPosting, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindPostedTransaction", ctx, accountID, transactionID)
-	ret0, _ := ret[0].(*aggregate.LedgerAccountPosting)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FindPostedTransaction indicates an expected call of FindPostedTransaction.
-func (mr *MockLedgerAccountAggregateRepositoryMockRecorder) FindPostedTransaction(ctx, accountID, transactionID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindPostedTransaction", reflect.TypeOf((*MockLedgerAccountAggregateRepository)(nil).FindPostedTransaction), ctx, accountID, transactionID)
-}
-
 // Save mocks base method.
 func (m *MockLedgerAccountAggregateRepository) Save(ctx context.Context, arg1 *aggregate.LedgerAccountAggregate) error {
 	m.ctrl.T.Helper()

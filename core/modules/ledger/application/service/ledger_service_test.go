@@ -6,10 +6,8 @@ import (
 	"testing"
 	"time"
 
-	ledgerprojection "wechat-clone/core/modules/ledger/application/projection"
 	ledgeraggregate "wechat-clone/core/modules/ledger/domain/aggregate"
 	ledgerrepos "wechat-clone/core/modules/ledger/domain/repos"
-	eventpkg "wechat-clone/core/shared/pkg/event"
 
 	"go.uber.org/mock/gomock"
 )
@@ -20,7 +18,6 @@ func TestLedgerServiceTransferToAccount(t *testing.T) {
 		baseRepo := ledgerrepos.NewMockRepos(ctrl)
 		txRepos := ledgerrepos.NewMockRepos(ctrl)
 		accountRepo := ledgerrepos.NewMockLedgerAccountAggregateRepository(ctrl)
-		outboxRepo := ledgerrepos.NewMockLedgerOutboxEventsRepository(ctrl)
 
 		fromAgg, _ := ledgeraggregate.NewLedgerAccountAggregate("acc-from")
 		fromAgg.Balances["VND"] = 500
@@ -31,11 +28,8 @@ func TestLedgerServiceTransferToAccount(t *testing.T) {
 				return fn(txRepos)
 			})
 		txRepos.EXPECT().LedgerAccountAggregateRepository().Return(accountRepo).AnyTimes()
-		txRepos.EXPECT().LedgerOutboxEventsRepository().Return(outboxRepo)
-		accountRepo.EXPECT().FindPostedTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-
-		accountRepo.EXPECT().Load(gomock.Any(), "acc-from").Return(fromAgg, nil)
-		accountRepo.EXPECT().Load(gomock.Any(), "acc-to").Return(nil, nil)
+		accountRepo.EXPECT().Load(gomock.Any(), "acc-from").Return(fromAgg, nil).AnyTimes()
+		accountRepo.EXPECT().Load(gomock.Any(), "acc-to").Return(nil, nil).AnyTimes()
 		accountRepo.EXPECT().
 			Save(gomock.Any(), gomock.AssignableToTypeOf(&ledgeraggregate.LedgerAccountAggregate{})).
 			DoAndReturn(func(_ context.Context, aggregate *ledgeraggregate.LedgerAccountAggregate) error {
@@ -53,25 +47,6 @@ func TestLedgerServiceTransferToAccount(t *testing.T) {
 				}
 				return nil
 			}).Times(2)
-		outboxRepo.EXPECT().
-			Append(gomock.Any(), gomock.Any()).
-			DoAndReturn(func(_ context.Context, evt eventpkg.Event) error {
-				if evt.EventName != ledgeraggregate.EventNameLedgerAccountTransferredToAccount {
-					t.Fatalf("unexpected outbox event name: %s", evt.EventName)
-				}
-				payload, ok := evt.EventData.(*ledgerprojection.LedgerTransactionProjected)
-				if !ok {
-					t.Fatalf("unexpected outbox payload type: %T", evt.EventData)
-				}
-				if payload.TransactionID != "ledger-tx-1" {
-					t.Fatalf("unexpected transaction id: %s", payload.TransactionID)
-				}
-				if len(payload.Entries) != 2 {
-					t.Fatalf("expected 2 projected entries, got %d", len(payload.Entries))
-				}
-				return nil
-			})
-
 		service := NewLedgerService(baseRepo)
 
 		transaction, err := service.TransferToAccount(context.Background(), TransferToAccountCommand{
@@ -110,9 +85,8 @@ func TestLedgerServiceTransferToAccount(t *testing.T) {
 				return fn(txRepos)
 			})
 		txRepos.EXPECT().LedgerAccountAggregateRepository().Return(accountRepo).AnyTimes()
-		accountRepo.EXPECT().FindPostedTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-		accountRepo.EXPECT().Load(gomock.Any(), "acc-from").Return(fromAgg, nil)
-		accountRepo.EXPECT().Load(gomock.Any(), "acc-to").Return(nil, nil)
+		accountRepo.EXPECT().Load(gomock.Any(), "acc-from").Return(fromAgg, nil).AnyTimes()
+		accountRepo.EXPECT().Load(gomock.Any(), "acc-to").Return(nil, nil).AnyTimes()
 
 		service := NewLedgerService(baseRepo)
 		_, err := service.TransferToAccount(context.Background(), TransferToAccountCommand{
@@ -132,7 +106,6 @@ func TestLedgerServiceTransferToAccount(t *testing.T) {
 		baseRepo := ledgerrepos.NewMockRepos(ctrl)
 		txRepos := ledgerrepos.NewMockRepos(ctrl)
 		accountRepo := ledgerrepos.NewMockLedgerAccountAggregateRepository(ctrl)
-
 		fromPosting, err := ledgeraggregate.NewLedgerAccountTransferOutPosting("acc-from", "ledger-tx-3", "acc-to", "USD", 100, gomockTime())
 		if err != nil {
 			t.Fatalf("NewLedgerAccountTransferOutPosting() error = %v", err)
@@ -141,6 +114,10 @@ func TestLedgerServiceTransferToAccount(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewLedgerAccountTransferInPosting() error = %v", err)
 		}
+		fromAgg, _ := ledgeraggregate.NewLedgerAccountAggregate("acc-from")
+		fromAgg.PostedTransactions[fromPosting.TransactionID] = fromPosting
+		toAgg, _ := ledgeraggregate.NewLedgerAccountAggregate("acc-to")
+		toAgg.PostedTransactions[toPosting.TransactionID] = toPosting
 
 		baseRepo.EXPECT().
 			WithTransaction(gomock.Any(), gomock.Any()).
@@ -148,8 +125,8 @@ func TestLedgerServiceTransferToAccount(t *testing.T) {
 				return fn(txRepos)
 			})
 		txRepos.EXPECT().LedgerAccountAggregateRepository().Return(accountRepo).AnyTimes()
-		accountRepo.EXPECT().FindPostedTransaction(gomock.Any(), "acc-from", "ledger-tx-3").Return(&fromPosting, nil)
-		accountRepo.EXPECT().FindPostedTransaction(gomock.Any(), "acc-to", "ledger-tx-3").Return(&toPosting, nil)
+		accountRepo.EXPECT().Load(gomock.Any(), "acc-from").Return(fromAgg, nil)
+		accountRepo.EXPECT().Load(gomock.Any(), "acc-to").Return(toAgg, nil)
 
 		service := NewLedgerService(baseRepo)
 		_, err = service.TransferToAccount(context.Background(), TransferToAccountCommand{
@@ -171,39 +148,15 @@ func TestLedgerServiceRecordPaymentSucceeded(t *testing.T) {
 		baseRepo := ledgerrepos.NewMockRepos(ctrl)
 		txRepos := ledgerrepos.NewMockRepos(ctrl)
 		accountRepo := ledgerrepos.NewMockLedgerAccountAggregateRepository(ctrl)
-		outboxRepo := ledgerrepos.NewMockLedgerOutboxEventsRepository(ctrl)
-
 		baseRepo.EXPECT().
 			WithTransaction(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(ctx context.Context, fn func(ledgerrepos.Repos) error) error {
 				return fn(txRepos)
 			})
 		txRepos.EXPECT().LedgerAccountAggregateRepository().Return(accountRepo).AnyTimes()
-		txRepos.EXPECT().LedgerOutboxEventsRepository().Return(outboxRepo)
-		accountRepo.EXPECT().FindPostedTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-
-		accountRepo.EXPECT().Load(gomock.Any(), "ledger:clearing:provider:stripe").Return(nil, nil)
-		accountRepo.EXPECT().Load(gomock.Any(), "wallet:available").Return(nil, nil)
+		accountRepo.EXPECT().Load(gomock.Any(), "ledger:clearing:provider:stripe").Return(nil, nil).AnyTimes()
+		accountRepo.EXPECT().Load(gomock.Any(), "wallet:available").Return(nil, nil).AnyTimes()
 		accountRepo.EXPECT().Save(gomock.Any(), gomock.Any()).Times(2)
-		outboxRepo.EXPECT().
-			Append(gomock.Any(), gomock.Any()).
-			DoAndReturn(func(_ context.Context, evt eventpkg.Event) error {
-				if evt.EventName != ledgeraggregate.EventNameLedgerAccountPaymentBooked {
-					t.Fatalf("unexpected outbox event name: %s", evt.EventName)
-				}
-				payload, ok := evt.EventData.(*ledgerprojection.LedgerTransactionProjected)
-				if !ok {
-					t.Fatalf("unexpected outbox payload type: %T", evt.EventData)
-				}
-				if payload.ReferenceType != "payment.succeeded" {
-					t.Fatalf("unexpected reference type: %s", payload.ReferenceType)
-				}
-				if payload.ReferenceID != "pay-1" {
-					t.Fatalf("unexpected reference id: %s", payload.ReferenceID)
-				}
-				return nil
-			})
-
 		service := NewLedgerService(baseRepo)
 		err := service.RecordPaymentSucceeded(context.Background(), RecordPaymentSucceededCommand{
 			PaymentID:          "pay-1",
@@ -222,7 +175,6 @@ func TestLedgerServiceRecordPaymentSucceeded(t *testing.T) {
 		baseRepo := ledgerrepos.NewMockRepos(ctrl)
 		txRepos := ledgerrepos.NewMockRepos(ctrl)
 		accountRepo := ledgerrepos.NewMockLedgerAccountAggregateRepository(ctrl)
-
 		debitPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(
 			"ledger:clearing:provider:stripe",
 			"payment:pay-1:succeeded",
@@ -249,6 +201,10 @@ func TestLedgerServiceRecordPaymentSucceeded(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewLedgerAccountPaymentPosting() error = %v", err)
 		}
+		debitAgg, _ := ledgeraggregate.NewLedgerAccountAggregate("ledger:clearing:provider:stripe")
+		debitAgg.PostedTransactions[debitPosting.TransactionID] = debitPosting
+		creditAgg, _ := ledgeraggregate.NewLedgerAccountAggregate("wallet:available")
+		creditAgg.PostedTransactions[creditPosting.TransactionID] = creditPosting
 
 		baseRepo.EXPECT().
 			WithTransaction(gomock.Any(), gomock.Any()).
@@ -256,8 +212,8 @@ func TestLedgerServiceRecordPaymentSucceeded(t *testing.T) {
 				return fn(txRepos)
 			})
 		txRepos.EXPECT().LedgerAccountAggregateRepository().Return(accountRepo).AnyTimes()
-		accountRepo.EXPECT().FindPostedTransaction(gomock.Any(), "ledger:clearing:provider:stripe", "payment:pay-1:succeeded").Return(&debitPosting, nil)
-		accountRepo.EXPECT().FindPostedTransaction(gomock.Any(), "wallet:available", "payment:pay-1:succeeded").Return(&creditPosting, nil)
+		accountRepo.EXPECT().Load(gomock.Any(), "ledger:clearing:provider:stripe").Return(debitAgg, nil)
+		accountRepo.EXPECT().Load(gomock.Any(), "wallet:available").Return(creditAgg, nil)
 
 		service := NewLedgerService(baseRepo)
 		err = service.RecordPaymentSucceeded(context.Background(), RecordPaymentSucceededCommand{
@@ -279,8 +235,6 @@ func TestLedgerServiceRecordPaymentReversed(t *testing.T) {
 		baseRepo := ledgerrepos.NewMockRepos(ctrl)
 		txRepos := ledgerrepos.NewMockRepos(ctrl)
 		accountRepo := ledgerrepos.NewMockLedgerAccountAggregateRepository(ctrl)
-		outboxRepo := ledgerrepos.NewMockLedgerOutboxEventsRepository(ctrl)
-
 		walletAgg, _ := ledgeraggregate.NewLedgerAccountAggregate("wallet:available")
 		_, _ = walletAgg.BookPayment("payment:pay-1:succeeded", "pay-1", "ledger:clearing:provider:stripe", "VND", 100, gomockTime())
 		walletAgg.Root().Update()
@@ -295,11 +249,8 @@ func TestLedgerServiceRecordPaymentReversed(t *testing.T) {
 				return fn(txRepos)
 			})
 		txRepos.EXPECT().LedgerAccountAggregateRepository().Return(accountRepo).AnyTimes()
-		txRepos.EXPECT().LedgerOutboxEventsRepository().Return(outboxRepo)
-		accountRepo.EXPECT().FindPostedTransaction(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-
-		accountRepo.EXPECT().Load(gomock.Any(), "wallet:available").Return(walletAgg, nil)
-		accountRepo.EXPECT().Load(gomock.Any(), "ledger:clearing:provider:stripe").Return(clearingAgg, nil)
+		accountRepo.EXPECT().Load(gomock.Any(), "wallet:available").Return(walletAgg, nil).AnyTimes()
+		accountRepo.EXPECT().Load(gomock.Any(), "ledger:clearing:provider:stripe").Return(clearingAgg, nil).AnyTimes()
 		accountRepo.EXPECT().
 			Save(gomock.Any(), gomock.AssignableToTypeOf(&ledgeraggregate.LedgerAccountAggregate{})).
 			DoAndReturn(func(_ context.Context, aggregate *ledgeraggregate.LedgerAccountAggregate) error {
@@ -317,28 +268,6 @@ func TestLedgerServiceRecordPaymentReversed(t *testing.T) {
 				}
 				return nil
 			}).Times(2)
-		outboxRepo.EXPECT().
-			Append(gomock.Any(), gomock.Any()).
-			DoAndReturn(func(_ context.Context, evt eventpkg.Event) error {
-				if evt.EventName != ledgeraggregate.EventNameLedgerAccountPaymentBooked {
-					t.Fatalf("unexpected outbox event name: %s", evt.EventName)
-				}
-				payload, ok := evt.EventData.(*ledgerprojection.LedgerTransactionProjected)
-				if !ok {
-					t.Fatalf("unexpected outbox payload type: %T", evt.EventData)
-				}
-				if payload.TransactionID != "payment:pay-1:refunded" {
-					t.Fatalf("unexpected transaction id: %s", payload.TransactionID)
-				}
-				if payload.ReferenceType != "payment.refunded" {
-					t.Fatalf("unexpected reference type: %s", payload.ReferenceType)
-				}
-				if payload.ReferenceID != "pay-1" {
-					t.Fatalf("unexpected reference id: %s", payload.ReferenceID)
-				}
-				return nil
-			})
-
 		service := NewLedgerService(baseRepo)
 		err := service.RecordPaymentReversed(context.Background(), RecordPaymentReversedCommand{
 			PaymentID:          "pay-1",
@@ -358,7 +287,6 @@ func TestLedgerServiceRecordPaymentReversed(t *testing.T) {
 		baseRepo := ledgerrepos.NewMockRepos(ctrl)
 		txRepos := ledgerrepos.NewMockRepos(ctrl)
 		accountRepo := ledgerrepos.NewMockLedgerAccountAggregateRepository(ctrl)
-
 		debitPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(
 			"wallet:available",
 			"payment:pay-1:refunded",
@@ -385,6 +313,10 @@ func TestLedgerServiceRecordPaymentReversed(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewLedgerAccountPaymentPosting() error = %v", err)
 		}
+		debitAgg, _ := ledgeraggregate.NewLedgerAccountAggregate("wallet:available")
+		debitAgg.PostedTransactions[debitPosting.TransactionID] = debitPosting
+		creditAgg, _ := ledgeraggregate.NewLedgerAccountAggregate("ledger:clearing:provider:stripe")
+		creditAgg.PostedTransactions[creditPosting.TransactionID] = creditPosting
 
 		baseRepo.EXPECT().
 			WithTransaction(gomock.Any(), gomock.Any()).
@@ -392,8 +324,8 @@ func TestLedgerServiceRecordPaymentReversed(t *testing.T) {
 				return fn(txRepos)
 			})
 		txRepos.EXPECT().LedgerAccountAggregateRepository().Return(accountRepo).AnyTimes()
-		accountRepo.EXPECT().FindPostedTransaction(gomock.Any(), "wallet:available", "payment:pay-1:refunded").Return(&debitPosting, nil)
-		accountRepo.EXPECT().FindPostedTransaction(gomock.Any(), "ledger:clearing:provider:stripe", "payment:pay-1:refunded").Return(&creditPosting, nil)
+		accountRepo.EXPECT().Load(gomock.Any(), "wallet:available").Return(debitAgg, nil)
+		accountRepo.EXPECT().Load(gomock.Any(), "ledger:clearing:provider:stripe").Return(creditAgg, nil)
 
 		service := NewLedgerService(baseRepo)
 		err = service.RecordPaymentReversed(context.Background(), RecordPaymentReversedCommand{

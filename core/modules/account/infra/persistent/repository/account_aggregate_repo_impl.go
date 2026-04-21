@@ -21,8 +21,7 @@ import (
 )
 
 const (
-	accountAggregateType       = "AccountAggregate"
-	legacyAccountAggregateType = "account"
+	accountAggregateType = "AccountAggregate"
 )
 
 type accountAggregateRepoImpl struct {
@@ -220,9 +219,6 @@ func (r *accountAggregateRepoImpl) buildEventModel(evt eventpkg.Event) (models.A
 
 func (r *accountAggregateRepoImpl) toDomainEvent(eventModel models.AccountOutboxEventModel) (eventpkg.Event, error) {
 	payloadFactory, ok := r.serializer.Type(eventModel.AggregateType, eventModel.EventName)
-	if !ok && eventModel.AggregateType == legacyAccountAggregateType {
-		payloadFactory, ok = r.serializer.Type(accountAggregateType, eventModel.EventName)
-	}
 	if !ok {
 		return eventpkg.Event{}, stackErr.Error(fmt.Errorf(
 			"unsupported account event: aggregate_type=%s event_name=%s",
@@ -240,9 +236,6 @@ func (r *accountAggregateRepoImpl) toDomainEvent(eventModel models.AccountOutbox
 	}
 
 	aggregateType := eventModel.AggregateType
-	if aggregateType == legacyAccountAggregateType {
-		aggregateType = accountAggregateType
-	}
 
 	return eventpkg.Event{
 		AggregateID:   eventModel.AggregateID,

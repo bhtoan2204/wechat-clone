@@ -8,6 +8,7 @@ import (
 	"time"
 
 	ledgerout "wechat-clone/core/modules/ledger/application/dto/out"
+	ledgerprojection "wechat-clone/core/modules/ledger/application/projection"
 	ledgerrepos "wechat-clone/core/modules/ledger/domain/repos"
 	"wechat-clone/core/shared/pkg/stackErr"
 	"wechat-clone/core/shared/utils"
@@ -20,11 +21,11 @@ type LedgerQueryService interface {
 }
 
 type ledgerQueryService struct {
-	baseRepo ledgerrepos.Repos
+	readRepo ledgerprojection.ReadRepository
 }
 
-func NewLedgerQueryService(baseRepo ledgerrepos.Repos) LedgerQueryService {
-	return &ledgerQueryService{baseRepo: baseRepo}
+func NewLedgerQueryService(readRepo ledgerprojection.ReadRepository) LedgerQueryService {
+	return &ledgerQueryService{readRepo: readRepo}
 }
 
 func (s *ledgerQueryService) GetAccountBalance(ctx context.Context, accountID, currency string) (*ledgerout.AccountBalanceResponse, error) {
@@ -37,14 +38,9 @@ func (s *ledgerQueryService) GetAccountBalance(ctx context.Context, accountID, c
 		return nil, stackErr.Error(fmt.Errorf("%v: currency is required", ErrValidation))
 	}
 
-	aggregate, err := s.baseRepo.LedgerAccountAggregateRepository().Load(ctx, accountID)
+	balance, err := s.readRepo.GetBalance(ctx, accountID, currency)
 	if err != nil {
 		return nil, stackErr.Error(err)
-	}
-
-	balance := int64(0)
-	if aggregate != nil {
-		balance = aggregate.Balance(currency)
 	}
 
 	return &ledgerout.AccountBalanceResponse{
@@ -60,7 +56,7 @@ func (s *ledgerQueryService) GetTransaction(ctx context.Context, transactionID s
 		return nil, stackErr.Error(fmt.Errorf("%v: transaction_id is required", ErrValidation))
 	}
 
-	transaction, err := s.baseRepo.LedgerRepository().GetTransaction(ctx, transactionID)
+	transaction, err := s.readRepo.GetTransaction(ctx, transactionID)
 	if errors.Is(err, ledgerrepos.ErrNotFound) {
 		return nil, stackErr.Error(fmt.Errorf("%v: %s", ErrTransactionNotFound, transactionID))
 	}
@@ -110,7 +106,7 @@ func (s *ledgerQueryService) ListTransactions(
 		limit = 100
 	}
 
-	filter := ledgerrepos.ListTransactionsFilter{
+	filter := ledgerprojection.ListTransactionsFilter{
 		AccountID: accountID,
 		Currency:  currency,
 		Limit:     limit + 1,
@@ -125,12 +121,12 @@ func (s *ledgerQueryService) ListTransactions(
 		filter.CursorTransactionID = transactionID
 	}
 
-	total, err := s.baseRepo.LedgerRepository().CountTransactions(ctx, accountID, currency)
+	total, err := s.readRepo.CountTransactions(ctx, accountID, currency)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 
-	transactions, err := s.baseRepo.LedgerRepository().ListTransactions(ctx, filter)
+	transactions, err := s.readRepo.ListTransactions(ctx, filter)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

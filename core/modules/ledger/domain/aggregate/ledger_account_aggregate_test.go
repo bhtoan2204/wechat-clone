@@ -28,6 +28,9 @@ func TestLedgerAccountAggregateTransferLifecycle(t *testing.T) {
 	if aggregate.Root().Version() != 1 {
 		t.Fatalf("expected version 1, got %d", aggregate.Root().Version())
 	}
+	if _, ok := aggregate.Root().Events()[0].EventData.(*EventLedgerAccountDepositFromIntent); !ok {
+		t.Fatalf("expected first event to be EventLedgerAccountDepositFromIntent, got %T", aggregate.Root().Events()[0].EventData)
+	}
 
 	applied, err = aggregate.TransferToAccount("ledger-tx-1", "acc-2", "VND", 100, time.Date(2026, 4, 16, 11, 0, 0, 0, time.UTC))
 	if err != nil {
@@ -79,6 +82,9 @@ func TestLedgerAccountAggregateReversePaymentLifecycle(t *testing.T) {
 	}
 	if aggregate.Balance("VND") != 0 {
 		t.Fatalf("expected balance 0, got %d", aggregate.Balance("VND"))
+	}
+	if _, ok := aggregate.Root().Events()[1].EventData.(*EventLedgerAccountWithdrawFromRefund); !ok {
+		t.Fatalf("expected refund event to be EventLedgerAccountWithdrawFromRefund, got %T", aggregate.Root().Events()[1].EventData)
 	}
 
 	applied, err = aggregate.ReversePayment("payment:pay-1:refunded", ledgerentity.PaymentReferenceRefunded, "pay-1", "ledger:clearing:provider:stripe", "VND", -300, time.Date(2026, 4, 16, 11, 0, 0, 0, time.UTC))

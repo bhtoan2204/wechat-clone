@@ -7,6 +7,7 @@ import (
 	"time"
 
 	ledgeraggregate "wechat-clone/core/modules/ledger/domain/aggregate"
+	"wechat-clone/core/modules/ledger/domain/entity"
 	eventpkg "wechat-clone/core/shared/pkg/event"
 )
 
@@ -15,6 +16,12 @@ type fakeLedgerEventStore struct {
 	baseVersion int
 	newVersion  int
 	checkOK     bool
+}
+
+type fakeLedgerOutboxEventsRepo struct{}
+
+func (f *fakeLedgerOutboxEventsRepo) Append(context.Context, eventpkg.Event) error {
+	return nil
 }
 
 func (f *fakeLedgerEventStore) CreateIfNotExist(context.Context, string, string) error {
@@ -28,7 +35,7 @@ func (f *fakeLedgerEventStore) CheckAndUpdateVersion(_ context.Context, _ string
 	return f.checkOK, nil
 }
 
-func (f *fakeLedgerEventStore) FindPostedTransaction(context.Context, string, string, string) (*ledgeraggregate.LedgerAccountPosting, error) {
+func (f *fakeLedgerEventStore) FindPostedTransaction(context.Context, string, string, string) (*entity.LedgerAccountPosting, error) {
 	return nil, nil
 }
 
@@ -54,7 +61,7 @@ func (f *fakeLedgerEventStore) ReadSnapshot(context.Context, string, string, eve
 
 func TestAggregateStoreSaveUsesExpectedVersion(t *testing.T) {
 	repo := &fakeLedgerEventStore{checkOK: true}
-	store := &aggregateStoreImpl{repo: repo}
+	store := &aggregateStoreImpl{repo: repo, outboxRepo: &fakeLedgerOutboxEventsRepo{}}
 
 	aggregate, err := ledgeraggregate.NewLedgerAccountAggregate("wallet:available")
 	if err != nil {
@@ -77,7 +84,7 @@ func TestAggregateStoreSaveUsesExpectedVersion(t *testing.T) {
 
 func TestAggregateStoreSaveRejectsUnexpectedVersion(t *testing.T) {
 	repo := &fakeLedgerEventStore{checkOK: false}
-	store := &aggregateStoreImpl{repo: repo}
+	store := &aggregateStoreImpl{repo: repo, outboxRepo: &fakeLedgerOutboxEventsRepo{}}
 
 	aggregate, err := ledgeraggregate.NewLedgerAccountAggregate("wallet:available")
 	if err != nil {

@@ -26,23 +26,12 @@ var (
 	ErrLedgerAccountInsufficientFunds    = errors.New("ledger account has insufficient funds")
 )
 
-const ledgerReferenceTransferToAccount = "ledger.transfer_to_account"
-
-type LedgerAccountPosting struct {
-	TransactionID         string    `json:"transaction_id"`
-	ReferenceType         string    `json:"reference_type"`
-	ReferenceID           string    `json:"reference_id"`
-	CounterpartyAccountID string    `json:"counterparty_account_id"`
-	Currency              string    `json:"currency"`
-	AmountDelta           int64     `json:"amount_delta"`
-	BookedAt              time.Time `json:"booked_at"`
-}
-
 type LedgerAccountAggregate struct {
 	event.AggregateRoot
 
-	AccountID string           `json:"account_id"`
-	Balances  map[string]int64 `json:"balances"`
+	AccountID          string                                 `json:"account_id"`
+	Balances           map[string]int64                       `json:"balances"`
+	PostedTransactions map[string]entity.LedgerAccountPosting `json:"posted_transactions"`
 }
 
 func NewLedgerAccountAggregate(accountID string) (*LedgerAccountAggregate, error) {
@@ -56,7 +45,12 @@ func NewLedgerAccountAggregate(accountID string) (*LedgerAccountAggregate, error
 
 func (a *LedgerAccountAggregate) RegisterEvents(register event.RegisterEventsFunc) error {
 	return register(
-		&EventLedgerAccountPaymentBooked{},
+		&EventLedgerAccountDepositFromIntent{},
+		&EventLedgerAccountWithdrawFromIntent{},
+		&EventLedgerAccountDepositFromRefund{},
+		&EventLedgerAccountWithdrawFromRefund{},
+		&EventLedgerAccountDepositFromChargeback{},
+		&EventLedgerAccountWithdrawFromChargeback{},
 		&EventLedgerAccountTransferredToAccount{},
 		&EventLedgerAccountReceivedTransfer{},
 	)
@@ -64,8 +58,18 @@ func (a *LedgerAccountAggregate) RegisterEvents(register event.RegisterEventsFun
 
 func (a *LedgerAccountAggregate) Transition(evt event.Event) error {
 	switch data := evt.EventData.(type) {
-	case *EventLedgerAccountPaymentBooked:
-		return a.applyPaymentBooked(evt.AggregateID, data)
+	case *EventLedgerAccountDepositFromIntent:
+		return a.applyDepositFromIntent(evt.AggregateID, data)
+	case *EventLedgerAccountWithdrawFromIntent:
+		return a.applyWithdrawFromIntent(evt.AggregateID, data)
+	case *EventLedgerAccountDepositFromRefund:
+		return a.applyDepositFromRefund(evt.AggregateID, data)
+	case *EventLedgerAccountWithdrawFromRefund:
+		return a.applyWithdrawFromRefund(evt.AggregateID, data)
+	case *EventLedgerAccountDepositFromChargeback:
+		return a.applyDepositFromChargeback(evt.AggregateID, data)
+	case *EventLedgerAccountWithdrawFromChargeback:
+		return a.applyWithdrawFromChargeback(evt.AggregateID, data)
 	case *EventLedgerAccountTransferredToAccount:
 		return a.applyTransferredToAccount(evt.AggregateID, data)
 	case *EventLedgerAccountReceivedTransfer:
@@ -81,6 +85,24 @@ func (a *LedgerAccountAggregate) Balance(currency string) int64 {
 	}
 	a.ensureState()
 	return a.Balances[strings.ToUpper(strings.TrimSpace(currency))]
+}
+
+func (a *LedgerAccountAggregate) PostedTransaction(transactionID string) (*entity.LedgerAccountPosting, bool) {
+	if a == nil {
+		return nil, false
+	}
+	a.ensureState()
+	transactionID = strings.TrimSpace(transactionID)
+	if transactionID == "" {
+		return nil, false
+	}
+
+	posting, ok := a.PostedTransactions[transactionID]
+	if !ok {
+		return nil, false
+	}
+	copyPosting := posting
+	return &copyPosting, true
 }
 
 func (a *LedgerAccountAggregate) BookPayment(
@@ -164,15 +186,7 @@ func (a *LedgerAccountAggregate) bookPaymentPosting(
 		return false, stackErr.Error(err)
 	}
 
-	if err := a.ApplyChange(a, &EventLedgerAccountPaymentBooked{
-		TransactionID:         posting.TransactionID,
-		ReferenceType:         posting.ReferenceType,
-		PaymentID:             posting.ReferenceID,
-		CounterpartyAccountID: posting.CounterpartyAccountID,
-		Currency:              posting.Currency,
-		AmountDelta:           posting.AmountDelta,
-		BookedAt:              posting.BookedAt,
-	}); err != nil {
+	if err := a.ApplyChange(a, newLedgerPaymentEvent(posting)); err != nil {
 		return false, stackErr.Error(err)
 	}
 
@@ -271,17 +285,6 @@ func (a *LedgerAccountAggregate) ReceiveTransfer(
 	return true, nil
 }
 
-func (a *LedgerAccountAggregate) applyPaymentBooked(accountID string, data *EventLedgerAccountPaymentBooked) error {
-	posting, ok, err := NewLedgerAccountPostingFromEvent(accountID, data)
-	if err != nil {
-		return stackErr.Error(err)
-	}
-	if !ok {
-		return stackErr.Error(errors.New("ledger payment booked event is unsupported"))
-	}
-	return a.applyPosting(accountID, posting)
-}
-
 func (a *LedgerAccountAggregate) applyTransferredToAccount(accountID string, data *EventLedgerAccountTransferredToAccount) error {
 	posting, ok, err := NewLedgerAccountPostingFromEvent(accountID, data)
 	if err != nil {
@@ -289,6 +292,41 @@ func (a *LedgerAccountAggregate) applyTransferredToAccount(accountID string, dat
 	}
 	if !ok {
 		return stackErr.Error(errors.New("ledger transfer to account event is unsupported"))
+	}
+	return a.applyPosting(accountID, posting)
+}
+
+func (a *LedgerAccountAggregate) applyDepositFromIntent(accountID string, data *EventLedgerAccountDepositFromIntent) error {
+	return a.applyEventPosting(accountID, data, "ledger deposit from intent event is unsupported")
+}
+
+func (a *LedgerAccountAggregate) applyWithdrawFromIntent(accountID string, data *EventLedgerAccountWithdrawFromIntent) error {
+	return a.applyEventPosting(accountID, data, "ledger withdraw from intent event is unsupported")
+}
+
+func (a *LedgerAccountAggregate) applyDepositFromRefund(accountID string, data *EventLedgerAccountDepositFromRefund) error {
+	return a.applyEventPosting(accountID, data, "ledger deposit from refund event is unsupported")
+}
+
+func (a *LedgerAccountAggregate) applyWithdrawFromRefund(accountID string, data *EventLedgerAccountWithdrawFromRefund) error {
+	return a.applyEventPosting(accountID, data, "ledger withdraw from refund event is unsupported")
+}
+
+func (a *LedgerAccountAggregate) applyDepositFromChargeback(accountID string, data *EventLedgerAccountDepositFromChargeback) error {
+	return a.applyEventPosting(accountID, data, "ledger deposit from chargeback event is unsupported")
+}
+
+func (a *LedgerAccountAggregate) applyWithdrawFromChargeback(accountID string, data *EventLedgerAccountWithdrawFromChargeback) error {
+	return a.applyEventPosting(accountID, data, "ledger withdraw from chargeback event is unsupported")
+}
+
+func (a *LedgerAccountAggregate) applyEventPosting(accountID string, eventData interface{}, unsupportedErr string) error {
+	posting, ok, err := NewLedgerAccountPostingFromEvent(accountID, eventData)
+	if err != nil {
+		return stackErr.Error(err)
+	}
+	if !ok {
+		return stackErr.Error(errors.New(unsupportedErr))
 	}
 	return a.applyPosting(accountID, posting)
 }
@@ -304,7 +342,7 @@ func (a *LedgerAccountAggregate) applyReceivedTransfer(accountID string, data *E
 	return a.applyPosting(accountID, posting)
 }
 
-func (a *LedgerAccountAggregate) applyPosting(accountID string, posting LedgerAccountPosting) error {
+func (a *LedgerAccountAggregate) applyPosting(accountID string, posting entity.LedgerAccountPosting) error {
 	normalizedAccountID, normalizedPosting, err := normalizeLedgerAccountPosting(accountID, posting)
 	if err != nil {
 		return err
@@ -320,10 +358,11 @@ func (a *LedgerAccountAggregate) applyPosting(accountID string, posting LedgerAc
 
 	a.AccountID = normalizedAccountID
 	a.Balances[normalizedPosting.Currency] += normalizedPosting.AmountDelta
+	a.PostedTransactions[normalizedPosting.TransactionID] = normalizedPosting
 	return nil
 }
 
-func (a *LedgerAccountAggregate) ensurePostingAllowed(posting LedgerAccountPosting) error {
+func (a *LedgerAccountAggregate) ensurePostingAllowed(posting entity.LedgerAccountPosting) error {
 	if posting.AmountDelta >= 0 {
 		return nil
 	}
@@ -359,15 +398,21 @@ func (a *LedgerAccountAggregate) ensureState() {
 	if a.Balances == nil {
 		a.Balances = make(map[string]int64)
 	}
+	if a.PostedTransactions == nil {
+		a.PostedTransactions = make(map[string]entity.LedgerAccountPosting)
+	}
 }
 
-func (a *LedgerAccountAggregate) lookupPendingPosting(transactionID string) (LedgerAccountPosting, bool) {
+func (a *LedgerAccountAggregate) lookupPendingPosting(transactionID string) (entity.LedgerAccountPosting, bool) {
 	if a == nil {
-		return LedgerAccountPosting{}, false
+		return entity.LedgerAccountPosting{}, false
 	}
 	transactionID = strings.TrimSpace(transactionID)
 	if transactionID == "" {
-		return LedgerAccountPosting{}, false
+		return entity.LedgerAccountPosting{}, false
+	}
+	if existing, ok := a.PostedTransactions[transactionID]; ok {
+		return existing, true
 	}
 
 	for _, evt := range a.Root().Events() {
@@ -380,52 +425,52 @@ func (a *LedgerAccountAggregate) lookupPendingPosting(transactionID string) (Led
 		}
 	}
 
-	return LedgerAccountPosting{}, false
+	return entity.LedgerAccountPosting{}, false
 }
 
-func normalizeLedgerAccountPosting(accountID string, posting LedgerAccountPosting) (string, LedgerAccountPosting, error) {
+func normalizeLedgerAccountPosting(accountID string, posting entity.LedgerAccountPosting) (string, entity.LedgerAccountPosting, error) {
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
-		return "", LedgerAccountPosting{}, ErrLedgerAccountIDRequired
+		return "", entity.LedgerAccountPosting{}, ErrLedgerAccountIDRequired
 	}
 
 	normalizedReferenceType := strings.TrimSpace(posting.ReferenceType)
 	switch normalizedReferenceType {
-	case entity.PaymentReferenceSucceeded, entity.PaymentReferenceRefunded, entity.PaymentReferenceChargeback, ledgerReferenceTransferToAccount:
+	case entity.PaymentReferenceSucceeded, entity.PaymentReferenceRefunded, entity.PaymentReferenceChargeback, entity.LedgerReferenceInternalTransfer:
 	default:
-		return "", LedgerAccountPosting{}, ErrLedgerAccountReferenceTypeInvalid
+		return "", entity.LedgerAccountPosting{}, ErrLedgerAccountReferenceTypeInvalid
 	}
 
 	normalizedTransactionID := strings.TrimSpace(posting.TransactionID)
 	if normalizedTransactionID == "" {
-		return "", LedgerAccountPosting{}, ErrLedgerAccountTransactionRequired
+		return "", entity.LedgerAccountPosting{}, ErrLedgerAccountTransactionRequired
 	}
 
 	normalizedReferenceID := strings.TrimSpace(posting.ReferenceID)
 	if normalizedReferenceID == "" {
-		return "", LedgerAccountPosting{}, ErrLedgerAccountReferenceIDRequired
+		return "", entity.LedgerAccountPosting{}, ErrLedgerAccountReferenceIDRequired
 	}
 
 	normalizedCounterpartyAccountID := strings.TrimSpace(posting.CounterpartyAccountID)
 	if normalizedCounterpartyAccountID == "" {
-		return "", LedgerAccountPosting{}, ErrLedgerAccountCounterpartyRequired
+		return "", entity.LedgerAccountPosting{}, ErrLedgerAccountCounterpartyRequired
 	}
 	if normalizedCounterpartyAccountID == accountID {
-		return "", LedgerAccountPosting{}, ErrLedgerAccountAccountsMustDiffer
+		return "", entity.LedgerAccountPosting{}, ErrLedgerAccountAccountsMustDiffer
 	}
 
 	normalizedCurrency := strings.ToUpper(strings.TrimSpace(posting.Currency))
 	if normalizedCurrency == "" {
-		return "", LedgerAccountPosting{}, ErrLedgerAccountCurrencyRequired
+		return "", entity.LedgerAccountPosting{}, ErrLedgerAccountCurrencyRequired
 	}
 	if posting.AmountDelta == 0 {
-		return "", LedgerAccountPosting{}, ErrLedgerAccountAmountInvalid
+		return "", entity.LedgerAccountPosting{}, ErrLedgerAccountAmountInvalid
 	}
 	if posting.BookedAt.IsZero() {
-		return "", LedgerAccountPosting{}, ErrLedgerAccountBookedAtRequired
+		return "", entity.LedgerAccountPosting{}, ErrLedgerAccountBookedAtRequired
 	}
 
-	return accountID, LedgerAccountPosting{
+	return accountID, entity.LedgerAccountPosting{
 		TransactionID:         normalizedTransactionID,
 		ReferenceType:         normalizedReferenceType,
 		ReferenceID:           normalizedReferenceID,
@@ -445,7 +490,7 @@ func NewLedgerAccountPaymentPosting(
 	currency string,
 	amountDelta int64,
 	bookedAt time.Time,
-) (LedgerAccountPosting, error) {
+) (entity.LedgerAccountPosting, error) {
 	posting, err := newLedgerPosting(
 		transactionID,
 		referenceType,
@@ -456,12 +501,12 @@ func NewLedgerAccountPaymentPosting(
 		bookedAt,
 	)
 	if err != nil {
-		return LedgerAccountPosting{}, stackErr.Error(err)
+		return entity.LedgerAccountPosting{}, stackErr.Error(err)
 	}
 
 	_, normalizedPosting, err := normalizeLedgerAccountPosting(accountID, posting)
 	if err != nil {
-		return LedgerAccountPosting{}, stackErr.Error(err)
+		return entity.LedgerAccountPosting{}, stackErr.Error(err)
 	}
 
 	return normalizedPosting, nil
@@ -474,11 +519,11 @@ func NewLedgerAccountTransferOutPosting(
 	currency string,
 	amount int64,
 	bookedAt time.Time,
-) (LedgerAccountPosting, error) {
+) (entity.LedgerAccountPosting, error) {
 	return NewLedgerAccountPaymentPosting(
 		accountID,
 		transactionID,
-		ledgerReferenceTransferToAccount,
+		entity.LedgerReferenceInternalTransfer,
 		transactionID,
 		toAccountID,
 		currency,
@@ -494,11 +539,11 @@ func NewLedgerAccountTransferInPosting(
 	currency string,
 	amount int64,
 	bookedAt time.Time,
-) (LedgerAccountPosting, error) {
+) (entity.LedgerAccountPosting, error) {
 	return NewLedgerAccountPaymentPosting(
 		accountID,
 		transactionID,
-		ledgerReferenceTransferToAccount,
+		entity.LedgerReferenceInternalTransfer,
 		transactionID,
 		fromAccountID,
 		currency,
@@ -507,32 +552,23 @@ func NewLedgerAccountTransferInPosting(
 	)
 }
 
-func NewLedgerAccountPostingFromEvent(accountID string, eventData interface{}) (LedgerAccountPosting, bool, error) {
+func NewLedgerAccountPostingFromEvent(accountID string, eventData interface{}) (entity.LedgerAccountPosting, bool, error) {
 	switch data := eventData.(type) {
-	case *EventLedgerAccountPaymentBooked:
-		if data == nil {
-			return LedgerAccountPosting{}, false, stackErr.Error(errors.New("ledger payment booked event is nil"))
-		}
-
-		referenceType := strings.TrimSpace(data.ReferenceType)
-		if referenceType == "" {
-			referenceType = entity.PaymentReferenceSucceeded
-		}
-
-		posting, err := NewLedgerAccountPaymentPosting(
-			accountID,
-			data.TransactionID,
-			referenceType,
-			data.PaymentID,
-			data.CounterpartyAccountID,
-			data.Currency,
-			data.AmountDelta,
-			data.BookedAt,
-		)
-		return posting, true, stackErr.Error(err)
+	case *EventLedgerAccountDepositFromIntent:
+		return newLedgerPostingFromPaymentEvent(accountID, data, entity.PaymentReferenceSucceeded, 1, "ledger deposit from intent event is nil")
+	case *EventLedgerAccountWithdrawFromIntent:
+		return newLedgerPostingFromPaymentEvent(accountID, data, entity.PaymentReferenceSucceeded, -1, "ledger withdraw from intent event is nil")
+	case *EventLedgerAccountDepositFromRefund:
+		return newLedgerPostingFromPaymentEvent(accountID, data, entity.PaymentReferenceRefunded, 1, "ledger deposit from refund event is nil")
+	case *EventLedgerAccountWithdrawFromRefund:
+		return newLedgerPostingFromPaymentEvent(accountID, data, entity.PaymentReferenceRefunded, -1, "ledger withdraw from refund event is nil")
+	case *EventLedgerAccountDepositFromChargeback:
+		return newLedgerPostingFromPaymentEvent(accountID, data, entity.PaymentReferenceChargeback, 1, "ledger deposit from chargeback event is nil")
+	case *EventLedgerAccountWithdrawFromChargeback:
+		return newLedgerPostingFromPaymentEvent(accountID, data, entity.PaymentReferenceChargeback, -1, "ledger withdraw from chargeback event is nil")
 	case *EventLedgerAccountTransferredToAccount:
 		if data == nil {
-			return LedgerAccountPosting{}, false, stackErr.Error(errors.New("ledger transfer to account event is nil"))
+			return entity.LedgerAccountPosting{}, false, stackErr.Error(errors.New("ledger transfer to account event is nil"))
 		}
 
 		posting, err := NewLedgerAccountTransferOutPosting(
@@ -546,7 +582,7 @@ func NewLedgerAccountPostingFromEvent(accountID string, eventData interface{}) (
 		return posting, true, stackErr.Error(err)
 	case *EventLedgerAccountReceivedTransfer:
 		if data == nil {
-			return LedgerAccountPosting{}, false, stackErr.Error(errors.New("ledger received transfer event is nil"))
+			return entity.LedgerAccountPosting{}, false, stackErr.Error(errors.New("ledger received transfer event is nil"))
 		}
 
 		posting, err := NewLedgerAccountTransferInPosting(
@@ -559,8 +595,129 @@ func NewLedgerAccountPostingFromEvent(accountID string, eventData interface{}) (
 		)
 		return posting, true, stackErr.Error(err)
 	default:
-		return LedgerAccountPosting{}, false, nil
+		return entity.LedgerAccountPosting{}, false, nil
 	}
+}
+
+type ledgerPaymentEventData struct {
+	transactionID         string
+	paymentID             string
+	counterpartyAccountID string
+	currency              string
+	amount                int64
+	bookedAt              time.Time
+}
+
+func newLedgerPaymentEvent(posting entity.LedgerAccountPosting) interface{} {
+	base := ledgerPaymentEventData{
+		transactionID:         posting.TransactionID,
+		paymentID:             posting.ReferenceID,
+		counterpartyAccountID: posting.CounterpartyAccountID,
+		currency:              posting.Currency,
+		amount:                absInt64(posting.AmountDelta),
+		bookedAt:              posting.BookedAt,
+	}
+
+	switch posting.ReferenceType {
+	case entity.PaymentReferenceSucceeded:
+		if posting.AmountDelta >= 0 {
+			return &EventLedgerAccountDepositFromIntent{
+				TransactionID:         base.transactionID,
+				PaymentID:             base.paymentID,
+				CounterpartyAccountID: base.counterpartyAccountID,
+				Currency:              base.currency,
+				Amount:                base.amount,
+				BookedAt:              base.bookedAt,
+			}
+		}
+		return &EventLedgerAccountWithdrawFromIntent{
+			TransactionID:         base.transactionID,
+			PaymentID:             base.paymentID,
+			CounterpartyAccountID: base.counterpartyAccountID,
+			Currency:              base.currency,
+			Amount:                base.amount,
+			BookedAt:              base.bookedAt,
+		}
+	case entity.PaymentReferenceRefunded:
+		if posting.AmountDelta >= 0 {
+			return &EventLedgerAccountDepositFromRefund{
+				TransactionID:         base.transactionID,
+				PaymentID:             base.paymentID,
+				CounterpartyAccountID: base.counterpartyAccountID,
+				Currency:              base.currency,
+				Amount:                base.amount,
+				BookedAt:              base.bookedAt,
+			}
+		}
+		return &EventLedgerAccountWithdrawFromRefund{
+			TransactionID:         base.transactionID,
+			PaymentID:             base.paymentID,
+			CounterpartyAccountID: base.counterpartyAccountID,
+			Currency:              base.currency,
+			Amount:                base.amount,
+			BookedAt:              base.bookedAt,
+		}
+	case entity.PaymentReferenceChargeback:
+		if posting.AmountDelta >= 0 {
+			return &EventLedgerAccountDepositFromChargeback{
+				TransactionID:         base.transactionID,
+				PaymentID:             base.paymentID,
+				CounterpartyAccountID: base.counterpartyAccountID,
+				Currency:              base.currency,
+				Amount:                base.amount,
+				BookedAt:              base.bookedAt,
+			}
+		}
+		return &EventLedgerAccountWithdrawFromChargeback{
+			TransactionID:         base.transactionID,
+			PaymentID:             base.paymentID,
+			CounterpartyAccountID: base.counterpartyAccountID,
+			Currency:              base.currency,
+			Amount:                base.amount,
+			BookedAt:              base.bookedAt,
+		}
+	default:
+		return nil
+	}
+}
+
+func newLedgerPostingFromPaymentEvent(
+	accountID string,
+	data interface{},
+	referenceType string,
+	direction int64,
+	nilErr string,
+) (entity.LedgerAccountPosting, bool, error) {
+	if data == nil {
+		return entity.LedgerAccountPosting{}, false, stackErr.Error(errors.New(nilErr))
+	}
+
+	eventData, ok := data.(interface {
+		paymentEvent() ledgerPaymentEventData
+	})
+	if !ok {
+		return entity.LedgerAccountPosting{}, false, nil
+	}
+
+	payload := eventData.paymentEvent()
+	posting, err := NewLedgerAccountPaymentPosting(
+		accountID,
+		payload.transactionID,
+		referenceType,
+		payload.paymentID,
+		payload.counterpartyAccountID,
+		payload.currency,
+		direction*payload.amount,
+		payload.bookedAt,
+	)
+	return posting, true, stackErr.Error(err)
+}
+
+func absInt64(value int64) int64 {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 func newLedgerPosting(
@@ -571,23 +728,23 @@ func newLedgerPosting(
 	currency string,
 	amountDelta int64,
 	bookedAt time.Time,
-) (LedgerAccountPosting, error) {
+) (entity.LedgerAccountPosting, error) {
 	transactionID = strings.TrimSpace(transactionID)
 	if transactionID == "" {
-		return LedgerAccountPosting{}, ErrLedgerAccountTransactionRequired
+		return entity.LedgerAccountPosting{}, ErrLedgerAccountTransactionRequired
 	}
 	currency = strings.ToUpper(strings.TrimSpace(currency))
 	if currency == "" {
-		return LedgerAccountPosting{}, ErrLedgerAccountCurrencyRequired
+		return entity.LedgerAccountPosting{}, ErrLedgerAccountCurrencyRequired
 	}
 	if amountDelta == 0 {
-		return LedgerAccountPosting{}, ErrLedgerAccountAmountInvalid
+		return entity.LedgerAccountPosting{}, ErrLedgerAccountAmountInvalid
 	}
 	if bookedAt.IsZero() {
-		return LedgerAccountPosting{}, ErrLedgerAccountBookedAtRequired
+		return entity.LedgerAccountPosting{}, ErrLedgerAccountBookedAtRequired
 	}
 
-	return LedgerAccountPosting{
+	return entity.LedgerAccountPosting{
 		TransactionID:         transactionID,
 		ReferenceType:         strings.TrimSpace(referenceType),
 		ReferenceID:           strings.TrimSpace(referenceID),
@@ -598,7 +755,7 @@ func newLedgerPosting(
 	}, nil
 }
 
-func SameLedgerAccountPosting(left LedgerAccountPosting, right LedgerAccountPosting) bool {
+func SameLedgerAccountPosting(left entity.LedgerAccountPosting, right entity.LedgerAccountPosting) bool {
 	return left.TransactionID == right.TransactionID &&
 		left.ReferenceType == right.ReferenceType &&
 		left.ReferenceID == right.ReferenceID &&
