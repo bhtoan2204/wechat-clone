@@ -40,7 +40,7 @@ func (r *ledgerProjectionRepoImpl) ProjectTransaction(ctx context.Context, trans
 			}
 			return stackErr.Error(fmt.Errorf("existing ledger projection mismatch for transaction_id=%s", transaction.TransactionID))
 		}
-		if err != nil && !errors.Is(err, ErrNotFound) {
+		if !errors.Is(err, ErrNotFound) {
 			return stackErr.Error(err)
 		}
 

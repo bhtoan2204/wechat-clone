@@ -180,30 +180,6 @@ func toFriendRequestEntity(m *models.FriendRequest) *entity.FriendRequest {
 	}
 }
 
-func toFriendRequestModels(es []*entity.FriendRequest) []*models.FriendRequest {
-	if es == nil {
-		return nil
-	}
-
-	out := make([]*models.FriendRequest, 0, len(es))
-	for _, e := range es {
-		out = append(out, toFriendRequestModel(e))
-	}
-	return out
-}
-
-func toFriendRequestEntities(ms []*models.FriendRequest) []*entity.FriendRequest {
-	if ms == nil {
-		return nil
-	}
-
-	out := make([]*entity.FriendRequest, 0, len(ms))
-	for _, m := range ms {
-		out = append(out, toFriendRequestEntity(m))
-	}
-	return out
-}
-
 func toFriendRequestModelStatus(s entity.FriendRequestStatus) models.FriendRequestStatus {
 	return models.FriendRequestStatus(s)
 }
