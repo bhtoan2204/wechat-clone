@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -20,8 +21,9 @@ type Storage interface {
 }
 
 type minioStorage struct {
-	client *minio.Client
-	bucket string
+	client        *minio.Client
+	bucket        string
+	publicBaseURL *url.URL
 }
 
 func NewMinIO(cfg config.StorageConfig) (Storage, error) {
@@ -29,6 +31,10 @@ func NewMinIO(cfg config.StorageConfig) (Storage, error) {
 	accessKey := strings.TrimSpace(cfg.MinIOAccessKey)
 	secretKey := strings.TrimSpace(cfg.MinIOSecretKey)
 	bucket := strings.TrimSpace(cfg.MinIOBucket)
+	publicBaseURL, err := parsePublicBaseURL(cfg.MinIOPublicBaseURL)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
 
 	switch {
 	case endpoint == "":
@@ -50,8 +56,9 @@ func NewMinIO(cfg config.StorageConfig) (Storage, error) {
 	}
 
 	return &minioStorage{
-		client: client,
-		bucket: bucket,
+		client:        client,
+		bucket:        bucket,
+		publicBaseURL: publicBaseURL,
 	}, nil
 }
 
@@ -68,7 +75,7 @@ func (s *minioStorage) PresignedGetObjectURL(ctx context.Context, objectKey stri
 	if err != nil {
 		return "", stackErr.Error(err)
 	}
-	return presignedURL.String(), nil
+	return s.publicURL(presignedURL), nil
 }
 
 func (s *minioStorage) PresignedPutObjectURL(ctx context.Context, objectKey string, expiry time.Duration) (string, time.Time, error) {
@@ -88,5 +95,36 @@ func (s *minioStorage) PresignedPutObjectURL(ctx context.Context, objectKey stri
 		return "", time.Time{}, stackErr.Error(err)
 	}
 
-	return presignedURL.String(), expiredAt, nil
+	return s.publicURL(presignedURL), expiredAt, nil
+}
+
+func parsePublicBaseURL(raw string) (*url.URL, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil, stackErr.Error(fmt.Errorf("parse minio public base url failed: %w", err))
+	}
+	if u.Scheme == "" || u.Host == "" {
+		return nil, stackErr.Error(fmt.Errorf("minio public base url must include scheme and host"))
+	}
+
+	return u, nil
+}
+
+func (s *minioStorage) publicURL(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	if s == nil || s.publicBaseURL == nil {
+		return u.String()
+	}
+
+	rewritten := *u
+	rewritten.Scheme = s.publicBaseURL.Scheme
+	rewritten.Host = s.publicBaseURL.Host
+	return rewritten.String()
 }

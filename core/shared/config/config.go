@@ -134,11 +134,12 @@ type LedgerStripeConfig struct {
 }
 
 type StorageConfig struct {
-	MinIOEndpoint  string `env:"MINIO_ENDPOINT"`
-	MinIOAccessKey string `env:"MINIO_ACCESS_KEY"`
-	MinIOSecretKey string `env:"MINIO_SECRET_KEY"`
-	MinIOBucket    string `env:"MINIO_BUCKET"`
-	MinIOUseSSL    bool   `env:"MINIO_USE_SSL"`
+	MinIOEndpoint      string `env:"MINIO_ENDPOINT"`
+	MinIOPublicBaseURL string `env:"MINIO_PUBLIC_BASE_URL"`
+	MinIOAccessKey     string `env:"MINIO_ACCESS_KEY"`
+	MinIOSecretKey     string `env:"MINIO_SECRET_KEY"`
+	MinIOBucket        string `env:"MINIO_BUCKET"`
+	MinIOUseSSL        bool   `env:"MINIO_USE_SSL"`
 }
 
 type CassandraConfig struct {
