@@ -9,7 +9,7 @@ type MessageModel struct {
 	Message                string     `gorm:"type:text;not null" json:"message"`
 	MessageType            string     `gorm:"type:varchar(50);default:'text';not null" json:"message_type"`
 	MentionsJSON           string     `gorm:"type:text;not null;default:'[]'" json:"mentions_json"`
-	MentionAll             bool       `gorm:"type:number(1);default:0;not null" json:"mention_all"`
+	MentionAll             int16      `gorm:"type:smallint;default:0;not null" json:"mention_all"`
 	ReactionsJSON          string     `gorm:"type:text;not null;default:'[]'" json:"reactions_json"`
 	ReplyToMessageID       *string    `gorm:"index" json:"reply_to_message_id"`
 	ForwardedFromMessageID *string    `gorm:"index" json:"forwarded_from_message_id"`
