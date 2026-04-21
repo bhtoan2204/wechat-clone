@@ -14,12 +14,11 @@ FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends bash ca-certificates tzdata \
+	&& apt-get install -y --no-install-recommends ca-certificates tzdata \
 	&& rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /out/gateway /app/gateway
-COPY secret /app/secret
 
 EXPOSE 8080
 
-ENTRYPOINT ["/bin/bash", "-lc", "set -a; . /app/secret/.env; set +a; exec /app/gateway"]
+ENTRYPOINT ["/app/gateway"]

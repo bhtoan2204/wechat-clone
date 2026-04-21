@@ -14,13 +14,12 @@ FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends bash ca-certificates tzdata \
+	&& apt-get install -y --no-install-recommends ca-certificates tzdata \
 	&& rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /out/wechat-clone /app/wechat-clone
 COPY migration /app/migration
-COPY secret /app/secret
 
 EXPOSE 35000
 
-ENTRYPOINT ["/bin/bash", "-lc", "set -a; . /app/secret/.env; set +a; exec /app/wechat-clone -path /app/migration"]
+ENTRYPOINT ["/app/wechat-clone", "-path", "/app/migration"]

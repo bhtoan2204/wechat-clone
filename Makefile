@@ -1,6 +1,8 @@
 .DEFAULT_GOAL := help
 
 FULL_COMPOSE := docker compose -f docker-compose.dev-min.yml -f docker-compose.full.yml
+APP_COMPOSE := docker compose -f docker-compose.app.yml
+PRODUCTION_COMPOSE := docker compose -f docker-compose.dev-min.yml -f docker-compose.full.yml -f docker-compose.app.yml
 
 BASE_ENV_FILE := secret/.env
 
@@ -34,12 +36,19 @@ up:
 
 ## Alias for the default full local stack
 up-full:
-	@bash -c '$(LOAD_BASE_ENV) $(FULL_COMPOSE) up -d'
+	@bash -c '$(LOAD_BASE_ENV) $(PRODUCTION_COMPOSE) up -d'
 .PHONY: up-full
+
+up-app:
+	@bash -c '$(LOAD_BASE_ENV) $(APP_COMPOSE) up -d'
 
 ## Stop and remove local containers
 down:
 	@bash -c '$(LOAD_BASE_ENV) $(FULL_COMPOSE) down --remove-orphans'
+.PHONY: down
+
+down-all:
+	@bash -c '$(LOAD_BASE_ENV) $(PRODUCTION_COMPOSE) down --remove-orphans'
 .PHONY: down
 
 ## Prepare Cassandra keyspace and MinIO bucket for local development
