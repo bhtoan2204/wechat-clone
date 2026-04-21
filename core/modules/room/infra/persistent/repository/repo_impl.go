@@ -22,7 +22,7 @@ type repoImpl struct {
 	messageRepo    repos.MessageRepository
 	roomMemberRepo repos.RoomMemberRepository
 	roomOutboxRepo repos.RoomOutboxEventsRepository
-	accountRepo    repos.RoomAccountProjectionRepository
+	accountRepo    repos.RoomAccountRepository
 }
 
 func NewRepoImpl(appCtx *appCtx.AppContext) (repos.Repos, error) {
@@ -34,7 +34,7 @@ func newRepoImplWithDB(appCtx *appCtx.AppContext, db *gorm.DB) (repos.Repos, err
 	messageRepo := NewMessageRepoImpl(db)
 	roomMemberRepo := NewRoomMemberImpl(db)
 	roomOutboxRepo := NewRoomOutboxEventsRepoImpl(db)
-	accountRepo := NewRoomAccountProjectionImpl(db)
+	accountRepo := NewRoomAccountImpl(db)
 	roomAggregateRepo := newRoomAggregateRepoImpl(db, roomRepo, roomMemberRepo, messageRepo, roomOutboxRepo, accountRepo)
 	messageAggregateRepo := newMessageAggregateRepoImpl(db, messageRepo, roomRepo, roomMemberRepo, accountRepo, roomOutboxRepo)
 
@@ -75,7 +75,7 @@ func (r *repoImpl) RoomOutboxEventsRepository() repos.RoomOutboxEventsRepository
 	return r.roomOutboxRepo
 }
 
-func (r *repoImpl) RoomAccountProjectionRepository() repos.RoomAccountProjectionRepository {
+func (r *repoImpl) RoomAccountRepository() repos.RoomAccountRepository {
 	return r.accountRepo
 }
 

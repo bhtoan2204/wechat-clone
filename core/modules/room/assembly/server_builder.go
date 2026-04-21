@@ -44,6 +44,7 @@ func buildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 	markChatMessageStatus := cqrs.NewDispatcher(roomcommand.NewMarkChatMessageStatusHandler(roomRepos, roomService))
 	listChatConversations := cqrs.NewDispatcher(roomquery.NewListChatConversationsHandler(roomService))
 	getChatConversation := cqrs.NewDispatcher(roomquery.NewGetChatConversationHandler(roomService))
+	getChatConversationMetadata := cqrs.NewDispatcher(roomquery.NewGetChatConversationMetadataHandler(roomService))
 	listChatMessages := cqrs.NewDispatcher(roomquery.NewListChatMessagesHandler(roomService))
 	searchChatMentions := cqrs.NewDispatcher(roomquery.NewSearchChatMentionsHandler(roomService))
 	getChatPresence := cqrs.NewDispatcher(roomquery.NewGetChatPresenceHandler(roomService))
@@ -59,6 +60,7 @@ func buildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 		updateGroupChat,
 		listChatConversations,
 		getChatConversation,
+		getChatConversationMetadata,
 		listChatMessages,
 		searchChatMentions,
 		createChatMessagePresignedURL,

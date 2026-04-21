@@ -13,20 +13,20 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type relationshipAccountProjectionRepo struct {
+type RelationshipAccountRepo struct {
 	db *gorm.DB
 }
 
-func newRelationshipAccountProjectionRepo(db *gorm.DB) repos.RelationshipAccountProjectionRepository {
-	return &relationshipAccountProjectionRepo{db: db}
+func newRelationshipAccountRepo(db *gorm.DB) repos.RelationshipAccountRepository {
+	return &RelationshipAccountRepo{db: db}
 }
 
-func (r *relationshipAccountProjectionRepo) ProjectAccount(ctx context.Context, account *entity.AccountProjection) error {
+func (r *RelationshipAccountRepo) ProjectAccount(ctx context.Context, account *entity.AccountProjection) error {
 	if account == nil {
 		return stackErr.Error(errors.New("account projection is required"))
 	}
 
-	model := &models.RelationshipAccountProjection{
+	model := &models.RelationshipAccount{
 		AccountID:       account.AccountID,
 		DisplayName:     account.DisplayName,
 		Username:        account.Username,
@@ -52,8 +52,8 @@ func (r *relationshipAccountProjectionRepo) ProjectAccount(ctx context.Context, 
 	return nil
 }
 
-func (r *relationshipAccountProjectionRepo) GetByID(ctx context.Context, accountID string) (*entity.AccountProjection, error) {
-	var model models.RelationshipAccountProjection
+func (r *RelationshipAccountRepo) GetByID(ctx context.Context, accountID string) (*entity.AccountProjection, error) {
+	var model models.RelationshipAccount
 	if err := r.db.WithContext(ctx).
 		Where("account_id = ?", accountID).
 		First(&model).Error; err != nil {
@@ -70,10 +70,10 @@ func (r *relationshipAccountProjectionRepo) GetByID(ctx context.Context, account
 	}, nil
 }
 
-func (r *relationshipAccountProjectionRepo) Exists(ctx context.Context, accountID string) (bool, error) {
+func (r *RelationshipAccountRepo) Exists(ctx context.Context, accountID string) (bool, error) {
 	var count int64
 	if err := r.db.WithContext(ctx).
-		Model(&models.RelationshipAccountProjection{}).
+		Model(&models.RelationshipAccount{}).
 		Where("account_id = ?", accountID).
 		Count(&count).Error; err != nil {
 		return false, stackErr.Error(err)

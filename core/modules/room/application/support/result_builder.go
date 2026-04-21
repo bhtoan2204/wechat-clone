@@ -57,6 +57,62 @@ func BuildConversationResult(
 	})
 }
 
+func BuildConversationMetadataResult(
+	ctx context.Context,
+	readRepos projection.QueryRepos,
+	viewerID string,
+	room *views.RoomView,
+) (*apptypes.ConversationMetadataResult, error) {
+	if room == nil {
+		return nil, stackErr.Error(errors.New("room is required"))
+	}
+
+	members, err := readRepos.RoomMemberReadRepository().ListRoomMembers(ctx, room.ID)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	viewerMember, found := lo.Find(members, func(member *views.RoomMemberView) bool {
+		return member != nil && strings.TrimSpace(member.AccountID) == strings.TrimSpace(viewerID)
+	})
+	if !found || viewerMember == nil {
+		return nil, stackErr.Error(ErrViewerNotMemberOfRoom)
+	}
+
+	result := &apptypes.ConversationMetadataResult{
+		RoomID:          room.ID,
+		RoomType:        strings.TrimSpace(room.RoomType),
+		OwnerID:         room.OwnerID,
+		MemberCount:     len(members),
+		PinnedMessageID: utils.DerefString(room.PinnedMessageID),
+		LastMessageID:   utils.DerefString(room.LastMessageID),
+		ViewerRole:      strings.TrimSpace(viewerMember.Role),
+		IsOwner:         strings.TrimSpace(room.OwnerID) == strings.TrimSpace(viewerID),
+	}
+	if viewerMember.LastDeliveredAt != nil {
+		result.ViewerLastDeliveredAt = viewerMember.LastDeliveredAt.UTC().Format(time.RFC3339)
+	}
+	if viewerMember.LastReadAt != nil {
+		result.ViewerLastReadAt = viewerMember.LastReadAt.UTC().Format(time.RFC3339)
+	}
+
+	if strings.EqualFold(strings.TrimSpace(room.RoomType), "direct") {
+		peer, ok := lo.Find(members, func(member *views.RoomMemberView) bool {
+			return member != nil && strings.TrimSpace(member.AccountID) != strings.TrimSpace(viewerID)
+		})
+		if ok && peer != nil {
+			result.DirectPeer = &apptypes.ConversationMetadataPeerResult{
+				AccountID:       strings.TrimSpace(peer.AccountID),
+				DisplayName:     strings.TrimSpace(peer.DisplayName),
+				Username:        strings.TrimSpace(peer.Username),
+				AvatarObjectKey: strings.TrimSpace(peer.AvatarObjectKey),
+			}
+		}
+	}
+
+	return result, nil
+}
+
 func BuildMessageResult(
 	ctx context.Context,
 	readRepos projection.QueryRepos,

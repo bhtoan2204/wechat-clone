@@ -2,24 +2,36 @@ package query
 
 import (
 	"context"
-	"fmt"
 	appCtx "wechat-clone/core/context"
 	"wechat-clone/core/modules/relationship/application/dto/in"
 	"wechat-clone/core/modules/relationship/application/dto/out"
-	repos "wechat-clone/core/modules/relationship/domain/repos"
+	relationshipprojection "wechat-clone/core/modules/relationship/application/projection"
 	"wechat-clone/core/shared/pkg/cqrs"
+	"wechat-clone/core/shared/pkg/stackErr"
 )
 
 type listFriendsHandler struct {
+	projRepo relationshipprojection.ReadRepository
 }
 
 func NewListFriends(
 	appCtx *appCtx.AppContext,
-	baseRepo repos.Repos,
+	projRepo relationshipprojection.ReadRepository,
 ) cqrs.Handler[*in.ListFriendsRequest, *out.ListFriendsResponse] {
-	return &listFriendsHandler{}
+	return &listFriendsHandler{projRepo: projRepo}
 }
 
 func (u *listFriendsHandler) Handle(ctx context.Context, req *in.ListFriendsRequest) (*out.ListFriendsResponse, error) {
-	return nil, fmt.Errorf("not implemented yet")
+	accountID, err := currentAccountID(ctx)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	result, err := u.projRepo.ListFriends(ctx, normalizeListTarget(accountID, req.UserID), req.Cursor, normalizeLimit(req.Limit))
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	if result == nil {
+		result = emptyListResult()
+	}
+	return &out.ListFriendsResponse{Items: result.Items, NextCursor: result.NextCursor, Total: result.Total}, nil
 }

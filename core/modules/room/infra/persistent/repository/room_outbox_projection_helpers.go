@@ -328,7 +328,7 @@ func sortRoomMembersByAccount(members []*entity.RoomMemberEntity) []*entity.Room
 
 func enrichRoomMembersWithAccountProjections(
 	ctx context.Context,
-	accountRepo repos.RoomAccountProjectionRepository,
+	accountRepo repos.RoomAccountRepository,
 	members []*entity.RoomMemberEntity,
 ) ([]*entity.RoomMemberEntity, error) {
 	if len(members) == 0 {

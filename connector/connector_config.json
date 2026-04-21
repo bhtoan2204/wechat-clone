@@ -186,5 +186,43 @@
       "transforms.route.regex": "chatapp\\.public\\.ledger_outbox_events",
       "transforms.route.replacement": "CHATAPP.APPUSER.LEDGER_OUTBOX_EVENTS"
     }
+  },
+  {
+    "name": "relationship-outbox-connector",
+    "config": {
+      "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+      "tasks.max": "1",
+      "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+      "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "value.converter.schemas.enable": "false",
+      "database.hostname": "postgres-db",
+      "database.port": "5432",
+      "database.user": "appuser",
+      "database.password": "App123",
+      "database.dbname": "chat_app",
+      "database.server.name": "postgres-relationship-outbox",
+      "schema.include.list": "public",
+      "table.include.list": "public.relationship_outbox_events",
+      "topic.prefix": "chatapp",
+      "plugin.name": "pgoutput",
+      "slot.name": "dbz_relationship_outbox",
+      "publication.name": "dbz_relationship_outbox_pub",
+      "publication.autocreate.mode": "filtered",
+      "snapshot.mode": "initial",
+      "include.schema.changes": "false",
+      "decimal.handling.mode": "double",
+      "skipped.operations": "u,d,t",
+      "transforms": "unwrap,createKey,extractKey,route",
+      "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+      "transforms.unwrap.drop.tombstones": "true",
+      "transforms.unwrap.delete.handling.mode": "drop",
+      "transforms.createKey.type": "org.apache.kafka.connect.transforms.ValueToKey",
+      "transforms.createKey.fields": "aggregate_id",
+      "transforms.extractKey.type": "org.apache.kafka.connect.transforms.ExtractField$Key",
+      "transforms.extractKey.field": "aggregate_id",
+      "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
+      "transforms.route.regex": "chatapp\\.public\\.relationship_outbox_events",
+      "transforms.route.replacement": "CHATAPP.APPUSER.RELATIONSHIP_OUTBOX_EVENTS"
+    }
   }
 ]

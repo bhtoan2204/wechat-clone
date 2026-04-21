@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-type RelationshipAccountProjection struct {
+type RelationshipAccount struct {
 	AccountID       string    `gorm:"column:account_id;type:varchar(36);primaryKey"`
 	DisplayName     string    `gorm:"column:display_name;type:varchar(255);not null;default:''"`
 	Username        string    `gorm:"column:username;type:varchar(255);not null;default:''"`
@@ -11,6 +11,6 @@ type RelationshipAccountProjection struct {
 	UpdatedAt       time.Time `gorm:"column:updated_at;type:timestamptz;not null;autoUpdateTime"`
 }
 
-func (RelationshipAccountProjection) TableName() string {
-	return "relationship_account_projections"
+func (RelationshipAccount) TableName() string {
+	return "relationship_accounts"
 }

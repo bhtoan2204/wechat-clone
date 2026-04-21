@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-type RoomAccountProjection struct {
+type RoomAccount struct {
 	AccountID       string    `gorm:"primaryKey"`
 	DisplayName     string    `gorm:"default:''"`
 	Username        string    `gorm:"default:''"`
@@ -11,6 +11,6 @@ type RoomAccountProjection struct {
 	UpdatedAt       time.Time `gorm:"autoUpdateTime"`
 }
 
-func (r *RoomAccountProjection) TableName() string {
-	return "room_account_projections"
+func (r *RoomAccount) TableName() string {
+	return "room_accounts"
 }

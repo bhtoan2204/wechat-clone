@@ -23,7 +23,7 @@ type roomAggregateRepoImpl struct {
 	roomMemberRepo  repos.RoomMemberRepository
 	messageRepo     repos.MessageRepository
 	outboxRepo      repos.RoomOutboxEventsRepository
-	roomAccountRepo repos.RoomAccountProjectionRepository
+	roomAccountRepo repos.RoomAccountRepository
 }
 
 func newRoomAggregateRepoImpl(db *gorm.DB,
@@ -31,7 +31,7 @@ func newRoomAggregateRepoImpl(db *gorm.DB,
 	roomMemberRepo repos.RoomMemberRepository,
 	messageRepo repos.MessageRepository,
 	outboxRepo repos.RoomOutboxEventsRepository,
-	accountRepo repos.RoomAccountProjectionRepository,
+	accountRepo repos.RoomAccountRepository,
 ) repos.RoomAggregateRepository {
 	return &roomAggregateRepoImpl{
 		db:              db,

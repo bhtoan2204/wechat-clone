@@ -51,6 +51,10 @@ func (s *chatService) GetConversation(ctx context.Context, accountID string, que
 	return s.conversations.GetConversation(ctx, accountID, query)
 }
 
+func (s *chatService) GetConversationMetadata(ctx context.Context, accountID string, query apptypes.GetConversationQuery) (*apptypes.ConversationMetadataResult, error) {
+	return s.conversations.GetConversationMetadata(ctx, accountID, query)
+}
+
 func (s *chatService) ListMessages(ctx context.Context, accountID string, query apptypes.ListMessagesQuery) ([]apptypes.MessageResult, error) {
 	return s.messages.ListMessages(ctx, accountID, query)
 }

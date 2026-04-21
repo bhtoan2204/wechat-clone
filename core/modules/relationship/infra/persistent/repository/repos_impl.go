@@ -23,7 +23,7 @@ type repoImpl struct {
 	followRelationRepo             repos.FollowRelationRepository
 	blockRelationRepo              repos.BlockRelationRepository
 	userRelationshipCounterRepo    repos.UserRelationshipCounterRepository
-	relationshipAccountProjectRepo repos.RelationshipAccountProjectionRepository
+	relationshipAccountProjectRepo repos.RelationshipAccountRepository
 	relationshipPairGuardRepo      repos.RelationshipPairGuardRepository
 }
 
@@ -38,7 +38,7 @@ func newRepoImplWithDB(appCtx *appCtx.AppContext, db *gorm.DB) repos.Repos {
 	followRelationRepo := newFollowRelationRepo(db)
 	blockRelationRepo := newBlockRelationRepo(db)
 	userRelationshipCounterRepo := newUserRelationshipCounterRepo(db)
-	relationshipAccountProjectRepo := newRelationshipAccountProjectionRepo(db)
+	relationshipAccountProjectRepo := newRelationshipAccountRepo(db)
 	relationshipPairGuardRepo := newRelationshipPairGuardRepo(db)
 	return &repoImpl{
 		appCtx:                         appCtx,
@@ -80,7 +80,7 @@ func (r *repoImpl) UserRelationshipCounterRepository() repos.UserRelationshipCou
 	return r.userRelationshipCounterRepo
 }
 
-func (r *repoImpl) RelationshipAccountProjectionRepository() repos.RelationshipAccountProjectionRepository {
+func (r *repoImpl) RelationshipAccountRepository() repos.RelationshipAccountRepository {
 	return r.relationshipAccountProjectRepo
 }
 

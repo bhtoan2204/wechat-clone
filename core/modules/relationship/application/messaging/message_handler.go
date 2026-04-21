@@ -24,13 +24,13 @@ type MessageHandler interface {
 
 type messageHandler struct {
 	consumer    []infraMessaging.Consumer
-	accountRepo repos.RelationshipAccountProjectionRepository
+	accountRepo repos.RelationshipAccountRepository
 }
 
 func NewMessageHandler(cfg *config.Config, baseRepo repos.Repos) (MessageHandler, error) {
 	instance := &messageHandler{
 		consumer:    make([]infraMessaging.Consumer, 0, 1),
-		accountRepo: baseRepo.RelationshipAccountProjectionRepository(),
+		accountRepo: baseRepo.RelationshipAccountRepository(),
 	}
 
 	accountTopic := strings.TrimSpace(cfg.KafkaConfig.KafkaRelationshipConsumer.AccountTopic)

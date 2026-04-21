@@ -20,6 +20,7 @@ type roomHTTPServer struct {
 	updateGroupChat               cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatConversationResponse]
 	listChatConversations         cqrs.Dispatcher[*in.ListChatConversationsRequest, []*out.ChatConversationResponse]
 	getChatConversation           cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationResponse]
+	getChatConversationMetadata   cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationMetadataResponse]
 	listChatMessages              cqrs.Dispatcher[*in.ListChatMessagesRequest, []*out.ChatMessageResponse]
 	searchChatMentions            cqrs.Dispatcher[*in.SearchChatMentionsRequest, []*out.ChatMentionCandidateResponse]
 	createChatMessagePresignedURL cqrs.Dispatcher[*in.CreateChatMessagePresignedURLRequest, *out.CreateChatMessagePresignedURLResponse]
@@ -44,6 +45,7 @@ func NewHTTPServer(
 	updateGroupChat cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatConversationResponse],
 	listChatConversations cqrs.Dispatcher[*in.ListChatConversationsRequest, []*out.ChatConversationResponse],
 	getChatConversation cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationResponse],
+	getChatConversationMetadata cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationMetadataResponse],
 	listChatMessages cqrs.Dispatcher[*in.ListChatMessagesRequest, []*out.ChatMessageResponse],
 	searchChatMentions cqrs.Dispatcher[*in.SearchChatMentionsRequest, []*out.ChatMentionCandidateResponse],
 	createChatMessagePresignedURL cqrs.Dispatcher[*in.CreateChatMessagePresignedURLRequest, *out.CreateChatMessagePresignedURLResponse],
@@ -67,6 +69,7 @@ func NewHTTPServer(
 		updateGroupChat:               updateGroupChat,
 		listChatConversations:         listChatConversations,
 		getChatConversation:           getChatConversation,
+		getChatConversationMetadata:   getChatConversationMetadata,
 		listChatMessages:              listChatMessages,
 		searchChatMentions:            searchChatMentions,
 		createChatMessagePresignedURL: createChatMessagePresignedURL,
@@ -91,7 +94,7 @@ func (s *roomHTTPServer) RegisterPublicRoutes(routes *gin.RouterGroup) {
 }
 
 func (s *roomHTTPServer) RegisterPrivateRoutes(routes *gin.RouterGroup) {
-	roomhttp.RegisterPrivateRoutes(routes, s.createDirectConversation, s.createGroupChat, s.updateGroupChat, s.listChatConversations, s.getChatConversation, s.listChatMessages, s.searchChatMentions, s.createChatMessagePresignedURL, s.getChatMessageMedia, s.sendChatMessage, s.toggleChatMessageReaction, s.editChatMessage, s.deleteChatMessage, s.forwardChatMessage, s.markChatMessageStatus, s.addChatMember, s.removeChatMember, s.pinChatMessage, s.getChatPresence)
+	roomhttp.RegisterPrivateRoutes(routes, s.createDirectConversation, s.createGroupChat, s.updateGroupChat, s.listChatConversations, s.getChatConversation, s.getChatConversationMetadata, s.listChatMessages, s.searchChatMentions, s.createChatMessagePresignedURL, s.getChatMessageMedia, s.sendChatMessage, s.toggleChatMessageReaction, s.editChatMessage, s.deleteChatMessage, s.forwardChatMessage, s.markChatMessageStatus, s.addChatMember, s.removeChatMember, s.pinChatMessage, s.getChatPresence)
 }
 
 func (s *roomHTTPServer) RegisterSocketRoutes(routes *gin.RouterGroup) {

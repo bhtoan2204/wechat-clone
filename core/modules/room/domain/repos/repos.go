@@ -14,7 +14,7 @@ type Repos interface {
 	RoomMemberRepository() RoomMemberRepository
 	RoomOutboxEventsRepository() RoomOutboxEventsRepository
 
-	RoomAccountProjectionRepository() RoomAccountProjectionRepository
+	RoomAccountRepository() RoomAccountRepository
 
 	WithTransaction(ctx context.Context, fn func(Repos) error) error
 }

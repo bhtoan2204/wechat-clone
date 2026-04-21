@@ -75,7 +75,7 @@ func resolveMessageMentions(
 		}, nil
 	}
 
-	accountProjections, err := baseRepo.RoomAccountProjectionRepository().ListByAccountIDs(ctx, filteredExplicitIDs)
+	accountProjections, err := baseRepo.RoomAccountRepository().ListByAccountIDs(ctx, filteredExplicitIDs)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -208,7 +208,7 @@ func ensureProjectedAccountsExist(ctx context.Context, baseRepo repos.Repos, acc
 		return nil
 	}
 
-	accountProjections, err := baseRepo.RoomAccountProjectionRepository().ListByAccountIDs(ctx, normalizedIDs)
+	accountProjections, err := baseRepo.RoomAccountRepository().ListByAccountIDs(ctx, normalizedIDs)
 	if err != nil {
 		return stackErr.Error(err)
 	}

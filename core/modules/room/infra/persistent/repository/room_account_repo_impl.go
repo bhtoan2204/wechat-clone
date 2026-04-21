@@ -11,15 +11,15 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type roomAccountProjectionImpl struct {
+type RoomAccountImpl struct {
 	db *gorm.DB
 }
 
-func NewRoomAccountProjectionImpl(db *gorm.DB) repos.RoomAccountProjectionRepository {
-	return &roomAccountProjectionImpl{db: db}
+func NewRoomAccountImpl(db *gorm.DB) repos.RoomAccountRepository {
+	return &RoomAccountImpl{db: db}
 }
 
-func (r *roomAccountProjectionImpl) ProjectAccount(ctx context.Context, account *entity.AccountEntity) error {
+func (r *RoomAccountImpl) ProjectAccount(ctx context.Context, account *entity.AccountEntity) error {
 	model := r.toModel(account)
 
 	if err := r.db.WithContext(ctx).
@@ -41,11 +41,11 @@ func (r *roomAccountProjectionImpl) ProjectAccount(ctx context.Context, account 
 	return nil
 }
 
-func (r *roomAccountProjectionImpl) ListByAccountIDs(ctx context.Context, accountIDs []string) ([]*entity.AccountEntity, error) {
+func (r *RoomAccountImpl) ListByAccountIDs(ctx context.Context, accountIDs []string) ([]*entity.AccountEntity, error) {
 	if len(accountIDs) == 0 {
 		return []*entity.AccountEntity{}, nil
 	}
-	var models []models.RoomAccountProjection
+	var models []models.RoomAccount
 	if err := r.db.WithContext(ctx).
 		Where("account_id IN ?", accountIDs).
 		Find(&models).Error; err != nil {
@@ -68,8 +68,8 @@ func (r *roomAccountProjectionImpl) ListByAccountIDs(ctx context.Context, accoun
 	return results, nil
 }
 
-func (r *roomAccountProjectionImpl) toModel(account *entity.AccountEntity) *models.RoomAccountProjection {
-	return &models.RoomAccountProjection{
+func (r *RoomAccountImpl) toModel(account *entity.AccountEntity) *models.RoomAccount {
+	return &models.RoomAccount{
 		AccountID:       account.AccountID,
 		DisplayName:     account.DisplayName,
 		Username:        account.Username,

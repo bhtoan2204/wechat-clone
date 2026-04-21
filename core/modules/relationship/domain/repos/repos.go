@@ -10,7 +10,7 @@ type Repos interface {
 	FollowRelationRepository() FollowRelationRepository
 	BlockRelationRepository() BlockRelationRepository
 	UserRelationshipCounterRepository() UserRelationshipCounterRepository
-	RelationshipAccountProjectionRepository() RelationshipAccountProjectionRepository
+	RelationshipAccountRepository() RelationshipAccountRepository
 	RelationshipPairGuardRepository() RelationshipPairGuardRepository
 
 	WithTransaction(ctx context.Context, fn func(Repos) error) error

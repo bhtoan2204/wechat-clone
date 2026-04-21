@@ -19,6 +19,7 @@ func RegisterPrivateRoutes(
 	updateGroupChat cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatConversationResponse],
 	listChatConversations cqrs.Dispatcher[*in.ListChatConversationsRequest, []*out.ChatConversationResponse],
 	getChatConversation cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationResponse],
+	getChatConversationMetadata cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationMetadataResponse],
 	listChatMessages cqrs.Dispatcher[*in.ListChatMessagesRequest, []*out.ChatMessageResponse],
 	searchChatMentions cqrs.Dispatcher[*in.SearchChatMentionsRequest, []*out.ChatMentionCandidateResponse],
 	createChatMessagePresignedURL cqrs.Dispatcher[*in.CreateChatMessagePresignedURLRequest, *out.CreateChatMessagePresignedURLResponse],
@@ -39,6 +40,7 @@ func RegisterPrivateRoutes(
 	routes.PATCH("/chat/groups/:room_id", httpx.Wrap(handler.NewUpdateGroupChatHandler(updateGroupChat)))
 	routes.GET("/chat/conversations", httpx.Wrap(handler.NewListChatConversationsHandler(listChatConversations)))
 	routes.GET("/chat/conversations/:room_id", httpx.Wrap(handler.NewGetChatConversationHandler(getChatConversation)))
+	routes.GET("/chat/conversations/:room_id/metadata", httpx.Wrap(handler.NewGetChatConversationMetadataHandler(getChatConversationMetadata)))
 	routes.GET("/chat/conversations/:room_id/messages", httpx.Wrap(handler.NewListChatMessagesHandler(listChatMessages)))
 	routes.GET("/chat/rooms/:room_id/mentions/search", httpx.Wrap(handler.NewSearchChatMentionsHandler(searchChatMentions)))
 	routes.POST("/chat/messages/presigned-url", httpx.Wrap(handler.NewCreateChatMessagePresignedURLHandler(createChatMessagePresignedURL)))

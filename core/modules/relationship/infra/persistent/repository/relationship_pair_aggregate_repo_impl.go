@@ -24,7 +24,7 @@ type relationshipPairAggregateRepo struct {
 	followRelationRepo          repos.FollowRelationRepository
 	blockRelationRepo           repos.BlockRelationRepository
 	userRelationshipCounterRepo repos.UserRelationshipCounterRepository
-	accountProjectionRepo       repos.RelationshipAccountProjectionRepository
+	accountProjectionRepo       repos.RelationshipAccountRepository
 	relationshipPairGuardRepo   repos.RelationshipPairGuardRepository
 }
 
@@ -37,7 +37,7 @@ func newRelationshipPairAggregateRepo(db *gorm.DB) repos.RelationshipPairAggrega
 		followRelationRepo:          newFollowRelationRepo(db),
 		blockRelationRepo:           newBlockRelationRepo(db),
 		userRelationshipCounterRepo: newUserRelationshipCounterRepo(db),
-		accountProjectionRepo:       newRelationshipAccountProjectionRepo(db),
+		accountProjectionRepo:       newRelationshipAccountRepo(db),
 		relationshipPairGuardRepo:   newRelationshipPairGuardRepo(db),
 	}
 }

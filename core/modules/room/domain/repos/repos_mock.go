@@ -68,18 +68,18 @@ func (mr *MockReposMockRecorder) MessageRepository() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MessageRepository", reflect.TypeOf((*MockRepos)(nil).MessageRepository))
 }
 
-// RoomAccountProjectionRepository mocks base method.
-func (m *MockRepos) RoomAccountProjectionRepository() RoomAccountProjectionRepository {
+// RoomAccountRepository mocks base method.
+func (m *MockRepos) RoomAccountRepository() RoomAccountRepository {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RoomAccountProjectionRepository")
-	ret0, _ := ret[0].(RoomAccountProjectionRepository)
+	ret := m.ctrl.Call(m, "RoomAccountRepository")
+	ret0, _ := ret[0].(RoomAccountRepository)
 	return ret0
 }
 
-// RoomAccountProjectionRepository indicates an expected call of RoomAccountProjectionRepository.
-func (mr *MockReposMockRecorder) RoomAccountProjectionRepository() *gomock.Call {
+// RoomAccountRepository indicates an expected call of RoomAccountRepository.
+func (mr *MockReposMockRecorder) RoomAccountRepository() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RoomAccountProjectionRepository", reflect.TypeOf((*MockRepos)(nil).RoomAccountProjectionRepository))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RoomAccountRepository", reflect.TypeOf((*MockRepos)(nil).RoomAccountRepository))
 }
 
 // RoomAggregateRepository mocks base method.

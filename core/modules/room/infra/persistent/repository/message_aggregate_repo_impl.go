@@ -16,7 +16,7 @@ type messageAggregateRepoImpl struct {
 	messageRepo    repos.MessageRepository
 	roomRepo       repos.RoomRepository
 	roomMemberRepo repos.RoomMemberRepository
-	accountRepo    repos.RoomAccountProjectionRepository
+	accountRepo    repos.RoomAccountRepository
 	outboxRepo     repos.RoomOutboxEventsRepository
 }
 
@@ -25,7 +25,7 @@ func newMessageAggregateRepoImpl(
 	messageRepo repos.MessageRepository,
 	roomRepo repos.RoomRepository,
 	roomMemberRepo repos.RoomMemberRepository,
-	accountRepo repos.RoomAccountProjectionRepository,
+	accountRepo repos.RoomAccountRepository,
 	outboxRepo repos.RoomOutboxEventsRepository,
 ) repos.MessageAggregateRepository {
 	return &messageAggregateRepoImpl{

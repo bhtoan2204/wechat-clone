@@ -37,6 +37,36 @@ func ToConversationResponse(res *apptypes.ConversationResult) *out.ChatConversat
 	}
 }
 
+func ToConversationMetadataResponse(res *apptypes.ConversationMetadataResult) *out.ChatConversationMetadataResponse {
+	if res == nil {
+		return nil
+	}
+
+	var peer *out.ChatConversationMetadataPeerResponse
+	if res.DirectPeer != nil {
+		peer = &out.ChatConversationMetadataPeerResponse{
+			AccountID:       res.DirectPeer.AccountID,
+			DisplayName:     res.DirectPeer.DisplayName,
+			Username:        res.DirectPeer.Username,
+			AvatarObjectKey: res.DirectPeer.AvatarObjectKey,
+		}
+	}
+
+	return &out.ChatConversationMetadataResponse{
+		RoomID:                res.RoomID,
+		RoomType:              res.RoomType,
+		OwnerID:               res.OwnerID,
+		MemberCount:           res.MemberCount,
+		PinnedMessageID:       res.PinnedMessageID,
+		LastMessageID:         res.LastMessageID,
+		ViewerRole:            res.ViewerRole,
+		ViewerLastDeliveredAt: res.ViewerLastDeliveredAt,
+		ViewerLastReadAt:      res.ViewerLastReadAt,
+		IsOwner:               res.IsOwner,
+		DirectPeer:            peer,
+	}
+}
+
 func ToMessageResponse(res *apptypes.MessageResult) *out.ChatMessageResponse {
 	if res == nil {
 		return nil

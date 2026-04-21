@@ -40,7 +40,7 @@ func BuildConversationResultFromState(
 		return nil, stackErr.Error(ErrViewerNotMemberOfRoom)
 	}
 
-	accountProjections, err := baseRepo.RoomAccountProjectionRepository().ListByAccountIDs(ctx, lo.Uniq(accountIDs))
+	accountProjections, err := baseRepo.RoomAccountRepository().ListByAccountIDs(ctx, lo.Uniq(accountIDs))
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

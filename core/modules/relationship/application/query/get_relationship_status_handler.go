@@ -2,24 +2,33 @@ package query
 
 import (
 	"context"
-	"fmt"
 	appCtx "wechat-clone/core/context"
 	"wechat-clone/core/modules/relationship/application/dto/in"
 	"wechat-clone/core/modules/relationship/application/dto/out"
-	repos "wechat-clone/core/modules/relationship/domain/repos"
+	relationshipprojection "wechat-clone/core/modules/relationship/application/projection"
 	"wechat-clone/core/shared/pkg/cqrs"
+	"wechat-clone/core/shared/pkg/stackErr"
 )
 
 type getRelationshipStatusHandler struct {
+	projRepo relationshipprojection.ReadRepository
 }
 
 func NewGetRelationshipStatus(
 	appCtx *appCtx.AppContext,
-	baseRepo repos.Repos,
+	projRepo relationshipprojection.ReadRepository,
 ) cqrs.Handler[*in.GetRelationshipStatusRequest, *out.GetRelationshipStatusResponse] {
-	return &getRelationshipStatusHandler{}
+	return &getRelationshipStatusHandler{projRepo: projRepo}
 }
 
 func (u *getRelationshipStatusHandler) Handle(ctx context.Context, req *in.GetRelationshipStatusRequest) (*out.GetRelationshipStatusResponse, error) {
-	return nil, fmt.Errorf("not implemented yet")
+	accountID, err := currentAccountID(ctx)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	pair, err := u.projRepo.GetPair(ctx, accountID, req.TargetUserID)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return buildRelationshipStatusResponse(accountID, req.TargetUserID, pair), nil
 }

@@ -14,5 +14,19 @@ func buildMessagingRuntime(cfg *config.Config, appCtx *appCtx.AppContext) (modru
 		return nil, stackErr.Error(err)
 	}
 
-	return relationshipserver.NewServer(messageHandler)
+	projectionProcessor, err := buildProjectionProcessor(cfg, appCtx)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	accountRuntime, err := relationshipserver.NewServer(messageHandler)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	projectionRuntime, err := relationshipserver.NewServer(projectionProcessor)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	return modruntime.NewComposite(accountRuntime, projectionRuntime), nil
 }

@@ -100,6 +100,7 @@ type KafkaLedgerConsumer struct {
 
 type KafkaRelationshipConsumer struct {
 	RelationshipProjectionGroup string `env:"KAFKA_RELATIONSHIP_CONSUMER_PROJECTION_GROUP"`
+	RelationshipOutboxTopic     string `env:"KAFKA_CONSUMER_RELATIONSHIP_OUTBOX_TOPIC"`
 	AccountTopic                string `env:"KAFKA_CONSUMER_ACCOUNT_TOPIC"`
 }
 

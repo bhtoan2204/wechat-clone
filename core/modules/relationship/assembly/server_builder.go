@@ -1,4 +1,3 @@
-// CODE_GENERATOR: module-http-server-builder
 package assembly
 
 import (
@@ -8,6 +7,7 @@ import (
 	relationshipcommand "wechat-clone/core/modules/relationship/application/command"
 	relationshipquery "wechat-clone/core/modules/relationship/application/query"
 	relationshiprepo "wechat-clone/core/modules/relationship/infra/persistent/repository"
+	relationshipReadRepos "wechat-clone/core/modules/relationship/infra/projection/cassandra"
 	relationshipserver "wechat-clone/core/modules/relationship/transport/server"
 	"wechat-clone/core/shared/pkg/cqrs"
 	"wechat-clone/core/shared/pkg/stackErr"
@@ -16,24 +16,28 @@ import (
 
 func buildHTTPServer(_ context.Context, appContext *appCtx.AppContext) (http.HTTPServer, error) {
 	relationshipRepos := relationshiprepo.NewRepoImpl(appContext)
+	relationshipReadRepos, err := relationshipReadRepos.NewProjectionRepo(appContext)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
 	sendFriendRequest := cqrs.NewDispatcher(relationshipcommand.NewSendFriendRequest(appContext, relationshipRepos))
 	cancelFriendRequest := cqrs.NewDispatcher(relationshipcommand.NewCancelFriendRequest(appContext, relationshipRepos))
 	acceptFriendRequest := cqrs.NewDispatcher(relationshipcommand.NewAcceptFriendRequest(appContext, relationshipRepos))
 	rejectFriendRequest := cqrs.NewDispatcher(relationshipcommand.NewRejectFriendRequest(appContext, relationshipRepos))
-	listIncomingFriendRequests := cqrs.NewDispatcher(relationshipquery.NewListIncomingFriendRequests(appContext, relationshipRepos))
-	listOutgoingFriendRequests := cqrs.NewDispatcher(relationshipquery.NewListOutgoingFriendRequests(appContext, relationshipRepos))
+	listIncomingFriendRequests := cqrs.NewDispatcher(relationshipquery.NewListIncomingFriendRequests(appContext, relationshipReadRepos))
+	listOutgoingFriendRequests := cqrs.NewDispatcher(relationshipquery.NewListOutgoingFriendRequests(appContext, relationshipReadRepos))
 	unfriendUser := cqrs.NewDispatcher(relationshipcommand.NewUnfriendUser(appContext, relationshipRepos))
-	listFriends := cqrs.NewDispatcher(relationshipquery.NewListFriends(appContext, relationshipRepos))
+	listFriends := cqrs.NewDispatcher(relationshipquery.NewListFriends(appContext, relationshipReadRepos))
 	followUser := cqrs.NewDispatcher(relationshipcommand.NewFollowUser(appContext, relationshipRepos))
 	unfollowUser := cqrs.NewDispatcher(relationshipcommand.NewUnfollowUser(appContext, relationshipRepos))
-	listFollowers := cqrs.NewDispatcher(relationshipquery.NewListFollowers(appContext, relationshipRepos))
-	listFollowing := cqrs.NewDispatcher(relationshipquery.NewListFollowing(appContext, relationshipRepos))
+	listFollowers := cqrs.NewDispatcher(relationshipquery.NewListFollowers(appContext, relationshipReadRepos))
+	listFollowing := cqrs.NewDispatcher(relationshipquery.NewListFollowing(appContext, relationshipReadRepos))
 	blockUser := cqrs.NewDispatcher(relationshipcommand.NewBlockUser(appContext, relationshipRepos))
 	unblockUser := cqrs.NewDispatcher(relationshipcommand.NewUnblockUser(appContext, relationshipRepos))
-	listBlockedUsers := cqrs.NewDispatcher(relationshipquery.NewListBlockedUsers(appContext, relationshipRepos))
-	getRelationshipStatus := cqrs.NewDispatcher(relationshipquery.NewGetRelationshipStatus(appContext, relationshipRepos))
-	getMutualFriends := cqrs.NewDispatcher(relationshipquery.NewGetMutualFriends(appContext, relationshipRepos))
-	getRelationshipSummary := cqrs.NewDispatcher(relationshipquery.NewGetRelationshipSummary(appContext, relationshipRepos))
+	listBlockedUsers := cqrs.NewDispatcher(relationshipquery.NewListBlockedUsers(appContext, relationshipReadRepos))
+	getRelationshipStatus := cqrs.NewDispatcher(relationshipquery.NewGetRelationshipStatus(appContext, relationshipReadRepos))
+	getMutualFriends := cqrs.NewDispatcher(relationshipquery.NewGetMutualFriends(appContext, relationshipReadRepos))
+	getRelationshipSummary := cqrs.NewDispatcher(relationshipquery.NewGetRelationshipSummary(appContext, relationshipReadRepos))
 
 	server, err := relationshipserver.NewHTTPServer(
 		sendFriendRequest,

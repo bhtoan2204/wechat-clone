@@ -17,6 +17,7 @@ import (
 type ConversationQueryService interface {
 	ListConversations(ctx context.Context, accountID string, query apptypes.ListConversationsQuery) ([]apptypes.ConversationResult, error)
 	GetConversation(ctx context.Context, accountID string, query apptypes.GetConversationQuery) (*apptypes.ConversationResult, error)
+	GetConversationMetadata(ctx context.Context, accountID string, query apptypes.GetConversationQuery) (*apptypes.ConversationMetadataResult, error)
 }
 
 type conversationQueryService struct {
@@ -80,4 +81,12 @@ func (s *conversationQueryService) GetConversation(ctx context.Context, accountI
 		return nil, stackErr.Error(err)
 	}
 	return roomsupport.BuildConversationResult(ctx, s.readRepos, accountID, room, true)
+}
+
+func (s *conversationQueryService) GetConversationMetadata(ctx context.Context, accountID string, query apptypes.GetConversationQuery) (*apptypes.ConversationMetadataResult, error) {
+	room, err := s.readRepos.RoomReadRepository().GetRoomByID(ctx, query.RoomID)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return roomsupport.BuildConversationMetadataResult(ctx, s.readRepos, accountID, room)
 }

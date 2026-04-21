@@ -266,6 +266,56 @@ endpoints:
         - name: updated_at
           type: string
 
+  - name: ChatGetConversationMetadata
+    method: GET
+    path: /chat/conversations/:room_id/metadata
+    handler: GetChatConversationMetadataHandler
+    auth: true
+    usecase:
+      name: RoomUsecase
+      method: GetChatConversationMetadata
+    request:
+      struct: GetChatConversationRequest
+      fields:
+        - name: room_id
+          type: string
+          required: true
+    response:
+      struct: ChatConversationMetadataResponse
+      fields:
+        - name: room_id
+          type: string
+        - name: room_type
+          type: string
+        - name: owner_id
+          type: string
+        - name: member_count
+          type: int
+        - name: pinned_message_id
+          type: string
+        - name: last_message_id
+          type: string
+        - name: viewer_role
+          type: string
+        - name: viewer_last_delivered_at
+          type: string
+        - name: viewer_last_read_at
+          type: string
+        - name: is_owner
+          type: bool
+        - name: direct_peer
+          type: object
+          struct: ChatConversationMetadataPeerResponse
+          fields:
+            - name: account_id
+              type: string
+            - name: display_name
+              type: string
+            - name: username
+              type: string
+            - name: avatar_object_key
+              type: string
+
   - name: ChatListMessages
     method: GET
     path: /chat/conversations/:room_id/messages
