@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gateway/config"
 	"gateway/infra/proxy"
+	"gateway/pkg/logging"
 	stackErr "gateway/pkg/stackErr"
 	"net"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"sync/atomic"
 
 	"github.com/hashicorp/consul/api"
+	"go.uber.org/zap"
 )
 
 type HTTPTransport struct {
@@ -71,6 +73,7 @@ func (t *HTTPTransport) nextTargetHost(services []*api.ServiceEntry) (string, bo
 }
 
 func (t *HTTPTransport) Start() error {
+	log := logging.DefaultLogger()
 	addr := normalizeListenAddr(t.cfg.HTTP.Port)
 
 	// For now, we don't have mesh networking, so we need to proxy the request to the target service
@@ -79,7 +82,6 @@ func (t *HTTPTransport) Start() error {
 			services, _, err := t.consulClient.Health().Service("wechat-clone", "", true, nil)
 			targetHost, ok := t.nextTargetHost(services)
 			if err != nil || !ok {
-				// Cố tình trỏ đến một host lỗi để ErrorHandler phía dưới bắt được
 				req.URL.Scheme = "http"
 				req.URL.Host = "service-not-found"
 				return
@@ -90,6 +92,7 @@ func (t *HTTPTransport) Start() error {
 			req.Host = targetHost
 		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+			log.Errorw("ErrorHandler", zap.Error(err), zap.Any("request", r))
 			w.WriteHeader(http.StatusBadGateway)
 			w.Write([]byte(`{"error": "Bad Gateway: Service 'wechat-clone' is currently unavailable or not found in Consul"}`))
 		},
