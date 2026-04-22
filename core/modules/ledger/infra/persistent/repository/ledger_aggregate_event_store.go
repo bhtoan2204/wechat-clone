@@ -24,6 +24,11 @@ type dbTX interface {
 	WithContext(ctx context.Context) *gorm.DB
 }
 
+type ledgerPostedTransactionStore struct {
+	db         dbTX
+	serializer eventpkg.Serializer
+}
+
 type ledgerEventStoreImpl struct {
 	db         dbTX
 	serializer eventpkg.Serializer
@@ -31,6 +36,13 @@ type ledgerEventStoreImpl struct {
 
 func newLedgerEventStore(dbTX dbTX, serializer eventpkg.Serializer) eventstore.LedgerEventStore {
 	return &ledgerEventStoreImpl{
+		db:         dbTX,
+		serializer: serializer,
+	}
+}
+
+func newLedgerPostedTransactionStore(dbTX dbTX, serializer eventpkg.Serializer) eventstore.LedgerPostingStore {
+	return &ledgerPostedTransactionStore{
 		db:         dbTX,
 		serializer: serializer,
 	}
@@ -78,7 +90,7 @@ func (s *ledgerEventStoreImpl) CheckAndUpdateVersion(
 	return result.RowsAffected == 1, nil
 }
 
-func (s *ledgerEventStoreImpl) findPostedTransaction(
+func (s *ledgerPostedTransactionStore) findPostedTransaction(
 	ctx context.Context,
 	aggregateID string,
 	aggregateType string,
@@ -96,18 +108,14 @@ func (s *ledgerEventStoreImpl) findPostedTransaction(
 		return nil, nil
 	}
 
-	return &entity.LedgerAccountPosting{
-		TransactionID:         postingModel.TransactionID,
-		ReferenceType:         postingModel.ReferenceType,
-		ReferenceID:           postingModel.ReferenceID,
-		CounterpartyAccountID: postingModel.CounterpartyAccountID,
-		Currency:              postingModel.Currency,
-		AmountDelta:           postingModel.AmountDelta,
-		BookedAt:              postingModel.BookedAt.UTC(),
-	}, nil
+	posting, err := s.postingFromRawEvent(postingModel)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	return &posting, nil
 }
 
-func (s *ledgerEventStoreImpl) ReservePostedTransaction(ctx context.Context, evt eventpkg.Event) error {
+func (s *ledgerPostedTransactionStore) ReservePostedTransaction(ctx context.Context, evt eventpkg.Event) error {
 	posting, ok, err := ledgeraggregate.NewLedgerAccountPostingFromEvent(evt.AggregateID, evt.EventData)
 	if err != nil {
 		return stackErr.Error(err)
@@ -116,18 +124,19 @@ func (s *ledgerEventStoreImpl) ReservePostedTransaction(ctx context.Context, evt
 		return nil
 	}
 
+	rawEventData, err := s.serializer.Marshal(evt.EventData)
+	if err != nil {
+		return stackErr.Error(fmt.Errorf("marshal ledger posted transaction event data failed: %w", err))
+	}
+
 	if err := mapError(s.db.WithContext(ctx).Create(&model.LedgerPostedTransactionModel{
-		ID:                    uuid.NewString(),
-		AggregateID:           evt.AggregateID,
-		AggregateType:         evt.AggregateType,
-		TransactionID:         posting.TransactionID,
-		ReferenceType:         posting.ReferenceType,
-		ReferenceID:           posting.ReferenceID,
-		CounterpartyAccountID: posting.CounterpartyAccountID,
-		Currency:              posting.Currency,
-		AmountDelta:           posting.AmountDelta,
-		BookedAt:              posting.BookedAt.UTC(),
-		CreatedAt:             time.Now().UTC(),
+		ID:            uuid.NewString(),
+		AggregateID:   evt.AggregateID,
+		AggregateType: evt.AggregateType,
+		TransactionID: posting.TransactionID,
+		EventName:     evt.EventName,
+		EventData:     string(rawEventData),
+		CreatedAt:     time.Now().UTC(),
 	}).Error); err == nil {
 		return nil
 	}
@@ -149,6 +158,38 @@ func (s *ledgerEventStoreImpl) ReservePostedTransaction(ctx context.Context, evt
 		evt.AggregateType,
 		posting.TransactionID,
 	))
+}
+
+func (s *ledgerPostedTransactionStore) postingFromRawEvent(postingModel model.LedgerPostedTransactionModel) (entity.LedgerAccountPosting, error) {
+	payloadFactory, ok := s.serializer.Type(postingModel.AggregateType, postingModel.EventName)
+	if !ok {
+		return entity.LedgerAccountPosting{}, stackErr.Error(fmt.Errorf(
+			"unsupported ledger posted transaction event: aggregate_type=%s event_name=%s",
+			postingModel.AggregateType,
+			postingModel.EventName,
+		))
+	}
+
+	payload := cloneEventPayload(payloadFactory())
+	if payload == nil {
+		return entity.LedgerAccountPosting{}, stackErr.Error(fmt.Errorf("ledger posted transaction payload prototype is nil"))
+	}
+	if err := s.serializer.Unmarshal([]byte(postingModel.EventData), payload); err != nil {
+		return entity.LedgerAccountPosting{}, stackErr.Error(fmt.Errorf("unmarshal ledger posted transaction event data failed: %w", err))
+	}
+
+	posting, ok, err := ledgeraggregate.NewLedgerAccountPostingFromEvent(postingModel.AggregateID, payload)
+	if err != nil {
+		return entity.LedgerAccountPosting{}, stackErr.Error(err)
+	}
+	if !ok {
+		return entity.LedgerAccountPosting{}, stackErr.Error(fmt.Errorf(
+			"ledger posted transaction event cannot be converted aggregate_id=%s event_name=%s",
+			postingModel.AggregateID,
+			postingModel.EventName,
+		))
+	}
+	return posting, nil
 }
 
 func (s *ledgerEventStoreImpl) Append(ctx context.Context, evt eventpkg.Event) error {

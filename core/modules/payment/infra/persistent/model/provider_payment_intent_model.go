@@ -11,6 +11,7 @@ type ProviderPaymentIntentModel struct {
 	ClearingAccountKey string    `gorm:"column:clearing_account_key;not null"`
 	CreditAccountID    string    `gorm:"not null"`
 	Status             string    `gorm:"not null"`
+	Version            int       `gorm:"not null;default:0"`
 	CreatedAt          time.Time `gorm:"autoCreateTime"`
 	UpdatedAt          time.Time `gorm:"autoUpdateTime"`
 }

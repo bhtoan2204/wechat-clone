@@ -14,14 +14,16 @@ import (
 )
 
 type aggregateStoreImpl struct {
-	repo       eventstore.LedgerEventStore
-	outboxRepo ledgerrepos.LedgerOutboxEventsRepository
+	repo         eventstore.LedgerEventStore
+	postingStore eventstore.LedgerPostingStore
+	outboxRepo   ledgerrepos.LedgerOutboxEventsRepository
 }
 
 func newAggregateStore(dbTX dbTX, serializer eventpkg.Serializer) eventstore.AggregateStore {
 	return &aggregateStoreImpl{
-		repo:       newLedgerEventStore(dbTX, serializer),
-		outboxRepo: NewLedgerOutboxEventsRepoImpl(dbTX),
+		repo:         newLedgerEventStore(dbTX, serializer),
+		postingStore: newLedgerPostedTransactionStore(dbTX, serializer),
+		outboxRepo:   NewLedgerOutboxEventsRepoImpl(dbTX),
 	}
 }
 
@@ -63,7 +65,7 @@ func (s *aggregateStoreImpl) Save(ctx context.Context, agg eventpkg.Aggregate) e
 	}
 
 	for idx, evt := range events {
-		if err := s.repo.ReservePostedTransaction(ctx, evt); err != nil {
+		if err := s.postingStore.ReservePostedTransaction(ctx, evt); err != nil {
 			if errors.Is(err, ledgerrepos.ErrAlreadyApplied) {
 				if len(events) == 1 && idx == 0 {
 					return stackErr.Error(err)

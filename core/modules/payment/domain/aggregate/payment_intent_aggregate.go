@@ -57,6 +57,10 @@ func NewProviderTopUpAggregate(
 }
 
 func RestorePaymentIntentAggregate(intent *paymententity.PaymentIntent) (*PaymentIntentAggregate, error) {
+	return RestorePaymentIntentAggregateWithVersion(intent, 0)
+}
+
+func RestorePaymentIntentAggregateWithVersion(intent *paymententity.PaymentIntent, version int) (*PaymentIntentAggregate, error) {
 	if intent == nil {
 		return nil, stackErr.Error(paymententity.ErrPaymentTransactionIDRequired)
 	}
@@ -66,7 +70,14 @@ func RestorePaymentIntentAggregate(intent *paymententity.PaymentIntent) (*Paymen
 	}
 	clone.UpdatedAt = intent.UpdatedAt.UTC()
 	clone.CreatedAt = intent.CreatedAt.UTC()
-	return &PaymentIntentAggregate{intent: &clone}, nil
+	if version < 0 {
+		version = 0
+	}
+	return &PaymentIntentAggregate{
+		intent:       &clone,
+		version:      version,
+		outboxEvents: nil,
+	}, nil
 }
 
 func (a *PaymentIntentAggregate) Snapshot() *paymententity.PaymentIntent {
@@ -103,6 +114,13 @@ func (a *PaymentIntentAggregate) Status() string {
 		return ""
 	}
 	return a.intent.Status
+}
+
+func (a *PaymentIntentAggregate) Version() int {
+	if a == nil {
+		return 0
+	}
+	return a.version
 }
 
 func (a *PaymentIntentAggregate) PendingProcessedEvents() []*paymententity.ProcessedPaymentEvent {

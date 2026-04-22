@@ -1,0 +1,7 @@
+ALTER TABLE ledger_posted_transactions
+    ADD COLUMN IF NOT EXISTS reference_type VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS reference_id VARCHAR(1024),
+    ADD COLUMN IF NOT EXISTS counterparty_account_id VARCHAR(1024),
+    ADD COLUMN IF NOT EXISTS currency VARCHAR(16),
+    ADD COLUMN IF NOT EXISTS amount_delta BIGINT,
+    ADD COLUMN IF NOT EXISTS booked_at TIMESTAMPTZ;

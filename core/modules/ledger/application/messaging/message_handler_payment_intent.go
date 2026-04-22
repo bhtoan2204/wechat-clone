@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	ledgerservice "wechat-clone/core/modules/ledger/application/service"
+	ledgeraggregate "wechat-clone/core/modules/ledger/domain/aggregate"
 	ledgerentity "wechat-clone/core/modules/ledger/domain/entity"
+	valueobject "wechat-clone/core/modules/ledger/domain/value_object"
 	"wechat-clone/core/shared/contracts"
 	sharedevents "wechat-clone/core/shared/contracts/events"
 	sharedlock "wechat-clone/core/shared/infra/lock"
+	eventpkg "wechat-clone/core/shared/pkg/event"
 	"wechat-clone/core/shared/pkg/logging"
 	"wechat-clone/core/shared/pkg/stackErr"
 
@@ -37,22 +41,13 @@ func (h *messageHandler) handlePaymentOutboxEvent(ctx context.Context, value []b
 			return stackErr.Error(err)
 		}
 		payload.PaymentID = resolvePaymentSucceededID(event.AggregateID, payload)
-		command := ledgerservice.RecordPaymentSucceededCommand{
-			PaymentID:          payload.PaymentID,
-			TransactionID:      payload.TransactionID,
-			ClearingAccountKey: payload.ClearingAccountKey,
-			CreditAccountID:    payload.CreditAccountID,
-			Currency:           payload.Currency,
-			Amount:             payload.Amount,
-		}
-
-		lockKeys, err := paymentSucceededAccountLockKeys(command)
+		events, err := paymentSucceededLedgerEvents(payload)
 		if err != nil {
-			return stackErr.Error(h.ledgerService.RecordPaymentSucceeded(ctx, command))
+			return stackErr.Error(err)
 		}
 
-		return stackErr.Error(h.withLedgerAccountLocks(ctx, lockKeys, func() error {
-			return h.ledgerService.RecordPaymentSucceeded(ctx, command)
+		return stackErr.Error(h.withLedgerAccountLocks(ctx, ledgerEventLockKeys(events), func() error {
+			return h.ledgerService.RecordLedgerEvents(ctx, ledgerservice.RecordLedgerEventsCommand{Events: events})
 		}))
 	case sharedevents.EventPaymentRefunded:
 		payload, err := unmarshalPaymentRefundedPayload(event.EventData)
@@ -60,23 +55,13 @@ func (h *messageHandler) handlePaymentOutboxEvent(ctx context.Context, value []b
 			return stackErr.Error(err)
 		}
 		payload.PaymentID = resolvePaymentRefundedID(event.AggregateID, payload)
-		command := ledgerservice.RecordPaymentReversedCommand{
-			PaymentID:          payload.PaymentID,
-			TransactionID:      payload.TransactionID,
-			ClearingAccountKey: payload.ClearingAccountKey,
-			CreditAccountID:    payload.CreditAccountID,
-			Currency:           payload.Currency,
-			Amount:             payload.Amount,
-			ReversalType:       ledgerentity.PaymentReferenceRefunded,
-		}
-
-		lockKeys, err := paymentReversedAccountLockKeys(command)
+		events, err := paymentReversedLedgerEvents(payload.PaymentID, payload.TransactionID, payload.ClearingAccountKey, payload.CreditAccountID, payload.Currency, payload.Amount, sharedevents.EventPaymentRefunded, payload.RefundedAt)
 		if err != nil {
-			return stackErr.Error(h.ledgerService.RecordPaymentReversed(ctx, command))
+			return stackErr.Error(err)
 		}
 
-		return stackErr.Error(h.withLedgerAccountLocks(ctx, lockKeys, func() error {
-			return h.ledgerService.RecordPaymentReversed(ctx, command)
+		return stackErr.Error(h.withLedgerAccountLocks(ctx, ledgerEventLockKeys(events), func() error {
+			return h.ledgerService.RecordLedgerEvents(ctx, ledgerservice.RecordLedgerEventsCommand{Events: events})
 		}))
 	case sharedevents.EventPaymentChargeback:
 		payload, err := unmarshalPaymentChargebackPayload(event.EventData)
@@ -84,23 +69,13 @@ func (h *messageHandler) handlePaymentOutboxEvent(ctx context.Context, value []b
 			return stackErr.Error(err)
 		}
 		payload.PaymentID = resolvePaymentChargebackID(event.AggregateID, payload)
-		command := ledgerservice.RecordPaymentReversedCommand{
-			PaymentID:          payload.PaymentID,
-			TransactionID:      payload.TransactionID,
-			ClearingAccountKey: payload.ClearingAccountKey,
-			CreditAccountID:    payload.CreditAccountID,
-			Currency:           payload.Currency,
-			Amount:             payload.Amount,
-			ReversalType:       ledgerentity.PaymentReferenceChargeback,
-		}
-
-		lockKeys, err := paymentReversedAccountLockKeys(command)
+		events, err := paymentReversedLedgerEvents(payload.PaymentID, payload.TransactionID, payload.ClearingAccountKey, payload.CreditAccountID, payload.Currency, payload.Amount, sharedevents.EventPaymentChargeback, payload.ChargedBackAt)
 		if err != nil {
-			return stackErr.Error(h.ledgerService.RecordPaymentReversed(ctx, command))
+			return stackErr.Error(err)
 		}
 
-		return stackErr.Error(h.withLedgerAccountLocks(ctx, lockKeys, func() error {
-			return h.ledgerService.RecordPaymentReversed(ctx, command)
+		return stackErr.Error(h.withLedgerAccountLocks(ctx, ledgerEventLockKeys(events), func() error {
+			return h.ledgerService.RecordLedgerEvents(ctx, ledgerservice.RecordLedgerEventsCommand{Events: events})
 		}))
 	default:
 		return nil
@@ -182,35 +157,138 @@ func resolvePaymentChargebackID(aggregateID string, payload sharedevents.Payment
 	return strings.TrimSpace(payload.TransactionID)
 }
 
-func paymentSucceededAccountLockKeys(command ledgerservice.RecordPaymentSucceededCommand) ([]string, error) {
+func paymentSucceededLedgerEvents(payload sharedevents.PaymentSucceededEvent) ([]eventpkg.Event, error) {
 	booking, err := ledgerentity.NewPaymentSucceededBooking(ledgerentity.PaymentSucceededBookingInput{
-		PaymentID:          command.PaymentID,
-		TransactionID:      command.TransactionID,
-		ClearingAccountKey: command.ClearingAccountKey,
-		CreditAccountID:    command.CreditAccountID,
-		Currency:           command.Currency,
-		Amount:             command.Amount,
+		PaymentID:          payload.PaymentID,
+		TransactionID:      payload.TransactionID,
+		ClearingAccountKey: payload.ClearingAccountKey,
+		CreditAccountID:    payload.CreditAccountID,
+		Currency:           payload.Currency,
+		Amount:             payload.Amount,
 	})
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 
-	return []string{booking.DebitAccountID, booking.CreditAccountID}, nil
+	return paymentLedgerEventsFromBooking(
+		booking.LedgerTransactionID(),
+		booking.PaymentID,
+		booking.Currency,
+		booking.Amount,
+		booking.DebitAccountID,
+		booking.CreditAccountID,
+		ledgeraggregate.EventNameLedgerAccountWithdrawFromIntent,
+		ledgeraggregate.EventNameLedgerAccountDepositFromIntent,
+		payload.SucceededAt,
+	)
 }
 
-func paymentReversedAccountLockKeys(command ledgerservice.RecordPaymentReversedCommand) ([]string, error) {
+func paymentReversedLedgerEvents(paymentID, transactionID, clearingAccountKey, creditAccountID, currency string, amount int64, reversalType string, bookedAt time.Time) ([]eventpkg.Event, error) {
 	booking, err := ledgerentity.NewPaymentReversalBooking(ledgerentity.PaymentReversalBookingInput{
-		PaymentID:          command.PaymentID,
-		TransactionID:      command.TransactionID,
-		ClearingAccountKey: command.ClearingAccountKey,
-		CreditAccountID:    command.CreditAccountID,
-		Currency:           command.Currency,
-		Amount:             command.Amount,
-		ReversalType:       command.ReversalType,
+		PaymentID:          paymentID,
+		TransactionID:      transactionID,
+		ClearingAccountKey: clearingAccountKey,
+		CreditAccountID:    creditAccountID,
+		Currency:           currency,
+		Amount:             amount,
+		ReversalType:       reversalType,
 	})
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 
-	return []string{booking.DebitAccountID, booking.CreditAccountID}, nil
+	return paymentLedgerEventsFromBooking(
+		booking.LedgerTransactionID(),
+		booking.PaymentID,
+		booking.Currency,
+		booking.Amount,
+		booking.DebitAccountID,
+		booking.CreditAccountID,
+		debitLedgerEventNameForReversal(booking.ReversalType),
+		creditLedgerEventNameForReversal(booking.ReversalType),
+		bookedAt,
+	)
+}
+
+func paymentLedgerEventsFromBooking(transactionID, paymentID, currency string, amount int64, debitAccountID, creditAccountID, debitEventName, creditEventName string, bookedAt time.Time) ([]eventpkg.Event, error) {
+	if bookedAt.IsZero() {
+		bookedAt = time.Now().UTC()
+	}
+	debitPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(
+		valueobject.LedgerAccountPostingInput{
+			AccountID:             debitAccountID,
+			TransactionID:         transactionID,
+			ReferenceType:         debitEventName,
+			ReferenceID:           paymentID,
+			CounterpartyAccountID: creditAccountID,
+			Currency:              currency,
+			AmountDelta:           -amount,
+			BookedAt:              bookedAt,
+		},
+	)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	creditPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(
+		valueobject.LedgerAccountPostingInput{
+			AccountID:             creditAccountID,
+			TransactionID:         transactionID,
+			ReferenceType:         creditEventName,
+			ReferenceID:           paymentID,
+			CounterpartyAccountID: debitAccountID,
+			Currency:              currency,
+			AmountDelta:           amount,
+			BookedAt:              bookedAt,
+		},
+	)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	debitEvent, ok, err := ledgeraggregate.NewLedgerAccountEventFromPosting(debitAccountID, debitPosting)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	if !ok {
+		return nil, stackErr.Error(fmt.Errorf("unsupported debit ledger event reference_type=%s", debitEventName))
+	}
+	creditEvent, ok, err := ledgeraggregate.NewLedgerAccountEventFromPosting(creditAccountID, creditPosting)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+	if !ok {
+		return nil, stackErr.Error(fmt.Errorf("unsupported credit ledger event reference_type=%s", creditEventName))
+	}
+
+	return []eventpkg.Event{debitEvent, creditEvent}, nil
+}
+
+func debitLedgerEventNameForReversal(paymentEventName string) string {
+	switch strings.TrimSpace(paymentEventName) {
+	case sharedevents.EventPaymentRefunded:
+		return ledgeraggregate.EventNameLedgerAccountWithdrawFromRefund
+	case sharedevents.EventPaymentChargeback:
+		return ledgeraggregate.EventNameLedgerAccountWithdrawFromChargeback
+	default:
+		return ""
+	}
+}
+
+func creditLedgerEventNameForReversal(paymentEventName string) string {
+	switch strings.TrimSpace(paymentEventName) {
+	case sharedevents.EventPaymentRefunded:
+		return ledgeraggregate.EventNameLedgerAccountDepositFromRefund
+	case sharedevents.EventPaymentChargeback:
+		return ledgeraggregate.EventNameLedgerAccountDepositFromChargeback
+	default:
+		return ""
+	}
+}
+
+func ledgerEventLockKeys(events []eventpkg.Event) []string {
+	keys := make([]string, 0, len(events))
+	for _, evt := range events {
+		keys = append(keys, strings.TrimSpace(evt.AggregateID))
+	}
+	return keys
 }

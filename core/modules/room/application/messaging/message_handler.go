@@ -113,6 +113,7 @@ func (h *messageHandler) handleLedgerEvent(ctx context.Context, value []byte) er
 	log.Infow("handle ledger event", zap.String("event_name", event.EventName))
 	switch event.EventName {
 	case sharedevents.EventLedgerAccountTransferredToAccount:
+		ctx = context.WithValue(ctx, ledgerTransferSenderAccountIDKey{}, strings.TrimSpace(event.AggregateID))
 		if err := h.handleLedgerAccountTransferredToAccount(ctx, event.EventData); err != nil {
 			log.Errorw("handle ledger account transferred event failed", zap.Error(err))
 			return stackErr.Error(err)

@@ -37,7 +37,7 @@ func (r *providerPaymentRepoImpl) Create(ctx context.Context, aggregate *payment
 		return paymentrepos.ErrProviderPaymentNotFound
 	}
 
-	if err := r.createIntent(ctx, intent); err != nil {
+	if err := r.createIntent(ctx, intent, aggregate.Version()); err != nil {
 		return stackErr.Error(err)
 	}
 	if err := r.appendOutboxEvents(ctx, aggregate.PendingOutboxEvents()...); err != nil {
@@ -58,7 +58,7 @@ func (r *providerPaymentRepoImpl) Save(ctx context.Context, aggregate *paymentag
 			return stackErr.Error(err)
 		}
 	}
-	if err := r.updateIntent(ctx, intent); err != nil {
+	if err := r.updateIntent(ctx, intent, aggregate.Version()); err != nil {
 		return stackErr.Error(err)
 	}
 	if err := r.appendOutboxEvents(ctx, aggregate.PendingOutboxEvents()...); err != nil {
@@ -88,7 +88,7 @@ func (r *providerPaymentRepoImpl) GetByExternalRef(ctx context.Context, provider
 	return toProviderPaymentAggregate(&paymentIntent)
 }
 
-func (r *providerPaymentRepoImpl) createIntent(ctx context.Context, intent *entity.PaymentIntent) error {
+func (r *providerPaymentRepoImpl) createIntent(ctx context.Context, intent *entity.PaymentIntent, version int) error {
 	err := r.db.WithContext(ctx).Create(&model.ProviderPaymentIntentModel{
 		TransactionID:      intent.TransactionID,
 		Provider:           intent.Provider,
@@ -98,13 +98,14 @@ func (r *providerPaymentRepoImpl) createIntent(ctx context.Context, intent *enti
 		ClearingAccountKey: intent.ClearingAccountKey,
 		CreditAccountID:    intent.CreditAccountID,
 		Status:             intent.Status,
+		Version:            version,
 		CreatedAt:          intent.CreatedAt,
 		UpdatedAt:          intent.UpdatedAt,
 	}).Error
 	return mapError(err)
 }
 
-func (r *providerPaymentRepoImpl) updateIntent(ctx context.Context, intent *entity.PaymentIntent) error {
+func (r *providerPaymentRepoImpl) updateIntent(ctx context.Context, intent *entity.PaymentIntent, version int) error {
 	result := r.db.WithContext(ctx).
 		Model(&model.ProviderPaymentIntentModel{}).
 		Where("transaction_id = ?", intent.TransactionID).
@@ -116,6 +117,7 @@ func (r *providerPaymentRepoImpl) updateIntent(ctx context.Context, intent *enti
 			"clearing_account_key": intent.ClearingAccountKey,
 			"credit_account_id":    intent.CreditAccountID,
 			"status":               intent.Status,
+			"version":              version,
 		})
 	if result.Error != nil {
 		return mapError(result.Error)
@@ -187,7 +189,7 @@ func toProviderPaymentAggregate(modelIntent *model.ProviderPaymentIntentModel) (
 		CreatedAt:          modelIntent.CreatedAt,
 		UpdatedAt:          modelIntent.UpdatedAt,
 	})
-	return paymentaggregate.RestorePaymentIntentAggregate(intent)
+	return paymentaggregate.RestorePaymentIntentAggregateWithVersion(intent, modelIntent.Version)
 }
 
 func aggregateSnapshot(aggregate *paymentaggregate.PaymentIntentAggregate) *entity.PaymentIntent {

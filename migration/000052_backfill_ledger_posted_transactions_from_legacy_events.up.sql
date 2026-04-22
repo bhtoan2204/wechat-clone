@@ -1,12 +1,16 @@
-CREATE TABLE ledger_posted_transactions (
-    id                      VARCHAR(1024) PRIMARY KEY,
-    aggregate_id            VARCHAR(1024) NOT NULL,
-    aggregate_type          VARCHAR(255)  NOT NULL,
-    transaction_id          VARCHAR(1024) NOT NULL,
-    event_name              VARCHAR(255)  NOT NULL,
-    event_data              TEXT          NOT NULL,
-    created_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
+ALTER TABLE ledger_posted_transactions
+    ADD COLUMN IF NOT EXISTS event_name VARCHAR(255);
+
+ALTER TABLE ledger_posted_transactions
+    ADD COLUMN IF NOT EXISTS event_data TEXT;
+
+ALTER TABLE ledger_posted_transactions
+    ALTER COLUMN reference_type DROP NOT NULL,
+    ALTER COLUMN reference_id DROP NOT NULL,
+    ALTER COLUMN counterparty_account_id DROP NOT NULL,
+    ALTER COLUMN currency DROP NOT NULL,
+    ALTER COLUMN amount_delta DROP NOT NULL,
+    ALTER COLUMN booked_at DROP NOT NULL;
 
 INSERT INTO ledger_posted_transactions (
     id,
@@ -28,6 +32,7 @@ SELECT
 FROM ledger_events
 WHERE aggregate_type = 'LedgerAccountAggregate'
   AND event_name IN (
+      'EventLedgerAccountPaymentBooked',
       'EventLedgerAccountDepositFromIntent',
       'EventLedgerAccountWithdrawFromIntent',
       'EventLedgerAccountDepositFromRefund',
@@ -36,7 +41,8 @@ WHERE aggregate_type = 'LedgerAccountAggregate'
       'EventLedgerAccountWithdrawFromChargeback',
       'EventLedgerAccountTransferredToAccount',
       'EventLedgerAccountReceivedTransfer'
-  );
-
-CREATE UNIQUE INDEX idx_ledger_posted_tx_agg_type_tx
-    ON ledger_posted_transactions(aggregate_id, aggregate_type, transaction_id);
+  )
+ON CONFLICT (aggregate_id, aggregate_type, transaction_id) DO UPDATE
+SET
+    event_name = EXCLUDED.event_name,
+    event_data = EXCLUDED.event_data;

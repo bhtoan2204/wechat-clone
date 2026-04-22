@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	appprojection "wechat-clone/core/modules/ledger/application/projection"
 	"wechat-clone/core/modules/ledger/domain/entity"
@@ -208,6 +209,7 @@ func upsertProjectedTransactionHeader(
 	transaction *appprojection.LedgerTransactionProjected,
 ) error {
 	transactionID := strings.TrimSpace(transaction.TransactionID)
+	projectedCreatedAt := normalizeProjectionTimestamp(transaction.CreatedAt)
 	var existing views.LedgerTransactionModel
 	err := tx.WithContext(ctx).
 		Where("transaction_id = ?", transactionID).
@@ -216,7 +218,7 @@ func upsertProjectedTransactionHeader(
 		if !strings.EqualFold(strings.TrimSpace(existing.Currency), strings.TrimSpace(transaction.Currency)) {
 			return stackErr.Error(fmt.Errorf("existing ledger projection currency mismatch for transaction_id=%s", transactionID))
 		}
-		if !existing.CreatedAt.UTC().Equal(transaction.CreatedAt.UTC()) {
+		if !normalizeProjectionTimestamp(existing.CreatedAt).Equal(projectedCreatedAt) {
 			return stackErr.Error(fmt.Errorf("existing ledger projection created_at mismatch for transaction_id=%s", transactionID))
 		}
 		return nil
@@ -228,7 +230,7 @@ func upsertProjectedTransactionHeader(
 	if err := mapError(tx.WithContext(ctx).Create(&views.LedgerTransactionModel{
 		TransactionID: transactionID,
 		Currency:      strings.ToUpper(strings.TrimSpace(transaction.Currency)),
-		CreatedAt:     transaction.CreatedAt.UTC(),
+		CreatedAt:     projectedCreatedAt,
 	}).Error); err != nil {
 		if !errors.Is(err, ErrDuplicate) {
 			return stackErr.Error(err)
@@ -256,6 +258,7 @@ func upsertProjectedTransactionEntries(
 	}
 
 	for _, projectedEntry := range transaction.Entries {
+		projectedEntry.CreatedAt = normalizeProjectionTimestamp(projectedEntry.CreatedAt)
 		if hasMatchingProjectedEntry(existingEntries, transactionID, projectedEntry) {
 			continue
 		}
@@ -271,7 +274,7 @@ func upsertProjectedTransactionEntries(
 			AccountID:     strings.TrimSpace(projectedEntry.AccountID),
 			Currency:      strings.ToUpper(strings.TrimSpace(projectedEntry.Currency)),
 			Amount:        projectedEntry.Amount,
-			CreatedAt:     projectedEntry.CreatedAt.UTC(),
+			CreatedAt:     projectedEntry.CreatedAt,
 		}
 		if err := mapError(tx.WithContext(ctx).Create(&entryModel).Error); err != nil {
 			return stackErr.Error(err)
@@ -300,7 +303,7 @@ func hasMatchingProjectedEntry(
 		if existingEntry.Amount != projectedEntry.Amount {
 			continue
 		}
-		if !existingEntry.CreatedAt.UTC().Equal(projectedEntry.CreatedAt.UTC()) {
+		if !normalizeProjectionTimestamp(existingEntry.CreatedAt).Equal(projectedEntry.CreatedAt) {
 			continue
 		}
 		return true
@@ -323,6 +326,10 @@ func hasConflictingProjectedEntry(
 		return !hasMatchingProjectedEntry([]views.LedgerEntryModel{existingEntry}, transactionID, projectedEntry)
 	}
 	return false
+}
+
+func normalizeProjectionTimestamp(value time.Time) time.Time {
+	return value.UTC().Truncate(time.Microsecond)
 }
 
 // func (r *ledgerRepoImpl) GetTransaction(ctx context.Context, transactionID string) (*entity.LedgerTransaction, error) {

@@ -3,7 +3,9 @@ package aggregate
 import (
 	"time"
 
+	"wechat-clone/core/modules/ledger/domain/entity"
 	"wechat-clone/core/shared/pkg/event"
+	"wechat-clone/core/shared/pkg/stackErr"
 )
 
 var (
@@ -151,4 +153,30 @@ type EventLedgerAccountReceivedTransfer struct {
 	Currency      string    `json:"currency"`
 	Amount        int64     `json:"amount"`
 	BookedAt      time.Time `json:"booked_at"`
+}
+
+func NewLedgerAccountEvent(aggregateID string, aggregateType string, data interface{}) (event.Event, error) {
+	if data == nil {
+		return event.Event{}, stackErr.Error(ErrLedgerAccountAggregateRequired)
+	}
+
+	return event.Event{
+		AggregateID:   aggregateID,
+		AggregateType: aggregateType,
+		EventName:     event.EventName(data),
+		EventData:     data,
+	}, nil
+}
+
+func NewLedgerAccountEventFromPosting(accountID string, posting entity.LedgerAccountPosting) (event.Event, bool, error) {
+	eventData := newLedgerPaymentEvent(posting)
+	if eventData == nil {
+		return event.Event{}, false, nil
+	}
+
+	evt, err := NewLedgerAccountEvent(accountID, event.AggregateTypeName(&LedgerAccountAggregate{}), eventData)
+	if err != nil {
+		return event.Event{}, false, stackErr.Error(err)
+	}
+	return evt, true, nil
 }

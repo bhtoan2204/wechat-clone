@@ -27,6 +27,7 @@ CREATE TABLE payment_intents (
     debit_account_id VARCHAR(1024) NOT NULL,
     credit_account_id VARCHAR(1024) NOT NULL,
     status VARCHAR(64) NOT NULL,
+    version BIGINT DEFAULT 0 NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT chk_payment_intents_amount_positive CHECK (amount > 0),

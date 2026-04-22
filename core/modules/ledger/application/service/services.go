@@ -46,6 +46,10 @@ func (s *services) TransferToAccount(ctx context.Context, command TransferToAcco
 	return s.ledgerService.TransferToAccount(ctx, command)
 }
 
+func (s *services) RecordLedgerEvents(ctx context.Context, command RecordLedgerEventsCommand) error {
+	return s.ledgerService.RecordLedgerEvents(ctx, command)
+}
+
 func (s *services) RecordPaymentSucceeded(ctx context.Context, command RecordPaymentSucceededCommand) error {
 	return s.ledgerService.RecordPaymentSucceeded(ctx, command)
 }

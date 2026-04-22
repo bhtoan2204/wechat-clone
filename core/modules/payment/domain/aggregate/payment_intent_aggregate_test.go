@@ -24,7 +24,7 @@ func TestNewProviderTopUpAggregateQueuesCreatedEvent(t *testing.T) {
 	if len(outbox) != 1 {
 		t.Fatalf("expected 1 outbox event, got %d", len(outbox))
 	}
-	if outbox[0].EventName != "payment.created" {
+	if outbox[0].EventName != sharedevents.EventPaymentCreated {
 		t.Fatalf("unexpected event name: %s", outbox[0].EventName)
 	}
 	if outbox[0].AggregateID != "txn-1" {
@@ -82,14 +82,14 @@ func TestPaymentIntentAggregateApplySuccessQueuesProcessedAndOutbox(t *testing.T
 	if len(processed) != 1 {
 		t.Fatalf("expected 1 processed event, got %d", len(processed))
 	}
-	if processed[0].IdempotencyKey != "payment.succeeded:txn-1" {
+	if processed[0].IdempotencyKey != sharedevents.EventPaymentSucceeded+":txn-1" {
 		t.Fatalf("unexpected processed event idempotency key: %s", processed[0].IdempotencyKey)
 	}
 	outbox := agg.PendingOutboxEvents()
 	if len(outbox) != 1 {
 		t.Fatalf("expected 1 outbox event, got %d", len(outbox))
 	}
-	if outbox[0].EventName != "payment.succeeded" {
+	if outbox[0].EventName != sharedevents.EventPaymentSucceeded {
 		t.Fatalf("unexpected event name: %s", outbox[0].EventName)
 	}
 	if outbox[0].AggregateType != AggregateTypePaymentIntent {
@@ -144,6 +144,42 @@ func TestPaymentIntentAggregateAssignsSequentialEnvelopeVersions(t *testing.T) {
 	}
 	if outbox[0].Version != 1 || outbox[1].Version != 2 {
 		t.Fatalf("unexpected envelope versions: %d, %d", outbox[0].Version, outbox[1].Version)
+	}
+}
+
+func TestPaymentIntentAggregateRestoreWithVersionContinuesEnvelopeSequence(t *testing.T) {
+	intent, err := entity.NewProviderTopUpIntent("txn-1", "stripe", 100, "VND", "wallet:available", time.Now().UTC())
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	intent.Status = entity.PaymentStatusPending
+
+	agg, err := RestorePaymentIntentAggregateWithVersion(intent, 2)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	mutation, err := agg.ApplyProviderOutcome(entity.PaymentProviderResult{
+		EventID:     "evt-1",
+		EventType:   "checkout.session.completed",
+		Status:      entity.PaymentStatusSuccess,
+		Amount:      100,
+		Currency:    "VND",
+		ExternalRef: "cs-1",
+	}, "", false, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if mutation.Duplicate || !mutation.Persist {
+		t.Fatalf("expected success mutation to persist without duplicate, got %+v", mutation)
+	}
+
+	outbox := agg.PendingOutboxEvents()
+	if len(outbox) != 1 {
+		t.Fatalf("expected 1 outbox event, got %d", len(outbox))
+	}
+	if outbox[0].Version != 3 {
+		t.Fatalf("expected restored aggregate to continue at version 3, got %d", outbox[0].Version)
 	}
 }
 

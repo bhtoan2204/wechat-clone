@@ -8,6 +8,8 @@ import (
 
 	ledgeraggregate "wechat-clone/core/modules/ledger/domain/aggregate"
 	ledgerrepos "wechat-clone/core/modules/ledger/domain/repos"
+	valueobject "wechat-clone/core/modules/ledger/domain/value_object"
+	sharedevents "wechat-clone/core/shared/contracts/events"
 
 	"go.uber.org/mock/gomock"
 )
@@ -106,11 +108,25 @@ func TestLedgerServiceTransferToAccount(t *testing.T) {
 		baseRepo := ledgerrepos.NewMockRepos(ctrl)
 		txRepos := ledgerrepos.NewMockRepos(ctrl)
 		accountRepo := ledgerrepos.NewMockLedgerAccountAggregateRepository(ctrl)
-		fromPosting, err := ledgeraggregate.NewLedgerAccountTransferOutPosting("acc-from", "ledger-tx-3", "acc-to", "USD", 100, gomockTime())
+		fromPosting, err := ledgeraggregate.NewLedgerAccountTransferOutPosting(valueobject.LedgerAccountTransferPostingInput{
+			AccountID:             "acc-from",
+			TransactionID:         "ledger-tx-3",
+			CounterpartyAccountID: "acc-to",
+			Currency:              "USD",
+			Amount:                100,
+			BookedAt:              gomockTime(),
+		})
 		if err != nil {
 			t.Fatalf("NewLedgerAccountTransferOutPosting() error = %v", err)
 		}
-		toPosting, err := ledgeraggregate.NewLedgerAccountTransferInPosting("acc-to", "ledger-tx-3", "acc-from", "USD", 100, gomockTime())
+		toPosting, err := ledgeraggregate.NewLedgerAccountTransferInPosting(valueobject.LedgerAccountTransferPostingInput{
+			AccountID:             "acc-to",
+			TransactionID:         "ledger-tx-3",
+			CounterpartyAccountID: "acc-from",
+			Currency:              "USD",
+			Amount:                100,
+			BookedAt:              gomockTime(),
+		})
 		if err != nil {
 			t.Fatalf("NewLedgerAccountTransferInPosting() error = %v", err)
 		}
@@ -175,29 +191,29 @@ func TestLedgerServiceRecordPaymentSucceeded(t *testing.T) {
 		baseRepo := ledgerrepos.NewMockRepos(ctrl)
 		txRepos := ledgerrepos.NewMockRepos(ctrl)
 		accountRepo := ledgerrepos.NewMockLedgerAccountAggregateRepository(ctrl)
-		debitPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(
-			"ledger:clearing:provider:stripe",
-			"payment:pay-1:succeeded",
-			"payment.succeeded",
-			"pay-1",
-			"wallet:available",
-			"VND",
-			-100,
-			gomockTime(),
-		)
+		debitPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(valueobject.LedgerAccountPostingInput{
+			AccountID:             "ledger:clearing:provider:stripe",
+			TransactionID:         "payment:pay-1:succeeded",
+			ReferenceType:         ledgeraggregate.EventNameLedgerAccountWithdrawFromIntent,
+			ReferenceID:           "pay-1",
+			CounterpartyAccountID: "wallet:available",
+			Currency:              "VND",
+			AmountDelta:           -100,
+			BookedAt:              gomockTime(),
+		})
 		if err != nil {
 			t.Fatalf("NewLedgerAccountPaymentPosting() error = %v", err)
 		}
-		creditPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(
-			"wallet:available",
-			"payment:pay-1:succeeded",
-			"payment.succeeded",
-			"pay-1",
-			"ledger:clearing:provider:stripe",
-			"VND",
-			100,
-			gomockTime(),
-		)
+		creditPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(valueobject.LedgerAccountPostingInput{
+			AccountID:             "wallet:available",
+			TransactionID:         "payment:pay-1:succeeded",
+			ReferenceType:         ledgeraggregate.EventNameLedgerAccountDepositFromIntent,
+			ReferenceID:           "pay-1",
+			CounterpartyAccountID: "ledger:clearing:provider:stripe",
+			Currency:              "VND",
+			AmountDelta:           100,
+			BookedAt:              gomockTime(),
+		})
 		if err != nil {
 			t.Fatalf("NewLedgerAccountPaymentPosting() error = %v", err)
 		}
@@ -275,7 +291,7 @@ func TestLedgerServiceRecordPaymentReversed(t *testing.T) {
 			CreditAccountID:    "wallet:available",
 			Currency:           "VND",
 			Amount:             100,
-			ReversalType:       "payment.refunded",
+			ReversalType:       sharedevents.EventPaymentRefunded,
 		})
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
@@ -287,29 +303,29 @@ func TestLedgerServiceRecordPaymentReversed(t *testing.T) {
 		baseRepo := ledgerrepos.NewMockRepos(ctrl)
 		txRepos := ledgerrepos.NewMockRepos(ctrl)
 		accountRepo := ledgerrepos.NewMockLedgerAccountAggregateRepository(ctrl)
-		debitPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(
-			"wallet:available",
-			"payment:pay-1:refunded",
-			"payment.refunded",
-			"pay-1",
-			"ledger:clearing:provider:stripe",
-			"VND",
-			-100,
-			gomockTime(),
-		)
+		debitPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(valueobject.LedgerAccountPostingInput{
+			AccountID:             "wallet:available",
+			TransactionID:         "payment:pay-1:refunded",
+			ReferenceType:         ledgeraggregate.EventNameLedgerAccountWithdrawFromRefund,
+			ReferenceID:           "pay-1",
+			CounterpartyAccountID: "ledger:clearing:provider:stripe",
+			Currency:              "VND",
+			AmountDelta:           -100,
+			BookedAt:              gomockTime(),
+		})
 		if err != nil {
 			t.Fatalf("NewLedgerAccountPaymentPosting() error = %v", err)
 		}
-		creditPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(
-			"ledger:clearing:provider:stripe",
-			"payment:pay-1:refunded",
-			"payment.refunded",
-			"pay-1",
-			"wallet:available",
-			"VND",
-			100,
-			gomockTime(),
-		)
+		creditPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(valueobject.LedgerAccountPostingInput{
+			AccountID:             "ledger:clearing:provider:stripe",
+			TransactionID:         "payment:pay-1:refunded",
+			ReferenceType:         ledgeraggregate.EventNameLedgerAccountDepositFromRefund,
+			ReferenceID:           "pay-1",
+			CounterpartyAccountID: "wallet:available",
+			Currency:              "VND",
+			AmountDelta:           100,
+			BookedAt:              gomockTime(),
+		})
 		if err != nil {
 			t.Fatalf("NewLedgerAccountPaymentPosting() error = %v", err)
 		}
@@ -334,7 +350,7 @@ func TestLedgerServiceRecordPaymentReversed(t *testing.T) {
 			CreditAccountID:    "wallet:available",
 			Currency:           "VND",
 			Amount:             100,
-			ReversalType:       "payment.refunded",
+			ReversalType:       sharedevents.EventPaymentRefunded,
 		})
 		if err != nil {
 			t.Fatalf("expected duplicate delivery to be idempotent, got %v", err)

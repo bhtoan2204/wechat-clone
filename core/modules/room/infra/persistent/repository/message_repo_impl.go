@@ -59,6 +59,9 @@ func (r *messageRepoImpl) UpdateMessage(ctx context.Context, message *entity.Mes
 func (r *messageRepoImpl) GetMessageByID(ctx context.Context, id string) (*entity.MessageEntity, error) {
 	var m models.MessageModel
 	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, stackErr.Error(err)
 	}
 	entityMessage, err := r.toEntity(&m)

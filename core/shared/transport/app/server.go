@@ -86,27 +86,32 @@ func (s *appServer) buildModuleRuntimes(appContext *appCtx.AppContext) error {
 		return stackErr.Error(fmt.Errorf("build notification messaging runtime failed: %w", err))
 	}
 
-	ledgerRuntime, err := ledgerassembly.BuildMessagingRuntime(s.cfg, appContext)
+	ledgerMessagingRuntime, err := ledgerassembly.BuildMessagingRuntime(s.cfg, appContext)
 	if err != nil {
 		return stackErr.Error(fmt.Errorf("build ledger messaging runtime failed: %w", err))
 	}
 
-	roomRuntime, err := roomassembly.BuildProjectionRuntime(s.cfg, appContext)
+	ledgerProjectionRuntime, err := ledgerassembly.BuildProjectionRuntime(s.cfg, appContext)
+	if err != nil {
+		return stackErr.Error(fmt.Errorf("build ledger messaging runtime failed: %w", err))
+	}
+
+	roomProjectionRuntime, err := roomassembly.BuildProjectionRuntime(s.cfg, appContext)
 	if err != nil {
 		return stackErr.Error(fmt.Errorf("build room projection runtime failed: %w", err))
 	}
 
-	relationshipRuntime, err := relationshipassembly.BuildMessagingRuntime(s.cfg, appContext)
+	relationshipMessagingRuntime, err := relationshipassembly.BuildMessagingRuntime(s.cfg, appContext)
 	if err != nil {
 		return stackErr.Error(fmt.Errorf("build relationship messaging runtime failed: %w", err))
 	}
 
 	s.moduleRuntimes = []modruntime.Module{
 		notificationRuntime,
-		ledgerRuntime,
-		// paymentRuntime,
-		roomRuntime,
-		relationshipRuntime,
+		ledgerMessagingRuntime,
+		roomProjectionRuntime,
+		relationshipMessagingRuntime,
+		ledgerProjectionRuntime,
 	}
 	return nil
 }

@@ -270,8 +270,8 @@ func (s *paymentCommandService) resolveCreatePaymentCreditAccount(
 	}
 
 	requestedCreditAccountID := strings.TrimSpace(req.CreditAccountID)
-	if requestedCreditAccountID != "" && requestedCreditAccountID != actorAccountID {
-		return "", stackErr.Error(fmt.Errorf("%w: credit_account_id must match authenticated account", ErrValidation))
+	if requestedCreditAccountID != "" {
+		return "", stackErr.Error(fmt.Errorf("%w: credit_account_id is server-owned and must not be provided", ErrValidation))
 	}
 
 	return actorAccountID, nil

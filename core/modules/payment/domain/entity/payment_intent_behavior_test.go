@@ -75,7 +75,7 @@ func TestPaymentIntentProviderBehaviors(t *testing.T) {
 	if key := intent.PaymentIdempotencyKey("", ""); key != "ext-1" {
 		t.Fatalf("unexpected idempotency key from external ref: %s", key)
 	}
-	if key := intent.TransitionIdempotencyKey(sharedevents.EventPaymentSucceeded); key != "payment.succeeded:txn-1" {
+	if key := intent.TransitionIdempotencyKey(sharedevents.EventPaymentSucceeded); key != sharedevents.EventPaymentSucceeded+":txn-1" {
 		t.Fatalf("unexpected transition idempotency key: %s", key)
 	}
 }
@@ -285,7 +285,7 @@ func TestPaymentIntentBuildsEventData(t *testing.T) {
 		ExternalRef: "ref-1",
 		Status:      PaymentStatusSuccess,
 	}, now)
-	if succeededEventData.IdempotencyKey != "payment.succeeded:txn-1" {
+	if succeededEventData.IdempotencyKey != sharedevents.EventPaymentSucceeded+":txn-1" {
 		t.Fatalf("unexpected success idempotency key: %s", succeededEventData.IdempotencyKey)
 	}
 	if succeededEventData.ProviderPaymentRef != "ref-1" {
@@ -296,7 +296,7 @@ func TestPaymentIntentBuildsEventData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if processedEvent.IdempotencyKey != "payment.succeeded:txn-1" {
+	if processedEvent.IdempotencyKey != sharedevents.EventPaymentSucceeded+":txn-1" {
 		t.Fatalf("unexpected processed transition idempotency key: %s", processedEvent.IdempotencyKey)
 	}
 

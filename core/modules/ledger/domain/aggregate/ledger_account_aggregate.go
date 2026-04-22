@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"wechat-clone/core/modules/ledger/domain/entity"
+	valueobject "wechat-clone/core/modules/ledger/domain/value_object"
+	sharedevents "wechat-clone/core/shared/contracts/events"
 	"wechat-clone/core/shared/pkg/event"
 	"wechat-clone/core/shared/pkg/stackErr"
 )
@@ -105,6 +107,36 @@ func (a *LedgerAccountAggregate) PostedTransaction(transactionID string) (*entit
 	return &copyPosting, true
 }
 
+func (a *LedgerAccountAggregate) ApplyPostingEvent(eventData interface{}) (bool, error) {
+	if a == nil {
+		return false, stackErr.Error(ErrLedgerAccountAggregateRequired)
+	}
+
+	posting, ok, err := previewLedgerPostingFromEvent(a.AggregateID(), eventData)
+	if err != nil {
+		return false, stackErr.Error(err)
+	}
+	if !ok {
+		return false, stackErr.Error(event.ErrUnsupportedEventType)
+	}
+
+	existing, exists := a.lookupPendingPosting(posting.TransactionID)
+	if exists {
+		if SameLedgerAccountPosting(existing, posting) {
+			return false, nil
+		}
+		return false, stackErr.Error(fmt.Errorf("ledger posting mismatch for transaction_id=%s", posting.TransactionID))
+	}
+	if err := a.ensurePostingAllowed(posting); err != nil {
+		return false, stackErr.Error(err)
+	}
+
+	if err := a.ApplyChange(a, eventData); err != nil {
+		return false, stackErr.Error(err)
+	}
+	return true, nil
+}
+
 func (a *LedgerAccountAggregate) BookPayment(
 	transactionID string,
 	paymentID string,
@@ -115,7 +147,7 @@ func (a *LedgerAccountAggregate) BookPayment(
 ) (bool, error) {
 	return a.bookPaymentPosting(
 		transactionID,
-		entity.PaymentReferenceSucceeded,
+		ledgerPaymentReferenceTypeForSucceededAmount(amountDelta),
 		paymentID,
 		counterpartyAccountID,
 		currency,
@@ -134,13 +166,13 @@ func (a *LedgerAccountAggregate) ReversePayment(
 	bookedAt time.Time,
 ) (bool, error) {
 	referenceType = strings.TrimSpace(referenceType)
-	if referenceType != entity.PaymentReferenceRefunded && referenceType != entity.PaymentReferenceChargeback {
+	if referenceType != sharedevents.EventPaymentRefunded && referenceType != sharedevents.EventPaymentChargeback {
 		return false, stackErr.Error(fmt.Errorf("%w: %s", ErrLedgerAccountReferenceTypeInvalid, referenceType))
 	}
 
 	return a.bookPaymentPosting(
 		transactionID,
-		referenceType,
+		ledgerPaymentReferenceTypeForReversal(referenceType, amountDelta),
 		paymentID,
 		counterpartyAccountID,
 		currency,
@@ -162,14 +194,16 @@ func (a *LedgerAccountAggregate) bookPaymentPosting(
 		return false, stackErr.Error(ErrLedgerAccountAggregateRequired)
 	}
 	posting, err := NewLedgerAccountPaymentPosting(
-		a.AggregateID(),
-		transactionID,
-		referenceType,
-		referenceID,
-		counterpartyAccountID,
-		currency,
-		amountDelta,
-		bookedAt,
+		valueobject.LedgerAccountPostingInput{
+			AccountID:             a.AggregateID(),
+			TransactionID:         transactionID,
+			ReferenceType:         referenceType,
+			ReferenceID:           referenceID,
+			CounterpartyAccountID: counterpartyAccountID,
+			Currency:              currency,
+			AmountDelta:           amountDelta,
+			BookedAt:              bookedAt,
+		},
 	)
 	if err != nil {
 		return false, stackErr.Error(err)
@@ -204,12 +238,14 @@ func (a *LedgerAccountAggregate) TransferToAccount(
 		return false, stackErr.Error(ErrLedgerAccountAggregateRequired)
 	}
 	posting, err := NewLedgerAccountTransferOutPosting(
-		a.AggregateID(),
-		transactionID,
-		toAccountID,
-		currency,
-		amount,
-		bookedAt,
+		valueobject.LedgerAccountTransferPostingInput{
+			AccountID:             a.AggregateID(),
+			TransactionID:         transactionID,
+			CounterpartyAccountID: toAccountID,
+			Currency:              currency,
+			Amount:                amount,
+			BookedAt:              bookedAt,
+		},
 	)
 	if err != nil {
 		return false, stackErr.Error(err)
@@ -250,12 +286,14 @@ func (a *LedgerAccountAggregate) ReceiveTransfer(
 		return false, stackErr.Error(ErrLedgerAccountAggregateRequired)
 	}
 	posting, err := NewLedgerAccountTransferInPosting(
-		a.AggregateID(),
-		transactionID,
-		fromAccountID,
-		currency,
-		amount,
-		bookedAt,
+		valueobject.LedgerAccountTransferPostingInput{
+			AccountID:             a.AggregateID(),
+			TransactionID:         transactionID,
+			CounterpartyAccountID: fromAccountID,
+			Currency:              currency,
+			Amount:                amount,
+			BookedAt:              bookedAt,
+		},
 	)
 	if err != nil {
 		return false, stackErr.Error(err)
@@ -286,12 +324,19 @@ func (a *LedgerAccountAggregate) ReceiveTransfer(
 }
 
 func (a *LedgerAccountAggregate) applyTransferredToAccount(accountID string, data *EventLedgerAccountTransferredToAccount) error {
-	posting, ok, err := NewLedgerAccountPostingFromEvent(accountID, data)
+	if data == nil {
+		return stackErr.Error(errors.New("ledger transfer to account event is nil"))
+	}
+	posting, err := NewLedgerAccountTransferOutPosting(valueobject.LedgerAccountTransferPostingInput{
+		AccountID:             accountID,
+		TransactionID:         data.TransactionID,
+		CounterpartyAccountID: data.ToAccountID,
+		Currency:              data.Currency,
+		Amount:                data.Amount,
+		BookedAt:              data.BookedAt,
+	})
 	if err != nil {
 		return stackErr.Error(err)
-	}
-	if !ok {
-		return stackErr.Error(errors.New("ledger transfer to account event is unsupported"))
 	}
 	return a.applyPosting(accountID, posting)
 }
@@ -321,7 +366,7 @@ func (a *LedgerAccountAggregate) applyWithdrawFromChargeback(accountID string, d
 }
 
 func (a *LedgerAccountAggregate) applyEventPosting(accountID string, eventData interface{}, unsupportedErr string) error {
-	posting, ok, err := NewLedgerAccountPostingFromEvent(accountID, eventData)
+	posting, ok, err := previewLedgerPostingFromEvent(accountID, eventData)
 	if err != nil {
 		return stackErr.Error(err)
 	}
@@ -332,12 +377,19 @@ func (a *LedgerAccountAggregate) applyEventPosting(accountID string, eventData i
 }
 
 func (a *LedgerAccountAggregate) applyReceivedTransfer(accountID string, data *EventLedgerAccountReceivedTransfer) error {
-	posting, ok, err := NewLedgerAccountPostingFromEvent(accountID, data)
+	if data == nil {
+		return stackErr.Error(errors.New("ledger received transfer event is nil"))
+	}
+	posting, err := NewLedgerAccountTransferInPosting(valueobject.LedgerAccountTransferPostingInput{
+		AccountID:             accountID,
+		TransactionID:         data.TransactionID,
+		CounterpartyAccountID: data.FromAccountID,
+		Currency:              data.Currency,
+		Amount:                data.Amount,
+		BookedAt:              data.BookedAt,
+	})
 	if err != nil {
 		return stackErr.Error(err)
-	}
-	if !ok {
-		return stackErr.Error(errors.New("ledger received transfer event is unsupported"))
 	}
 	return a.applyPosting(accountID, posting)
 }
@@ -387,7 +439,12 @@ func (a *LedgerAccountAggregate) ensurePostingAllowed(posting entity.LedgerAccou
 
 func requiresNonNegativeBalance(referenceType string) bool {
 	switch strings.TrimSpace(referenceType) {
-	case entity.PaymentReferenceSucceeded, entity.PaymentReferenceRefunded, entity.PaymentReferenceChargeback:
+	case EventNameLedgerAccountDepositFromIntent,
+		EventNameLedgerAccountWithdrawFromIntent,
+		EventNameLedgerAccountDepositFromRefund,
+		EventNameLedgerAccountWithdrawFromRefund,
+		EventNameLedgerAccountDepositFromChargeback,
+		EventNameLedgerAccountWithdrawFromChargeback:
 		return false
 	default:
 		return true
@@ -415,16 +472,6 @@ func (a *LedgerAccountAggregate) lookupPendingPosting(transactionID string) (ent
 		return existing, true
 	}
 
-	for _, evt := range a.Root().Events() {
-		posting, ok, err := NewLedgerAccountPostingFromEvent(evt.AggregateID, evt.EventData)
-		if err != nil || !ok {
-			continue
-		}
-		if posting.TransactionID == transactionID {
-			return posting, true
-		}
-	}
-
 	return entity.LedgerAccountPosting{}, false
 }
 
@@ -436,7 +483,13 @@ func normalizeLedgerAccountPosting(accountID string, posting entity.LedgerAccoun
 
 	normalizedReferenceType := strings.TrimSpace(posting.ReferenceType)
 	switch normalizedReferenceType {
-	case entity.PaymentReferenceSucceeded, entity.PaymentReferenceRefunded, entity.PaymentReferenceChargeback, entity.LedgerReferenceInternalTransfer:
+	case EventNameLedgerAccountDepositFromIntent,
+		EventNameLedgerAccountWithdrawFromIntent,
+		EventNameLedgerAccountDepositFromRefund,
+		EventNameLedgerAccountWithdrawFromRefund,
+		EventNameLedgerAccountDepositFromChargeback,
+		EventNameLedgerAccountWithdrawFromChargeback,
+		entity.LedgerReferenceInternalTransfer:
 	default:
 		return "", entity.LedgerAccountPosting{}, ErrLedgerAccountReferenceTypeInvalid
 	}
@@ -481,30 +534,21 @@ func normalizeLedgerAccountPosting(accountID string, posting entity.LedgerAccoun
 	}, nil
 }
 
-func NewLedgerAccountPaymentPosting(
-	accountID string,
-	transactionID string,
-	referenceType string,
-	referenceID string,
-	counterpartyAccountID string,
-	currency string,
-	amountDelta int64,
-	bookedAt time.Time,
-) (entity.LedgerAccountPosting, error) {
+func NewLedgerAccountPaymentPosting(input valueobject.LedgerAccountPostingInput) (entity.LedgerAccountPosting, error) {
 	posting, err := newLedgerPosting(
-		transactionID,
-		referenceType,
-		referenceID,
-		counterpartyAccountID,
-		currency,
-		amountDelta,
-		bookedAt,
+		input.TransactionID,
+		input.ReferenceType,
+		input.ReferenceID,
+		input.CounterpartyAccountID,
+		input.Currency,
+		input.AmountDelta,
+		input.BookedAt,
 	)
 	if err != nil {
 		return entity.LedgerAccountPosting{}, stackErr.Error(err)
 	}
 
-	_, normalizedPosting, err := normalizeLedgerAccountPosting(accountID, posting)
+	_, normalizedPosting, err := normalizeLedgerAccountPosting(input.AccountID, posting)
 	if err != nil {
 		return entity.LedgerAccountPosting{}, stackErr.Error(err)
 	}
@@ -512,87 +556,81 @@ func NewLedgerAccountPaymentPosting(
 	return normalizedPosting, nil
 }
 
-func NewLedgerAccountTransferOutPosting(
-	accountID string,
-	transactionID string,
-	toAccountID string,
-	currency string,
-	amount int64,
-	bookedAt time.Time,
-) (entity.LedgerAccountPosting, error) {
+func NewLedgerAccountTransferOutPosting(input valueobject.LedgerAccountTransferPostingInput) (entity.LedgerAccountPosting, error) {
 	return NewLedgerAccountPaymentPosting(
-		accountID,
-		transactionID,
-		entity.LedgerReferenceInternalTransfer,
-		transactionID,
-		toAccountID,
-		currency,
-		-amount,
-		bookedAt,
+		valueobject.LedgerAccountPostingInput{
+			AccountID:             input.AccountID,
+			TransactionID:         input.TransactionID,
+			ReferenceType:         entity.LedgerReferenceInternalTransfer,
+			ReferenceID:           input.TransactionID,
+			CounterpartyAccountID: input.CounterpartyAccountID,
+			Currency:              input.Currency,
+			AmountDelta:           -input.Amount,
+			BookedAt:              input.BookedAt,
+		},
 	)
 }
 
-func NewLedgerAccountTransferInPosting(
-	accountID string,
-	transactionID string,
-	fromAccountID string,
-	currency string,
-	amount int64,
-	bookedAt time.Time,
-) (entity.LedgerAccountPosting, error) {
+func NewLedgerAccountTransferInPosting(input valueobject.LedgerAccountTransferPostingInput) (entity.LedgerAccountPosting, error) {
 	return NewLedgerAccountPaymentPosting(
-		accountID,
-		transactionID,
-		entity.LedgerReferenceInternalTransfer,
-		transactionID,
-		fromAccountID,
-		currency,
-		amount,
-		bookedAt,
+		valueobject.LedgerAccountPostingInput{
+			AccountID:             input.AccountID,
+			TransactionID:         input.TransactionID,
+			ReferenceType:         entity.LedgerReferenceInternalTransfer,
+			ReferenceID:           input.TransactionID,
+			CounterpartyAccountID: input.CounterpartyAccountID,
+			Currency:              input.Currency,
+			AmountDelta:           input.Amount,
+			BookedAt:              input.BookedAt,
+		},
 	)
 }
 
 func NewLedgerAccountPostingFromEvent(accountID string, eventData interface{}) (entity.LedgerAccountPosting, bool, error) {
+	return previewLedgerPostingFromEvent(accountID, eventData)
+}
+
+func previewLedgerPostingFromEvent(accountID string, eventData interface{}) (entity.LedgerAccountPosting, bool, error) {
 	switch data := eventData.(type) {
 	case *EventLedgerAccountDepositFromIntent:
-		return newLedgerPostingFromPaymentEvent(accountID, data, entity.PaymentReferenceSucceeded, 1, "ledger deposit from intent event is nil")
+		return newLedgerPostingFromPaymentEvent(accountID, data, EventNameLedgerAccountDepositFromIntent, 1, "ledger deposit from intent event is nil")
 	case *EventLedgerAccountWithdrawFromIntent:
-		return newLedgerPostingFromPaymentEvent(accountID, data, entity.PaymentReferenceSucceeded, -1, "ledger withdraw from intent event is nil")
+		return newLedgerPostingFromPaymentEvent(accountID, data, EventNameLedgerAccountWithdrawFromIntent, -1, "ledger withdraw from intent event is nil")
 	case *EventLedgerAccountDepositFromRefund:
-		return newLedgerPostingFromPaymentEvent(accountID, data, entity.PaymentReferenceRefunded, 1, "ledger deposit from refund event is nil")
+		return newLedgerPostingFromPaymentEvent(accountID, data, EventNameLedgerAccountDepositFromRefund, 1, "ledger deposit from refund event is nil")
 	case *EventLedgerAccountWithdrawFromRefund:
-		return newLedgerPostingFromPaymentEvent(accountID, data, entity.PaymentReferenceRefunded, -1, "ledger withdraw from refund event is nil")
+		return newLedgerPostingFromPaymentEvent(accountID, data, EventNameLedgerAccountWithdrawFromRefund, -1, "ledger withdraw from refund event is nil")
 	case *EventLedgerAccountDepositFromChargeback:
-		return newLedgerPostingFromPaymentEvent(accountID, data, entity.PaymentReferenceChargeback, 1, "ledger deposit from chargeback event is nil")
+		return newLedgerPostingFromPaymentEvent(accountID, data, EventNameLedgerAccountDepositFromChargeback, 1, "ledger deposit from chargeback event is nil")
 	case *EventLedgerAccountWithdrawFromChargeback:
-		return newLedgerPostingFromPaymentEvent(accountID, data, entity.PaymentReferenceChargeback, -1, "ledger withdraw from chargeback event is nil")
+		return newLedgerPostingFromPaymentEvent(accountID, data, EventNameLedgerAccountWithdrawFromChargeback, -1, "ledger withdraw from chargeback event is nil")
 	case *EventLedgerAccountTransferredToAccount:
 		if data == nil {
 			return entity.LedgerAccountPosting{}, false, stackErr.Error(errors.New("ledger transfer to account event is nil"))
 		}
 
-		posting, err := NewLedgerAccountTransferOutPosting(
-			accountID,
-			data.TransactionID,
-			data.ToAccountID,
-			data.Currency,
-			data.Amount,
-			data.BookedAt,
-		)
+		posting, err := NewLedgerAccountTransferOutPosting(valueobject.LedgerAccountTransferPostingInput{
+			AccountID:             accountID,
+			TransactionID:         data.TransactionID,
+			CounterpartyAccountID: data.ToAccountID,
+			Currency:              data.Currency,
+			Amount:                data.Amount,
+			BookedAt:              data.BookedAt,
+		})
 		return posting, true, stackErr.Error(err)
 	case *EventLedgerAccountReceivedTransfer:
 		if data == nil {
 			return entity.LedgerAccountPosting{}, false, stackErr.Error(errors.New("ledger received transfer event is nil"))
 		}
 
-		posting, err := NewLedgerAccountTransferInPosting(
-			accountID,
-			data.TransactionID,
-			data.FromAccountID,
-			data.Currency,
-			data.Amount,
-			data.BookedAt,
-		)
+		posting, err := NewLedgerAccountTransferInPosting(valueobject.LedgerAccountTransferPostingInput{
+			AccountID:             accountID,
+			TransactionID:         data.TransactionID,
+			CounterpartyAccountID: data.FromAccountID,
+			Currency:              data.Currency,
+			Amount:                data.Amount,
+			BookedAt:              data.BookedAt,
+		})
 		return posting, true, stackErr.Error(err)
 	default:
 		return entity.LedgerAccountPosting{}, false, nil
@@ -619,17 +657,16 @@ func newLedgerPaymentEvent(posting entity.LedgerAccountPosting) interface{} {
 	}
 
 	switch posting.ReferenceType {
-	case entity.PaymentReferenceSucceeded:
-		if posting.AmountDelta >= 0 {
-			return &EventLedgerAccountDepositFromIntent{
-				TransactionID:         base.transactionID,
-				PaymentID:             base.paymentID,
-				CounterpartyAccountID: base.counterpartyAccountID,
-				Currency:              base.currency,
-				Amount:                base.amount,
-				BookedAt:              base.bookedAt,
-			}
+	case EventNameLedgerAccountDepositFromIntent:
+		return &EventLedgerAccountDepositFromIntent{
+			TransactionID:         base.transactionID,
+			PaymentID:             base.paymentID,
+			CounterpartyAccountID: base.counterpartyAccountID,
+			Currency:              base.currency,
+			Amount:                base.amount,
+			BookedAt:              base.bookedAt,
 		}
+	case EventNameLedgerAccountWithdrawFromIntent:
 		return &EventLedgerAccountWithdrawFromIntent{
 			TransactionID:         base.transactionID,
 			PaymentID:             base.paymentID,
@@ -638,17 +675,16 @@ func newLedgerPaymentEvent(posting entity.LedgerAccountPosting) interface{} {
 			Amount:                base.amount,
 			BookedAt:              base.bookedAt,
 		}
-	case entity.PaymentReferenceRefunded:
-		if posting.AmountDelta >= 0 {
-			return &EventLedgerAccountDepositFromRefund{
-				TransactionID:         base.transactionID,
-				PaymentID:             base.paymentID,
-				CounterpartyAccountID: base.counterpartyAccountID,
-				Currency:              base.currency,
-				Amount:                base.amount,
-				BookedAt:              base.bookedAt,
-			}
+	case EventNameLedgerAccountDepositFromRefund:
+		return &EventLedgerAccountDepositFromRefund{
+			TransactionID:         base.transactionID,
+			PaymentID:             base.paymentID,
+			CounterpartyAccountID: base.counterpartyAccountID,
+			Currency:              base.currency,
+			Amount:                base.amount,
+			BookedAt:              base.bookedAt,
 		}
+	case EventNameLedgerAccountWithdrawFromRefund:
 		return &EventLedgerAccountWithdrawFromRefund{
 			TransactionID:         base.transactionID,
 			PaymentID:             base.paymentID,
@@ -657,17 +693,16 @@ func newLedgerPaymentEvent(posting entity.LedgerAccountPosting) interface{} {
 			Amount:                base.amount,
 			BookedAt:              base.bookedAt,
 		}
-	case entity.PaymentReferenceChargeback:
-		if posting.AmountDelta >= 0 {
-			return &EventLedgerAccountDepositFromChargeback{
-				TransactionID:         base.transactionID,
-				PaymentID:             base.paymentID,
-				CounterpartyAccountID: base.counterpartyAccountID,
-				Currency:              base.currency,
-				Amount:                base.amount,
-				BookedAt:              base.bookedAt,
-			}
+	case EventNameLedgerAccountDepositFromChargeback:
+		return &EventLedgerAccountDepositFromChargeback{
+			TransactionID:         base.transactionID,
+			PaymentID:             base.paymentID,
+			CounterpartyAccountID: base.counterpartyAccountID,
+			Currency:              base.currency,
+			Amount:                base.amount,
+			BookedAt:              base.bookedAt,
 		}
+	case EventNameLedgerAccountWithdrawFromChargeback:
 		return &EventLedgerAccountWithdrawFromChargeback{
 			TransactionID:         base.transactionID,
 			PaymentID:             base.paymentID,
@@ -700,16 +735,16 @@ func newLedgerPostingFromPaymentEvent(
 	}
 
 	payload := eventData.paymentEvent()
-	posting, err := NewLedgerAccountPaymentPosting(
-		accountID,
-		payload.transactionID,
-		referenceType,
-		payload.paymentID,
-		payload.counterpartyAccountID,
-		payload.currency,
-		direction*payload.amount,
-		payload.bookedAt,
-	)
+	posting, err := NewLedgerAccountPaymentPosting(valueobject.LedgerAccountPostingInput{
+		AccountID:             accountID,
+		TransactionID:         payload.transactionID,
+		ReferenceType:         referenceType,
+		ReferenceID:           payload.paymentID,
+		CounterpartyAccountID: payload.counterpartyAccountID,
+		Currency:              payload.currency,
+		AmountDelta:           direction * payload.amount,
+		BookedAt:              payload.bookedAt,
+	})
 	return posting, true, stackErr.Error(err)
 }
 
@@ -753,6 +788,30 @@ func newLedgerPosting(
 		AmountDelta:           amountDelta,
 		BookedAt:              bookedAt.UTC(),
 	}, nil
+}
+
+func ledgerPaymentReferenceTypeForSucceededAmount(amountDelta int64) string {
+	if amountDelta >= 0 {
+		return EventNameLedgerAccountDepositFromIntent
+	}
+	return EventNameLedgerAccountWithdrawFromIntent
+}
+
+func ledgerPaymentReferenceTypeForReversal(paymentEventName string, amountDelta int64) string {
+	switch strings.TrimSpace(paymentEventName) {
+	case sharedevents.EventPaymentRefunded:
+		if amountDelta >= 0 {
+			return EventNameLedgerAccountDepositFromRefund
+		}
+		return EventNameLedgerAccountWithdrawFromRefund
+	case sharedevents.EventPaymentChargeback:
+		if amountDelta >= 0 {
+			return EventNameLedgerAccountDepositFromChargeback
+		}
+		return EventNameLedgerAccountWithdrawFromChargeback
+	default:
+		return ""
+	}
 }
 
 func SameLedgerAccountPosting(left entity.LedgerAccountPosting, right entity.LedgerAccountPosting) bool {

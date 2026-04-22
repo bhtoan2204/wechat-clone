@@ -35,12 +35,12 @@ func NewProcessor(cfg *config.Config, ledgerProjector projection.LedgerProjectio
 		projector: ledgerProjector,
 	}
 
-	topic := strings.TrimSpace(cfg.KafkaConfig.KafkaRoomConsumer.RoomOutboxTopic)
+	topic := strings.TrimSpace(cfg.KafkaConfig.KafkaLedgerConsumer.LedgerOutboxTopic)
 	if topic == "" || ledgerProjector == nil {
 		return instance, nil
 	}
 
-	handlerName := fmt.Sprintf("room-projection-%s-handler", strings.ToLower(topic))
+	handlerName := fmt.Sprintf("ledger-projection-%s-handler", strings.ToLower(topic))
 	consumer, err := infraMessaging.NewConsumer(&infraMessaging.Config{
 		Servers:      cfg.KafkaConfig.KafkaServers,
 		Group:        cfg.KafkaConfig.KafkaLedgerConsumer.LedgerProjectionGroup,
@@ -63,7 +63,7 @@ func NewProcessor(cfg *config.Config, ledgerProjector projection.LedgerProjectio
 
 func (p *processor) Start() error {
 	for _, consumer := range p.consumer {
-		consumer.Read(infraMessaging.WrapConsumerCallback(consumer, "Handle room projection message failed"))
+		consumer.Read(infraMessaging.WrapConsumerCallback(consumer, "Handle ledger projection message failed"))
 	}
 	return nil
 }
@@ -102,7 +102,12 @@ func (h *processor) handleLedgerOutboxEvent(ctx context.Context, value []byte) e
 }
 
 func toLedgerTransactionProjection(event contracts.OutboxMessage) (projection.LedgerTransactionProjected, error) {
-	payload, err := unmarshalLedgerAggregateEvent(event.EventName, event.EventData, event.CreatedAt)
+	outboxCreatedAt, err := parseOutboxCreatedAt(event.CreatedAt)
+	if err != nil {
+		return projection.LedgerTransactionProjected{}, stackErr.Error(err)
+	}
+
+	payload, err := unmarshalLedgerAggregateEvent(event.EventName, event.EventData)
 	if err != nil {
 		return projection.LedgerTransactionProjected{}, stackErr.Error(err)
 	}
@@ -117,6 +122,9 @@ func toLedgerTransactionProjection(event contracts.OutboxMessage) (projection.Le
 			event.AggregateID,
 			event.EventName,
 		))
+	}
+	if posting.BookedAt.IsZero() {
+		posting.BookedAt = outboxCreatedAt
 	}
 
 	return projection.LedgerTransactionProjected{
@@ -136,7 +144,7 @@ func toLedgerTransactionProjection(event contracts.OutboxMessage) (projection.Le
 	}, nil
 }
 
-func unmarshalLedgerAggregateEvent(eventName string, data json.RawMessage, createdAtRaw string) (interface{}, error) {
+func unmarshalLedgerAggregateEvent(eventName string, data json.RawMessage) (interface{}, error) {
 	switch strings.TrimSpace(eventName) {
 	case ledgeraggregate.EventNameLedgerAccountDepositFromIntent:
 		return unmarshalLedgerEventData[ledgeraggregate.EventLedgerAccountDepositFromIntent](data, "unmarshal ledger deposit from intent payload failed")

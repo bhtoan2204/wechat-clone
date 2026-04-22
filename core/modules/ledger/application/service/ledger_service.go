@@ -9,6 +9,9 @@ import (
 	ledgeraggregate "wechat-clone/core/modules/ledger/domain/aggregate"
 	"wechat-clone/core/modules/ledger/domain/entity"
 	ledgerrepos "wechat-clone/core/modules/ledger/domain/repos"
+	valueobject "wechat-clone/core/modules/ledger/domain/value_object"
+	sharedevents "wechat-clone/core/shared/contracts/events"
+	eventpkg "wechat-clone/core/shared/pkg/event"
 	"wechat-clone/core/shared/pkg/stackErr"
 )
 
@@ -39,11 +42,16 @@ type RecordPaymentReversedCommand struct {
 	ReversalType       string
 }
 
+type RecordLedgerEventsCommand struct {
+	Events []eventpkg.Event
+}
+
 const LedgerAccountLockKeyPrefix = "ledger-account"
 
 //go:generate mockgen -package=service -destination=ledger_service_mock.go -source=ledger_service.go
 type LedgerService interface {
 	TransferToAccount(ctx context.Context, command TransferToAccountCommand) (*entity.LedgerTransaction, error)
+	RecordLedgerEvents(ctx context.Context, command RecordLedgerEventsCommand) error
 	RecordPaymentSucceeded(ctx context.Context, command RecordPaymentSucceededCommand) error
 	RecordPaymentReversed(ctx context.Context, command RecordPaymentReversedCommand) error
 }
@@ -78,23 +86,27 @@ func (s *ledgerService) TransferToAccount(ctx context.Context, command TransferT
 	}
 
 	fromPosting, err := ledgeraggregate.NewLedgerAccountTransferOutPosting(
-		booking.FromAccountID,
-		transaction.TransactionID,
-		booking.ToAccountID,
-		transaction.Currency,
-		booking.Amount,
-		transaction.CreatedAt,
+		valueobject.LedgerAccountTransferPostingInput{
+			AccountID:             booking.FromAccountID,
+			TransactionID:         transaction.TransactionID,
+			CounterpartyAccountID: booking.ToAccountID,
+			Currency:              transaction.Currency,
+			Amount:                booking.Amount,
+			BookedAt:              transaction.CreatedAt,
+		},
 	)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 	toPosting, err := ledgeraggregate.NewLedgerAccountTransferInPosting(
-		booking.ToAccountID,
-		transaction.TransactionID,
-		booking.FromAccountID,
-		transaction.Currency,
-		booking.Amount,
-		transaction.CreatedAt,
+		valueobject.LedgerAccountTransferPostingInput{
+			AccountID:             booking.ToAccountID,
+			TransactionID:         transaction.TransactionID,
+			CounterpartyAccountID: booking.FromAccountID,
+			Currency:              transaction.Currency,
+			Amount:                booking.Amount,
+			BookedAt:              transaction.CreatedAt,
+		},
 	)
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -188,98 +200,45 @@ func (s *ledgerService) RecordPaymentSucceeded(ctx context.Context, command Reco
 	}
 
 	debitPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(
-		booking.DebitAccountID,
-		transaction.TransactionID,
-		entity.PaymentReferenceSucceeded,
-		booking.PaymentID,
-		booking.CreditAccountID,
-		transaction.Currency,
-		-booking.Amount,
-		transaction.CreatedAt,
+		valueobject.LedgerAccountPostingInput{
+			AccountID:             booking.DebitAccountID,
+			TransactionID:         transaction.TransactionID,
+			ReferenceType:         ledgeraggregate.EventNameLedgerAccountWithdrawFromIntent,
+			ReferenceID:           booking.PaymentID,
+			CounterpartyAccountID: booking.CreditAccountID,
+			Currency:              transaction.Currency,
+			AmountDelta:           -booking.Amount,
+			BookedAt:              transaction.CreatedAt,
+		},
 	)
 	if err != nil {
 		return stackErr.Error(err)
 	}
 	creditPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(
-		booking.CreditAccountID,
-		transaction.TransactionID,
-		entity.PaymentReferenceSucceeded,
-		booking.PaymentID,
-		booking.DebitAccountID,
-		transaction.Currency,
-		booking.Amount,
-		transaction.CreatedAt,
+		valueobject.LedgerAccountPostingInput{
+			AccountID:             booking.CreditAccountID,
+			TransactionID:         transaction.TransactionID,
+			ReferenceType:         ledgeraggregate.EventNameLedgerAccountDepositFromIntent,
+			ReferenceID:           booking.PaymentID,
+			CounterpartyAccountID: booking.DebitAccountID,
+			Currency:              transaction.Currency,
+			AmountDelta:           booking.Amount,
+			BookedAt:              transaction.CreatedAt,
+		},
 	)
 	if err != nil {
 		return stackErr.Error(err)
 	}
 
-	if err := s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
-		alreadyApplied, err := s.ensureLedgerPostingsState(ctx, txRepos, []expectedLedgerPosting{
-			{accountID: booking.DebitAccountID, posting: debitPosting},
-			{accountID: booking.CreditAccountID, posting: creditPosting},
-		})
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		if alreadyApplied {
-			return nil
-		}
-
-		debitAgg, err := s.loadLedgerAccount(ctx, txRepos, booking.DebitAccountID)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		creditAgg, err := s.loadLedgerAccount(ctx, txRepos, booking.CreditAccountID)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-
-		debitApplied, err := debitAgg.BookPayment(
-			transaction.TransactionID,
-			booking.PaymentID,
-			booking.CreditAccountID,
-			transaction.Currency,
-			-booking.Amount,
-			transaction.CreatedAt,
-		)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		creditApplied, err := creditAgg.BookPayment(
-			transaction.TransactionID,
-			booking.PaymentID,
-			booking.DebitAccountID,
-			transaction.Currency,
-			booking.Amount,
-			transaction.CreatedAt,
-		)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		if debitApplied != creditApplied {
-			return stackErr.Error(fmt.Errorf("ledger payment booking became inconsistent for transaction_id=%s", transaction.TransactionID))
-		}
-		if !debitApplied {
-			return nil
-		}
-
-		if alreadyApplied, err := s.saveLedgerAccount(ctx, txRepos, debitAgg); err != nil {
-			return stackErr.Error(err)
-		} else if alreadyApplied {
-			return nil
-		}
-		if alreadyApplied, err := s.saveLedgerAccount(ctx, txRepos, creditAgg); err != nil {
-			return stackErr.Error(err)
-		} else if alreadyApplied {
-			return stackErr.Error(fmt.Errorf("ledger payment duplicate state became inconsistent for transaction_id=%s", transaction.TransactionID))
-		}
-		return nil
-	}); err != nil {
+	events, err := ledgerPaymentEventsFromPostings([]ledgerPostingEventInput{
+		{accountID: booking.DebitAccountID, posting: debitPosting},
+		{accountID: booking.CreditAccountID, posting: creditPosting},
+	})
+	if err != nil {
 		return stackErr.Error(err)
 	}
 
-	return nil
+	return stackErr.Error(s.RecordLedgerEvents(ctx, RecordLedgerEventsCommand{Events: events}))
 }
 
 func (s *ledgerService) RecordPaymentReversed(ctx context.Context, command RecordPaymentReversedCommand) error {
@@ -302,100 +261,136 @@ func (s *ledgerService) RecordPaymentReversed(ctx context.Context, command Recor
 	}
 
 	debitPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(
-		booking.DebitAccountID,
-		transaction.TransactionID,
-		booking.ReversalType,
-		booking.PaymentID,
-		booking.CreditAccountID,
-		transaction.Currency,
-		-booking.Amount,
-		transaction.CreatedAt,
+		valueobject.LedgerAccountPostingInput{
+			AccountID:             booking.DebitAccountID,
+			TransactionID:         transaction.TransactionID,
+			ReferenceType:         debitLedgerEventNameForPaymentReversal(booking.ReversalType),
+			ReferenceID:           booking.PaymentID,
+			CounterpartyAccountID: booking.CreditAccountID,
+			Currency:              transaction.Currency,
+			AmountDelta:           -booking.Amount,
+			BookedAt:              transaction.CreatedAt,
+		},
 	)
 	if err != nil {
 		return stackErr.Error(err)
 	}
 	creditPosting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(
-		booking.CreditAccountID,
-		transaction.TransactionID,
-		booking.ReversalType,
-		booking.PaymentID,
-		booking.DebitAccountID,
-		transaction.Currency,
-		booking.Amount,
-		transaction.CreatedAt,
+		valueobject.LedgerAccountPostingInput{
+			AccountID:             booking.CreditAccountID,
+			TransactionID:         transaction.TransactionID,
+			ReferenceType:         creditLedgerEventNameForPaymentReversal(booking.ReversalType),
+			ReferenceID:           booking.PaymentID,
+			CounterpartyAccountID: booking.DebitAccountID,
+			Currency:              transaction.Currency,
+			AmountDelta:           booking.Amount,
+			BookedAt:              transaction.CreatedAt,
+		},
 	)
 	if err != nil {
 		return stackErr.Error(err)
 	}
 
-	if err := s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
-		alreadyApplied, err := s.ensureLedgerPostingsState(ctx, txRepos, []expectedLedgerPosting{
-			{accountID: booking.DebitAccountID, posting: debitPosting},
-			{accountID: booking.CreditAccountID, posting: creditPosting},
-		})
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		if alreadyApplied {
-			return nil
-		}
-
-		debitAgg, err := s.loadLedgerAccount(ctx, txRepos, booking.DebitAccountID)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		creditAgg, err := s.loadLedgerAccount(ctx, txRepos, booking.CreditAccountID)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-
-		debitApplied, err := debitAgg.ReversePayment(
-			transaction.TransactionID,
-			booking.ReversalType,
-			booking.PaymentID,
-			booking.CreditAccountID,
-			transaction.Currency,
-			-booking.Amount,
-			transaction.CreatedAt,
-		)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		creditApplied, err := creditAgg.ReversePayment(
-			transaction.TransactionID,
-			booking.ReversalType,
-			booking.PaymentID,
-			booking.DebitAccountID,
-			transaction.Currency,
-			booking.Amount,
-			transaction.CreatedAt,
-		)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		if debitApplied != creditApplied {
-			return stackErr.Error(fmt.Errorf("ledger payment reversal became inconsistent for transaction_id=%s", transaction.TransactionID))
-		}
-		if !debitApplied {
-			return nil
-		}
-
-		if alreadyApplied, err := s.saveLedgerAccount(ctx, txRepos, debitAgg); err != nil {
-			return stackErr.Error(err)
-		} else if alreadyApplied {
-			return nil
-		}
-		if alreadyApplied, err := s.saveLedgerAccount(ctx, txRepos, creditAgg); err != nil {
-			return stackErr.Error(err)
-		} else if alreadyApplied {
-			return stackErr.Error(fmt.Errorf("ledger payment reversal duplicate state became inconsistent for transaction_id=%s", transaction.TransactionID))
-		}
-		return nil
-	}); err != nil {
+	events, err := ledgerPaymentEventsFromPostings([]ledgerPostingEventInput{
+		{accountID: booking.DebitAccountID, posting: debitPosting},
+		{accountID: booking.CreditAccountID, posting: creditPosting},
+	})
+	if err != nil {
 		return stackErr.Error(err)
 	}
 
-	return nil
+	return stackErr.Error(s.RecordLedgerEvents(ctx, RecordLedgerEventsCommand{Events: events}))
+}
+
+func (s *ledgerService) RecordLedgerEvents(ctx context.Context, command RecordLedgerEventsCommand) error {
+	if len(command.Events) == 0 {
+		return nil
+	}
+
+	return stackErr.Error(s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
+		aggregates := make(map[string]*ledgeraggregate.LedgerAccountAggregate, len(command.Events))
+		saveOrder := make([]string, 0, len(command.Events))
+		appliedCount := 0
+		for _, evt := range command.Events {
+			accountID := strings.TrimSpace(evt.AggregateID)
+			agg, ok := aggregates[accountID]
+			if !ok {
+				loadedAgg, err := s.loadLedgerAccount(ctx, txRepos, accountID)
+				if err != nil {
+					return stackErr.Error(err)
+				}
+				aggregates[accountID] = loadedAgg
+				agg = loadedAgg
+				saveOrder = append(saveOrder, accountID)
+			}
+
+			applied, err := agg.ApplyPostingEvent(evt.EventData)
+			if err != nil {
+				return stackErr.Error(err)
+			}
+			if applied {
+				appliedCount++
+			}
+		}
+		if appliedCount == 0 {
+			return nil
+		}
+		if appliedCount != len(command.Events) {
+			return stackErr.Error(fmt.Errorf("ledger event application became inconsistent"))
+		}
+
+		for _, accountID := range saveOrder {
+			agg := aggregates[accountID]
+			if alreadyApplied, err := s.saveLedgerAccount(ctx, txRepos, agg); err != nil {
+				return stackErr.Error(err)
+			} else if alreadyApplied {
+				return stackErr.Error(fmt.Errorf("ledger duplicate state became inconsistent for aggregate_id=%s", accountID))
+			}
+		}
+		return nil
+	}))
+}
+
+type ledgerPostingEventInput struct {
+	accountID string
+	posting   entity.LedgerAccountPosting
+}
+
+func ledgerPaymentEventsFromPostings(inputs []ledgerPostingEventInput) ([]eventpkg.Event, error) {
+	events := make([]eventpkg.Event, 0, len(inputs))
+	for _, item := range inputs {
+		evt, ok, err := ledgeraggregate.NewLedgerAccountEventFromPosting(item.accountID, item.posting)
+		if err != nil {
+			return nil, stackErr.Error(err)
+		}
+		if !ok {
+			return nil, stackErr.Error(fmt.Errorf("unsupported ledger posting reference_type=%s", item.posting.ReferenceType))
+		}
+		events = append(events, evt)
+	}
+	return events, nil
+}
+
+func debitLedgerEventNameForPaymentReversal(paymentEventName string) string {
+	switch strings.TrimSpace(paymentEventName) {
+	case sharedevents.EventPaymentRefunded:
+		return ledgeraggregate.EventNameLedgerAccountWithdrawFromRefund
+	case sharedevents.EventPaymentChargeback:
+		return ledgeraggregate.EventNameLedgerAccountWithdrawFromChargeback
+	default:
+		return ""
+	}
+}
+
+func creditLedgerEventNameForPaymentReversal(paymentEventName string) string {
+	switch strings.TrimSpace(paymentEventName) {
+	case sharedevents.EventPaymentRefunded:
+		return ledgeraggregate.EventNameLedgerAccountDepositFromRefund
+	case sharedevents.EventPaymentChargeback:
+		return ledgeraggregate.EventNameLedgerAccountDepositFromChargeback
+	default:
+		return ""
+	}
 }
 
 func (s *ledgerService) loadLedgerAccount(

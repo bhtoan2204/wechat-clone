@@ -1,14 +1,9 @@
 package events
 
-import "time"
+import (
+	"time"
 
-const (
-	EventPaymentCreated                = "payment.created"
-	EventPaymentCheckoutSessionCreated = "payment.checkout_session_created"
-	EventPaymentSucceeded              = "payment.succeeded"
-	EventPaymentFailed                 = "payment.failed"
-	EventPaymentRefunded               = "payment.refunded"
-	EventPaymentChargeback             = "payment.chargeback"
+	"wechat-clone/core/shared/pkg/event"
 )
 
 type PaymentCreatedEvent struct {
@@ -93,3 +88,12 @@ type PaymentChargebackEvent struct {
 	IdempotencyKey     string    `json:"idempotency_key"`
 	ChargedBackAt      time.Time `json:"charged_back_at"`
 }
+
+var (
+	EventPaymentCreated                = event.EventName((*PaymentCreatedEvent)(nil))
+	EventPaymentCheckoutSessionCreated = event.EventName((*PaymentCheckoutSessionCreatedEvent)(nil))
+	EventPaymentSucceeded              = event.EventName((*PaymentSucceededEvent)(nil))
+	EventPaymentFailed                 = event.EventName((*PaymentFailedEvent)(nil))
+	EventPaymentRefunded               = event.EventName((*PaymentRefundedEvent)(nil))
+	EventPaymentChargeback             = event.EventName((*PaymentChargebackEvent)(nil))
+)

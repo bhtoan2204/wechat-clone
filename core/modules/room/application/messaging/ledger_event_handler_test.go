@@ -15,23 +15,23 @@ import (
 	sharedevents "wechat-clone/core/shared/contracts/events"
 
 	"go.uber.org/mock/gomock"
+	"gorm.io/gorm"
 )
 
 func TestDecodeLedgerAccountTransferPayloadDerivesParticipantsFromEntrySign(t *testing.T) {
-	raw, err := json.Marshal(sharedevents.LedgerTransaction{
+	raw, err := json.Marshal(sharedevents.LedgerAccountTransferredToAccountEvent{
 		TransactionID: "txn-1",
+		ToAccountID:   "receiver-1",
 		Currency:      "vnd",
-		CreatedAt:     time.Date(2026, 4, 19, 8, 30, 0, 0, time.UTC),
-		Entries: []*sharedevents.LedgerEntry{
-			{AccountID: "receiver-1", Currency: "VND", Amount: 2500},
-			{AccountID: "sender-1", Currency: "VND", Amount: -2500},
-		},
+		Amount:        2500,
+		BookedAt:      time.Date(2026, 4, 19, 8, 30, 0, 0, time.UTC),
 	})
 	if err != nil {
 		t.Fatalf("marshal payload: %v", err)
 	}
 
-	payload, err := decodeLedgerAccountTransferPayload(context.Background(), raw)
+	ctx := context.WithValue(context.Background(), ledgerTransferSenderAccountIDKey{}, "sender-1")
+	payload, err := decodeLedgerAccountTransferPayload(ctx, raw)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -51,20 +51,19 @@ func TestDecodeLedgerAccountTransferPayloadDerivesParticipantsFromEntrySign(t *t
 }
 
 func TestDecodeLedgerAccountTransferPayloadRejectsUnbalancedEntries(t *testing.T) {
-	raw, err := json.Marshal(sharedevents.LedgerTransaction{
+	raw, err := json.Marshal(sharedevents.LedgerAccountTransferredToAccountEvent{
 		TransactionID: "txn-2",
+		ToAccountID:   "receiver-1",
 		Currency:      "USD",
-		Entries: []*sharedevents.LedgerEntry{
-			{AccountID: "sender-1", Currency: "USD", Amount: -1000},
-			{AccountID: "receiver-1", Currency: "USD", Amount: 999},
-		},
+		Amount:        0,
 	})
 	if err != nil {
 		t.Fatalf("marshal payload: %v", err)
 	}
 
-	if _, err := decodeLedgerAccountTransferPayload(context.Background(), raw); err == nil {
-		t.Fatal("expected unbalanced ledger payload to fail")
+	ctx := context.WithValue(context.Background(), ledgerTransferSenderAccountIDKey{}, "sender-1")
+	if _, err := decodeLedgerAccountTransferPayload(ctx, raw); err == nil {
+		t.Fatal("expected invalid ledger transfer payload to fail")
 	}
 }
 
@@ -79,25 +78,24 @@ func TestHandleLedgerAccountTransferredToAccountSkipsDuplicateTransferMessage(t 
 		baseRepo: baseRepo,
 	}
 
-	raw, err := json.Marshal(sharedevents.LedgerTransaction{
+	raw, err := json.Marshal(sharedevents.LedgerAccountTransferredToAccountEvent{
 		TransactionID: "txn-dup",
+		ToAccountID:   "receiver-1",
 		Currency:      "VND",
-		Entries: []*sharedevents.LedgerEntry{
-			{AccountID: "sender-1", Currency: "VND", Amount: -2500},
-			{AccountID: "receiver-1", Currency: "VND", Amount: 2500},
-		},
+		Amount:        2500,
 	})
 	if err != nil {
 		t.Fatalf("marshal payload: %v", err)
 	}
 
+	ctx := context.WithValue(context.Background(), ledgerTransferSenderAccountIDKey{}, "sender-1")
 	baseRepo.EXPECT().MessageRepository().Return(messageRepo).Times(1)
 	messageRepo.EXPECT().
 		GetMessageByID(gomock.Any(), transferMessageID("txn-dup")).
 		Return(&entity.MessageEntity{ID: transferMessageID("txn-dup")}, nil).
 		Times(1)
 
-	if err := handler.handleLedgerAccountTransferredToAccount(context.Background(), raw); err != nil {
+	if err := handler.handleLedgerAccountTransferredToAccount(ctx, raw); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 }
@@ -108,7 +106,6 @@ func TestHandleLedgerAccountTransferredToAccountCreatesDeterministicTransferMess
 
 	baseRepo := repos.NewMockRepos(ctrl)
 	txRepos := repos.NewMockRepos(ctrl)
-	roomAggRepo := repos.NewMockRoomAggregateRepository(ctrl)
 	txRoomAggRepo := repos.NewMockRoomAggregateRepository(ctrl)
 	messageRepo := repos.NewMockMessageRepository(ctrl)
 	realtime := service.NewMockService(ctrl)
@@ -121,28 +118,22 @@ func TestHandleLedgerAccountTransferredToAccountCreatesDeterministicTransferMess
 	}
 
 	createdAt := time.Date(2026, 4, 19, 8, 30, 0, 0, time.UTC)
-	raw, err := json.Marshal(sharedevents.LedgerTransaction{
+	raw, err := json.Marshal(sharedevents.LedgerAccountTransferredToAccountEvent{
 		TransactionID: "txn-123",
+		ToAccountID:   "receiver-1",
 		Currency:      "VND",
-		CreatedAt:     createdAt,
-		Entries: []*sharedevents.LedgerEntry{
-			{AccountID: "receiver-1", Currency: "VND", Amount: 2500},
-			{AccountID: "sender-1", Currency: "VND", Amount: -2500},
-		},
+		Amount:        2500,
+		BookedAt:      createdAt,
 	})
 	if err != nil {
 		t.Fatalf("marshal payload: %v", err)
 	}
 
+	ctx := context.WithValue(context.Background(), ledgerTransferSenderAccountIDKey{}, "sender-1")
 	baseRepo.EXPECT().MessageRepository().Return(messageRepo).Times(1)
 	messageRepo.EXPECT().
 		GetMessageByID(gomock.Any(), transferMessageID("txn-123")).
 		Return(nil, nil).
-		Times(1)
-	baseRepo.EXPECT().RoomAggregateRepository().Return(roomAggRepo).Times(1)
-	roomAggRepo.EXPECT().
-		LoadByDirectKey(gomock.Any(), entity.CanonicalDirectKey("sender-1", "receiver-1")).
-		Return(roomAgg, nil).
 		Times(1)
 	baseRepo.EXPECT().
 		WithTransaction(gomock.Any(), gomock.Any()).
@@ -150,7 +141,11 @@ func TestHandleLedgerAccountTransferredToAccountCreatesDeterministicTransferMess
 			return fn(txRepos)
 		}).
 		Times(1)
-	txRepos.EXPECT().RoomAggregateRepository().Return(txRoomAggRepo).Times(1)
+	txRepos.EXPECT().RoomAggregateRepository().Return(txRoomAggRepo).Times(2)
+	txRoomAggRepo.EXPECT().
+		LoadByDirectKey(gomock.Any(), entity.CanonicalDirectKey("sender-1", "receiver-1")).
+		Return(roomAgg, nil).
+		Times(1)
 	txRoomAggRepo.EXPECT().
 		Save(gomock.Any(), roomAgg).
 		Return(nil).
@@ -178,9 +173,79 @@ func TestHandleLedgerAccountTransferredToAccountCreatesDeterministicTransferMess
 		}).
 		Times(1)
 
-	if err := handler.handleLedgerAccountTransferredToAccount(context.Background(), raw); err != nil {
+	if err := handler.handleLedgerAccountTransferredToAccount(ctx, raw); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+}
+
+func TestHandleLedgerAccountTransferredToAccountCreatesDirectRoomWhenMissing(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	baseRepo := repos.NewMockRepos(ctrl)
+	txRepos := repos.NewMockRepos(ctrl)
+	txRoomAggRepo := repos.NewMockRoomAggregateRepository(ctrl)
+	messageRepo := repos.NewMockMessageRepository(ctrl)
+	realtime := service.NewMockService(ctrl)
+
+	handler := &messageHandler{
+		baseRepo: baseRepo,
+		svc:      realtime,
+	}
+
+	createdAt := time.Date(2026, 4, 19, 8, 30, 0, 0, time.UTC)
+	raw, err := json.Marshal(sharedevents.LedgerAccountTransferredToAccountEvent{
+		TransactionID: "txn-create-room",
+		ToAccountID:   "receiver-1",
+		Currency:      "VND",
+		Amount:        2500,
+		BookedAt:      createdAt,
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+
+	ctx := context.WithValue(context.Background(), ledgerTransferSenderAccountIDKey{}, "sender-1")
+	baseRepo.EXPECT().MessageRepository().Return(messageRepo).Times(1)
+	messageRepo.EXPECT().
+		GetMessageByID(gomock.Any(), transferMessageID("txn-create-room")).
+		Return(nil, nil).
+		Times(1)
+	baseRepo.EXPECT().
+		WithTransaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(repos.Repos) error) error {
+			return fn(txRepos)
+		}).
+		Times(1)
+	txRepos.EXPECT().RoomAggregateRepository().Return(txRoomAggRepo).Times(2)
+	txRoomAggRepo.EXPECT().
+		LoadByDirectKey(gomock.Any(), entity.CanonicalDirectKey("sender-1", "receiver-1")).
+		Return(nil, stackNotFound()).
+		Times(1)
+	txRoomAggRepo.EXPECT().
+		Save(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, agg *aggregate.RoomStateAggregate) error {
+			if agg == nil || agg.Room() == nil {
+				t.Fatal("expected room aggregate to be created")
+			}
+			if agg.Room().DirectKey != entity.CanonicalDirectKey("sender-1", "receiver-1") {
+				t.Fatalf("expected direct room key, got %s", agg.Room().DirectKey)
+			}
+			return nil
+		}).
+		Times(1)
+	realtime.EXPECT().
+		EmitMessage(gomock.Any(), gomock.AssignableToTypeOf(roomtypes.MessagePayload{})).
+		Return(nil).
+		Times(1)
+
+	if err := handler.handleLedgerAccountTransferredToAccount(ctx, raw); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func stackNotFound() error {
+	return gorm.ErrRecordNotFound
 }
 
 func mustBuildDirectRoomAggregate(t *testing.T, roomID, senderID, receiverID string) *aggregate.RoomStateAggregate {

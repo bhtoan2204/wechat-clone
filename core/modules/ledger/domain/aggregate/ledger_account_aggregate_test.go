@@ -5,7 +5,8 @@ import (
 	"testing"
 	"time"
 
-	ledgerentity "wechat-clone/core/modules/ledger/domain/entity"
+	valueobject "wechat-clone/core/modules/ledger/domain/value_object"
+	sharedevents "wechat-clone/core/shared/contracts/events"
 	eventpkg "wechat-clone/core/shared/pkg/event"
 )
 
@@ -73,7 +74,7 @@ func TestLedgerAccountAggregateReversePaymentLifecycle(t *testing.T) {
 		t.Fatalf("expected payment posting to apply")
 	}
 
-	applied, err = aggregate.ReversePayment("payment:pay-1:refunded", ledgerentity.PaymentReferenceRefunded, "pay-1", "ledger:clearing:provider:stripe", "VND", -300, time.Date(2026, 4, 16, 11, 0, 0, 0, time.UTC))
+	applied, err = aggregate.ReversePayment("payment:pay-1:refunded", sharedevents.EventPaymentRefunded, "pay-1", "ledger:clearing:provider:stripe", "VND", -300, time.Date(2026, 4, 16, 11, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("ReversePayment() error = %v", err)
 	}
@@ -87,7 +88,7 @@ func TestLedgerAccountAggregateReversePaymentLifecycle(t *testing.T) {
 		t.Fatalf("expected refund event to be EventLedgerAccountWithdrawFromRefund, got %T", aggregate.Root().Events()[1].EventData)
 	}
 
-	applied, err = aggregate.ReversePayment("payment:pay-1:refunded", ledgerentity.PaymentReferenceRefunded, "pay-1", "ledger:clearing:provider:stripe", "VND", -300, time.Date(2026, 4, 16, 11, 0, 0, 0, time.UTC))
+	applied, err = aggregate.ReversePayment("payment:pay-1:refunded", sharedevents.EventPaymentRefunded, "pay-1", "ledger:clearing:provider:stripe", "VND", -300, time.Date(2026, 4, 16, 11, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("ReversePayment() duplicate error = %v", err)
 	}
@@ -160,28 +161,32 @@ func TestLedgerAccountAggregateLoadFromHistoryRejectsInvalidPostingPayload(t *te
 
 func TestSameLedgerAccountPostingIgnoresBookedAt(t *testing.T) {
 	left, err := NewLedgerAccountPaymentPosting(
-		"wallet:available",
-		"payment:pay-1:succeeded",
-		ledgerentity.PaymentReferenceSucceeded,
-		"pay-1",
-		"ledger:clearing:provider:stripe",
-		"VND",
-		300,
-		time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC),
+		valueobject.LedgerAccountPostingInput{
+			AccountID:             "wallet:available",
+			TransactionID:         "payment:pay-1:succeeded",
+			ReferenceType:         EventNameLedgerAccountDepositFromIntent,
+			ReferenceID:           "pay-1",
+			CounterpartyAccountID: "ledger:clearing:provider:stripe",
+			Currency:              "VND",
+			AmountDelta:           300,
+			BookedAt:              time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC),
+		},
 	)
 	if err != nil {
 		t.Fatalf("NewLedgerAccountPaymentPosting() error = %v", err)
 	}
 
 	right, err := NewLedgerAccountPaymentPosting(
-		"wallet:available",
-		"payment:pay-1:succeeded",
-		ledgerentity.PaymentReferenceSucceeded,
-		"pay-1",
-		"ledger:clearing:provider:stripe",
-		"VND",
-		300,
-		time.Date(2026, 4, 16, 10, 5, 0, 0, time.UTC),
+		valueobject.LedgerAccountPostingInput{
+			AccountID:             "wallet:available",
+			TransactionID:         "payment:pay-1:succeeded",
+			ReferenceType:         EventNameLedgerAccountDepositFromIntent,
+			ReferenceID:           "pay-1",
+			CounterpartyAccountID: "ledger:clearing:provider:stripe",
+			Currency:              "VND",
+			AmountDelta:           300,
+			BookedAt:              time.Date(2026, 4, 16, 10, 5, 0, 0, time.UTC),
+		},
 	)
 	if err != nil {
 		t.Fatalf("NewLedgerAccountPaymentPosting() error = %v", err)

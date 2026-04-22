@@ -11,6 +11,7 @@ import (
 	"wechat-clone/core/modules/payment/domain/entity"
 	repos "wechat-clone/core/modules/payment/domain/repos"
 	domainservice "wechat-clone/core/modules/payment/domain/service"
+	sharedevents "wechat-clone/core/shared/contracts/events"
 	sharedlock "wechat-clone/core/shared/infra/lock"
 	"wechat-clone/core/shared/pkg/actorctx"
 
@@ -18,7 +19,7 @@ import (
 )
 
 func TestCreatePaymentRejectsUnauthorizedOrCrossAccountRequests(t *testing.T) {
-	t.Run("rejects credit account that does not match authenticated actor", func(t *testing.T) {
+	t.Run("rejects client supplied credit account id", func(t *testing.T) {
 		svc := &paymentCommandService{}
 
 		_, err := svc.CreatePayment(
@@ -27,7 +28,7 @@ func TestCreatePaymentRejectsUnauthorizedOrCrossAccountRequests(t *testing.T) {
 				Provider:        "stripe",
 				Amount:          100,
 				Currency:        "VND",
-				CreditAccountID: "acc-user-2",
+				CreditAccountID: "acc-user-1",
 			},
 		)
 		if !errors.Is(err, ErrValidation) {
@@ -90,14 +91,14 @@ func TestProcessWebhookLocksByTransactionIDAndFinalizesSuccess(t *testing.T) {
 		if len(processedEvents) != 1 {
 			t.Fatalf("expected 1 processed event, got %d", len(processedEvents))
 		}
-		if processedEvents[0].IdempotencyKey != "payment.succeeded:txn-1" {
+		if processedEvents[0].IdempotencyKey != sharedevents.EventPaymentSucceeded+":txn-1" {
 			t.Fatalf("unexpected processed event idempotency key: %s", processedEvents[0].IdempotencyKey)
 		}
 		outboxEvents := savedAggregate.PendingOutboxEvents()
 		if len(outboxEvents) != 1 {
 			t.Fatalf("expected 1 outbox event, got %d", len(outboxEvents))
 		}
-		if outboxEvents[0].EventName != "payment.succeeded" {
+		if outboxEvents[0].EventName != sharedevents.EventPaymentSucceeded {
 			t.Fatalf("unexpected outbox event name: %s", outboxEvents[0].EventName)
 		}
 		return nil
@@ -148,7 +149,7 @@ func TestApplyProviderOutcomeFinalizesSuccessOnlyOncePerPayment(t *testing.T) {
 		if len(processedEvents) != 1 {
 			t.Fatalf("expected 1 processed event, got %d", len(processedEvents))
 		}
-		if processedEvents[0].IdempotencyKey != "payment.succeeded:txn-1" {
+		if processedEvents[0].IdempotencyKey != sharedevents.EventPaymentSucceeded+":txn-1" {
 			t.Fatalf("unexpected processed event idempotency key: %s", processedEvents[0].IdempotencyKey)
 		}
 		return nil
@@ -258,14 +259,14 @@ func TestApplyProviderOutcomeFinalizesRefundAsReversal(t *testing.T) {
 		if len(processedEvents) != 1 {
 			t.Fatalf("expected 1 processed event, got %d", len(processedEvents))
 		}
-		if processedEvents[0].IdempotencyKey != "payment.refunded:txn-1" {
+		if processedEvents[0].IdempotencyKey != sharedevents.EventPaymentRefunded+":txn-1" {
 			t.Fatalf("unexpected processed event idempotency key: %s", processedEvents[0].IdempotencyKey)
 		}
 		outboxEvents := savedAggregate.PendingOutboxEvents()
 		if len(outboxEvents) != 1 {
 			t.Fatalf("expected 1 outbox event, got %d", len(outboxEvents))
 		}
-		if outboxEvents[0].EventName != "payment.refunded" {
+		if outboxEvents[0].EventName != sharedevents.EventPaymentRefunded {
 			t.Fatalf("unexpected outbox event name: %s", outboxEvents[0].EventName)
 		}
 		return nil

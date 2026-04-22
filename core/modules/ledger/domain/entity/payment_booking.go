@@ -4,12 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-)
 
-const (
-	PaymentReferenceSucceeded  = "payment.succeeded"
-	PaymentReferenceRefunded   = "payment.refunded"
-	PaymentReferenceChargeback = "payment.chargeback"
+	sharedevents "wechat-clone/core/shared/contracts/events"
 )
 
 var (
@@ -158,9 +154,9 @@ func NewPaymentReversalBooking(input PaymentReversalBookingInput) (*PaymentRever
 func (b *PaymentReversalBooking) LedgerTransactionID() string {
 	suffix := "reversed"
 	switch b.ReversalType {
-	case PaymentReferenceRefunded:
+	case sharedevents.EventPaymentRefunded:
 		suffix = "refunded"
-	case PaymentReferenceChargeback:
+	case sharedevents.EventPaymentChargeback:
 		suffix = "chargeback"
 	}
 	return fmt.Sprintf("payment:%s:%s", strings.TrimSpace(b.PaymentID), suffix)
@@ -179,10 +175,10 @@ func ledgerClearingAccountID(clearingAccountKey string) string {
 
 func normalizePaymentBookingType(value string) string {
 	switch strings.TrimSpace(value) {
-	case PaymentReferenceRefunded:
-		return PaymentReferenceRefunded
-	case PaymentReferenceChargeback:
-		return PaymentReferenceChargeback
+	case sharedevents.EventPaymentRefunded:
+		return sharedevents.EventPaymentRefunded
+	case sharedevents.EventPaymentChargeback:
+		return sharedevents.EventPaymentChargeback
 	default:
 		return ""
 	}
