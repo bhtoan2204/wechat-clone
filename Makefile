@@ -1,8 +1,8 @@
 .DEFAULT_GOAL := help
 
-FULL_COMPOSE := docker compose -f docker-compose.dev-min.yml -f docker-compose.full.yml
-APP_COMPOSE := docker compose -f docker-compose.app.yml
-PRODUCTION_COMPOSE := docker compose -f docker-compose.dev-min.yml -f docker-compose.full.yml -f docker-compose.app.yml
+FULL_COMPOSE := docker compose -p wechat-full -f docker-compose.dev-min.yml -f docker-compose.full.yml
+APP_COMPOSE := docker compose -p wechat-app -f docker-compose.app.yml
+PRODUCTION_COMPOSE := docker compose -p wechat-prod -f docker-compose.dev-min.yml -f docker-compose.full.yml -f docker-compose.app.yml
 
 BASE_ENV_FILE := secret/.env
 
@@ -44,12 +44,16 @@ up-app:
 
 ## Stop and remove local containers
 down:
-	@bash -c '$(LOAD_BASE_ENV) $(FULL_COMPOSE) down --remove-orphans'
+	@bash -c '$(LOAD_BASE_ENV) $(FULL_COMPOSE) down'
 .PHONY: down
 
 down-all:
 	@bash -c '$(LOAD_BASE_ENV) $(PRODUCTION_COMPOSE) down --remove-orphans'
-.PHONY: down
+.PHONY: down-all
+
+down-app:
+	@bash -c '$(LOAD_BASE_ENV) $(APP_COMPOSE) down'
+.PHONY: down-app
 
 ## Prepare Cassandra keyspace and MinIO bucket for local development
 bootstrap:
