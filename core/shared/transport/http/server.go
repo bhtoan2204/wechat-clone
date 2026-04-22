@@ -8,8 +8,6 @@ import (
 	"strings"
 	appCtx "wechat-clone/core/context"
 	"wechat-clone/core/shared/config"
-	"wechat-clone/core/shared/constant"
-	"wechat-clone/core/shared/infra/idempotency"
 	"wechat-clone/core/shared/pkg/logging"
 	baseserver "wechat-clone/core/shared/pkg/server"
 	"wechat-clone/core/shared/pkg/stackErr"
@@ -53,22 +51,10 @@ func (s *Server) Routes(ctx context.Context, appCtx *appCtx.AppContext) *gin.Eng
 	r := gin.New()
 	r.MaxMultipartMemory = 50 << 20
 	r.RedirectTrailingSlash = false
-	cache := appCtx.GetCache()
 	r.Use(middleware.SetRequestID())
-	idemStore := idempotency.NewRedisStore(cache)
-	idemManager := idempotency.NewManager(
-		idemStore,
-		constant.DEFAULT_IDEMPOTENCY_LOCK_TTL,
-		constant.DEFAULT_IDEMPOTENCY_DONE_TTL,
-	)
-	if s.cfg.ServerConfig.Environment == "production" {
-		r.Use(middleware.IdempotencyMiddleware(idemManager))
-		r.Use(middleware.RateLimitMiddleware(cache))
-	}
 	r.Use(gin.CustomRecovery(func(c *gin.Context, err interface{}) {
 		c.JSON(http.StatusInternalServerError, gin.H{"errors": gin.H{"error": "something went wrong"}})
 	}))
-	r.Use(middleware.ErrorMiddleware())
 
 	// cors
 	corsConfig := cors.DefaultConfig()
