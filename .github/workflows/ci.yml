@@ -2,24 +2,25 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: ["*"]
+    branches: [ "*" ]
 
 permissions:
   contents: read
 
 jobs:
-  test-and-build:
+  quality:
+    name: Quality checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
@@ -39,8 +40,49 @@ jobs:
             exit 1
           fi
 
-      - name: Run unit tests
-        run: go test ./... -v -count=1
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.8
+          args: --timeout=5m
+
+      - name: Run unit tests with coverage
+        run: go test ./... -v -count=1 -coverprofile=coverage.out
+
+      - name: Show coverage summary
+        run: go tool cover -func=coverage.out
 
       - name: Build
         run: go build ./...
+
+  codeql:
+    name: CodeQL
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: go
+
+      - name: Build for CodeQL
+        run: go build ./...
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
