@@ -31,16 +31,16 @@ help:
 
 ## Start the full local stack for development
 up:
-	@bash -c '$(LOAD_BASE_ENV) $(FULL_COMPOSE) up -d'
+	@bash -c '$(LOAD_BASE_ENV) $(FULL_COMPOSE) up -d --build'
 .PHONY: up
 
 ## Alias for the default full local stack
 up-full:
-	@bash -c '$(LOAD_BASE_ENV) $(PRODUCTION_COMPOSE) up -d'
+	@bash -c '$(LOAD_BASE_ENV) $(PRODUCTION_COMPOSE) up -d --build'
 .PHONY: up-full
 
 up-app:
-	@bash -c '$(LOAD_BASE_ENV) $(APP_COMPOSE) up -d'
+	@bash -c '$(LOAD_BASE_ENV) $(APP_COMPOSE) up -d --build'
 
 ## Stop and remove local containers
 down:
