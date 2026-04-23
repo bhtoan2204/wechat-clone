@@ -181,3 +181,30 @@ func TestCORSMiddlewareAddsHeadersToUnauthorizedResponse(t *testing.T) {
 		t.Fatalf("expected allow origin header, got %q", got)
 	}
 }
+
+func TestStripCORSHeadersRemovesUpstreamCORSValues(t *testing.T) {
+	header := http.Header{}
+	header.Set("Access-Control-Allow-Origin", "*")
+	header.Set("Access-Control-Allow-Methods", "GET")
+	header.Set("Access-Control-Allow-Headers", "Content-Type")
+	header.Set("Access-Control-Expose-Headers", "X-Test")
+	header.Set("Access-Control-Max-Age", "60")
+
+	StripCORSHeaders(header)
+
+	if got := header.Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("expected allow origin to be removed, got %q", got)
+	}
+	if got := header.Get("Access-Control-Allow-Methods"); got != "" {
+		t.Fatalf("expected allow methods to be removed, got %q", got)
+	}
+	if got := header.Get("Access-Control-Allow-Headers"); got != "" {
+		t.Fatalf("expected allow headers to be removed, got %q", got)
+	}
+	if got := header.Get("Access-Control-Expose-Headers"); got != "" {
+		t.Fatalf("expected expose headers to be removed, got %q", got)
+	}
+	if got := header.Get("Access-Control-Max-Age"); got != "" {
+		t.Fatalf("expected max age to be removed, got %q", got)
+	}
+}

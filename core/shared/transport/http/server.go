@@ -13,7 +13,6 @@ import (
 	"wechat-clone/core/shared/pkg/stackErr"
 	"wechat-clone/core/shared/transport/http/middleware"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -55,18 +54,6 @@ func (s *Server) Routes(ctx context.Context, appCtx *appCtx.AppContext) *gin.Eng
 	r.Use(gin.CustomRecovery(func(c *gin.Context, err interface{}) {
 		c.JSON(http.StatusInternalServerError, gin.H{"errors": gin.H{"error": "something went wrong"}})
 	}))
-
-	// cors
-	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowAllOrigins = true
-	corsConfig.AllowHeaders = []string{
-		"*",
-		"Origin",
-		"Content-Length",
-		"Content-Type",
-		"Authorization",
-	}
-	r.Use(cors.New(corsConfig))
 
 	pingHandler := func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{

@@ -169,12 +169,24 @@ func (t *HTTPTransport) Start() error {
 			req.URL.Host = targetHost
 			req.Host = targetHost
 		},
+		ModifyResponse: func(resp *http.Response) error {
+			if resp == nil {
+				return nil
+			}
+
+			middleware.StripCORSHeaders(resp.Header)
+			if resp.Request != nil {
+				middleware.ApplyCORSHeaders(resp.Header, resp.Request.Header.Get("Origin"))
+			}
+			return nil
+		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			log.Errorw(
 				"reverse proxy request failed",
 				zap.Error(err),
 				zap.Any("request", snapshotRequestForLog(r)),
 			)
+			middleware.ApplyCORSHeaders(w.Header(), r.Header.Get("Origin"))
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadGateway)
 			_, _ = w.Write([]byte(`{"error":"Bad Gateway: Service 'wechat-clone' is currently unavailable or not found in Consul"}`))
