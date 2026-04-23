@@ -220,6 +220,27 @@ func TestCORSMiddlewareAddsHeadersToUnauthorizedResponse(t *testing.T) {
 	}
 }
 
+func TestCORSMiddlewareDoesNotDuplicateOriginWhenDownstreamAlreadySetCORS(t *testing.T) {
+	handler := CORSMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		ApplyCORSHeaders(w.Header(), "http://localhost:5173")
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/notification/list?limit=20", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	values := rec.Header().Values("Access-Control-Allow-Origin")
+	if len(values) != 1 {
+		t.Fatalf("expected a single allow origin header value, got %v", values)
+	}
+	if values[0] != "http://localhost:5173" {
+		t.Fatalf("expected allow origin header to match request origin, got %q", values[0])
+	}
+}
+
 func TestStripCORSHeadersRemovesUpstreamCORSValues(t *testing.T) {
 	header := http.Header{}
 	header.Set("Access-Control-Allow-Origin", "*")
