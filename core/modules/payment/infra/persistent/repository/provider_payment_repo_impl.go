@@ -142,34 +142,34 @@ func (r *providerPaymentRepoImpl) markProcessed(ctx context.Context, event *enti
 }
 
 func (r *providerPaymentRepoImpl) appendOutboxEvents(ctx context.Context, events ...eventpkg.Event) error {
+	if len(events) == 0 {
+		return nil
+	}
+
+	models := make([]model.PaymentOutboxEventModel, 0, len(events))
 	for _, evt := range events {
-		if err := r.appendOutboxEvent(ctx, evt); err != nil {
-			return stackErr.Error(err)
+		data, err := r.serializer.Marshal(evt.EventData)
+		if err != nil {
+			return stackErr.Error(fmt.Errorf("marshal event data failed: %w", err))
 		}
-	}
-	return nil
-}
 
-func (r *providerPaymentRepoImpl) appendOutboxEvent(ctx context.Context, evt eventpkg.Event) error {
-	data, err := r.serializer.Marshal(evt.EventData)
-	if err != nil {
-		return stackErr.Error(fmt.Errorf("marshal event data failed: %w", err))
+		createdAt := time.Now().UTC()
+		if evt.CreatedAt > 0 {
+			createdAt = time.Unix(evt.CreatedAt, 0).UTC()
+		}
+
+		models = append(models, model.PaymentOutboxEventModel{
+			AggregateID:   evt.AggregateID,
+			AggregateType: evt.AggregateType,
+			Version:       evt.Version,
+			EventName:     evt.EventName,
+			EventData:     string(data),
+			Metadata:      "{}",
+			CreatedAt:     createdAt,
+		})
 	}
 
-	createdAt := time.Now().UTC()
-	if evt.CreatedAt > 0 {
-		createdAt = time.Unix(evt.CreatedAt, 0).UTC()
-	}
-
-	return stackErr.Error(r.db.WithContext(ctx).Create(&model.PaymentOutboxEventModel{
-		AggregateID:   evt.AggregateID,
-		AggregateType: evt.AggregateType,
-		Version:       evt.Version,
-		EventName:     evt.EventName,
-		EventData:     string(data),
-		Metadata:      "{}",
-		CreatedAt:     createdAt,
-	}).Error)
+	return stackErr.Error(r.db.WithContext(ctx).Create(&models).Error)
 }
 
 func toProviderPaymentAggregate(modelIntent *model.ProviderPaymentIntentModel) (*paymentaggregate.PaymentIntentAggregate, error) {

@@ -20,9 +20,13 @@ func (k NotificationKind) Normalize() NotificationKind {
 type NotificationType string
 
 const (
-	NotificationTypeAccountCreated NotificationType = "account.created"
-	NotificationTypeRoomMention    NotificationType = "room.mention"
-	NotificationTypeRoomMessage    NotificationType = "room.message"
+	NotificationTypeAccountCreated         NotificationType = "account.created"
+	NotificationTypeRoomMention            NotificationType = "room.mention"
+	NotificationTypeRoomMessage            NotificationType = "room.message"
+	NotificationTypeFriendRequestSent      NotificationType = "relationship.friend_request.sent"
+	NotificationTypeFriendRequestCancelled NotificationType = "relationship.friend_request.cancelled"
+	NotificationTypeFriendRequestAccepted  NotificationType = "relationship.friend_request.accepted"
+	NotificationTypeFriendRequestRejected  NotificationType = "relationship.friend_request.rejected"
 )
 
 func (t NotificationType) String() string {

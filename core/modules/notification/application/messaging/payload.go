@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	roomprojection "wechat-clone/core/modules/room/application/projection"
 	"wechat-clone/core/shared/contracts"
 	sharedevents "wechat-clone/core/shared/contracts/events"
 	"wechat-clone/core/shared/pkg/logging"
@@ -14,9 +13,13 @@ import (
 )
 
 var eventPayloadTypes = map[string]reflect.Type{
-	sharedevents.EventAccountCreated:                     reflect.TypeOf(sharedevents.AccountCreatedEvent{}),
-	sharedevents.EventRoomMessageCreated:                 reflect.TypeOf(sharedevents.RoomMessageCreatedEvent{}),
-	roomprojection.EventMessageAggregateProjectionSynced: reflect.TypeOf(roomprojection.MessageAggregateSync{}),
+	sharedevents.EventAccountCreated:                         reflect.TypeOf(sharedevents.AccountCreatedEvent{}),
+	sharedevents.EventRoomMessageCreated:                     reflect.TypeOf(sharedevents.RoomMessageCreatedEvent{}),
+	sharedevents.EventMessageAggregateProjectionSynced:       reflect.TypeOf(sharedevents.RoomMessageAggregateSyncedEvent{}),
+	sharedevents.EventRelationshipPairFriendRequestSent:      reflect.TypeOf(sharedevents.RelationshipPairFriendRequestSentEvent{}),
+	sharedevents.EventRelationshipPairFriendRequestCancelled: reflect.TypeOf(sharedevents.RelationshipPairFriendRequestCancelledEvent{}),
+	sharedevents.EventRelationshipPairFriendRequestAccepted:  reflect.TypeOf(sharedevents.RelationshipPairFriendRequestAcceptedEvent{}),
+	sharedevents.EventRelationshipPairFriendRequestRejected:  reflect.TypeOf(sharedevents.RelationshipPairFriendRequestRejectedEvent{}),
 }
 
 func decodeEventPayload(ctx context.Context, eventName string, raw []byte) (interface{}, error) {

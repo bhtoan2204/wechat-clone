@@ -335,6 +335,14 @@ func normalizeNotificationType(value types.NotificationType) (types.Notification
 		return types.NotificationTypeRoomMention, nil
 	case types.NotificationTypeRoomMessage:
 		return types.NotificationTypeRoomMessage, nil
+	case types.NotificationTypeFriendRequestSent:
+		return types.NotificationTypeFriendRequestSent, nil
+	case types.NotificationTypeFriendRequestCancelled:
+		return types.NotificationTypeFriendRequestCancelled, nil
+	case types.NotificationTypeFriendRequestAccepted:
+		return types.NotificationTypeFriendRequestAccepted, nil
+	case types.NotificationTypeFriendRequestRejected:
+		return types.NotificationTypeFriendRequestRejected, nil
 	default:
 		return "", stackErr.Error(ErrNotificationTypeRequired)
 	}
@@ -385,6 +393,13 @@ func normalizeMessageNotificationInput(input MessageNotificationInput) (MessageN
 
 func WelcomeNotificationID(accountID string) string {
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte("notification:welcome:"+strings.TrimSpace(accountID))).String()
+}
+
+func FriendRequestNotificationID(notificationType types.NotificationType, requestID, accountID string) string {
+	return uuid.NewSHA1(
+		uuid.NameSpaceOID,
+		[]byte("notification:friend-request:"+notificationType.String()+":"+strings.TrimSpace(requestID)+":"+strings.TrimSpace(accountID)),
+	).String()
 }
 
 func RoomMentionNotificationID(messageID, accountID string) string {

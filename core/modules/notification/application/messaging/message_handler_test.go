@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
+	notificationservice "wechat-clone/core/modules/notification/application/service"
 	"wechat-clone/core/modules/notification/domain/aggregate"
 	notificationrepos "wechat-clone/core/modules/notification/domain/repos"
+	notificationtypes "wechat-clone/core/modules/notification/types"
 	sharedevents "wechat-clone/core/shared/contracts/events"
 
 	"go.uber.org/mock/gomock"
@@ -64,5 +66,131 @@ func TestHandleAccountEventSkipsExistingWelcomeNotification(t *testing.T) {
 
 	if err := handler.handleAccountEvent(context.Background(), raw); err != nil {
 		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestHandleRelationshipEventCreatesFriendRequestNotification(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	repo := notificationrepos.NewMockNotificationRepository(ctrl)
+	realtime := notificationservice.NewMockRealtimeService(ctrl)
+	baseRepo := notificationrepos.NewMockRepos(ctrl)
+	baseRepo.EXPECT().NotificationRepository().Return(repo).AnyTimes()
+
+	accountID := "acc-target"
+	requestID := "req-1"
+	notificationID := aggregate.FriendRequestNotificationID(notificationtypes.NotificationTypeFriendRequestSent, requestID, accountID)
+
+	repo.EXPECT().Load(gomock.Any(), notificationID).Return(nil, notificationrepos.ErrNotificationNotFound)
+	repo.EXPECT().Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.NotificationAggregate{})).DoAndReturn(func(_ context.Context, agg *aggregate.NotificationAggregate) error {
+		snapshot, err := agg.Snapshot()
+		if err != nil {
+			t.Fatalf("Snapshot() error = %v", err)
+		}
+		if snapshot.AccountID != accountID {
+			t.Fatalf("AccountID = %s, want %s", snapshot.AccountID, accountID)
+		}
+		if snapshot.Type != notificationtypes.NotificationTypeFriendRequestSent {
+			t.Fatalf("Type = %s, want %s", snapshot.Type, notificationtypes.NotificationTypeFriendRequestSent)
+		}
+		return nil
+	})
+	repo.EXPECT().CountUnread(gomock.Any(), accountID).Return(3, nil)
+	realtime.EXPECT().EmitMessage(gomock.Any(), gomock.Any()).Return(nil)
+
+	handler := &messageHandler{
+		baseRepo: baseRepo,
+		realtime: realtime,
+		push:     nil,
+		email:    nil,
+	}
+
+	raw := []byte(`{
+		"id": 11,
+		"aggregate_id": "pair:acc-source:acc-target",
+		"aggregate_type": "RelationshipPairAggregate",
+		"version": 1,
+		"event_name": "EventRelationshipPairFriendRequestSent",
+		"event_data": {
+			"RequestID":"req-1",
+			"RequesterID":"acc-source",
+			"AddresseeID":"acc-target",
+			"CreatedAt":"2026-04-23T08:00:00Z"
+		},
+		"created_at": "2026-04-23T08:00:00Z"
+	}`)
+
+	if err := handler.handleRelationshipOutboxEvent(context.Background(), raw); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestHandleRelationshipEventCreatesAcceptedNotificationForRequester(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	repo := notificationrepos.NewMockNotificationRepository(ctrl)
+	realtime := notificationservice.NewMockRealtimeService(ctrl)
+	baseRepo := notificationrepos.NewMockRepos(ctrl)
+	baseRepo.EXPECT().NotificationRepository().Return(repo).AnyTimes()
+
+	accountID := "acc-requester"
+	requestID := "req-2"
+	notificationID := aggregate.FriendRequestNotificationID(notificationtypes.NotificationTypeFriendRequestAccepted, requestID, accountID)
+
+	repo.EXPECT().Load(gomock.Any(), notificationID).Return(nil, notificationrepos.ErrNotificationNotFound)
+	repo.EXPECT().Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.NotificationAggregate{})).DoAndReturn(func(_ context.Context, agg *aggregate.NotificationAggregate) error {
+		snapshot, err := agg.Snapshot()
+		if err != nil {
+			t.Fatalf("Snapshot() error = %v", err)
+		}
+		if snapshot.AccountID != accountID {
+			t.Fatalf("AccountID = %s, want %s", snapshot.AccountID, accountID)
+		}
+		if snapshot.Type != notificationtypes.NotificationTypeFriendRequestAccepted {
+			t.Fatalf("Type = %s, want %s", snapshot.Type, notificationtypes.NotificationTypeFriendRequestAccepted)
+		}
+		return nil
+	})
+	repo.EXPECT().CountUnread(gomock.Any(), accountID).Return(5, nil)
+	realtime.EXPECT().EmitMessage(gomock.Any(), gomock.Any()).Return(nil)
+
+	handler := &messageHandler{
+		baseRepo: baseRepo,
+		realtime: realtime,
+	}
+
+	raw := []byte(`{
+		"id": 12,
+		"aggregate_id": "pair:acc-requester:acc-addressee",
+		"aggregate_type": "RelationshipPairAggregate",
+		"version": 2,
+		"event_name": "EventRelationshipPairFriendRequestAccepted",
+		"event_data": {
+			"RequestID":"req-2",
+			"RequesterID":"acc-requester",
+			"AddresseeID":"acc-addressee",
+			"CreatedAt":"2026-04-23T08:00:00Z",
+			"FriendshipID":"friendship-1",
+			"AcceptedAt":"2026-04-23T08:05:00Z"
+		},
+		"created_at": "2026-04-23T08:05:00Z"
+	}`)
+
+	if err := handler.handleRelationshipOutboxEvent(context.Background(), raw); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestDecodeRelationshipPayloadObject(t *testing.T) {
+	raw := []byte(`{"RequestID":"req-9","RequesterID":"acc-a","AddresseeID":"acc-b","CreatedAt":"2026-04-23T08:00:00Z"}`)
+
+	payloadAny, err := decodeEventPayload(context.Background(), sharedevents.EventRelationshipPairFriendRequestSent, raw)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if payloadAny == nil {
+		t.Fatal("expected payload, got nil")
 	}
 }

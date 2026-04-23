@@ -65,6 +65,8 @@ type expectedLedgerPosting struct {
 	posting   entity.LedgerAccountPosting
 }
 
+type loadedLedgerAccounts map[string]*ledgeraggregate.LedgerAccountAggregate
+
 func NewLedgerService(baseRepo ledgerrepos.Repos) *ledgerService {
 	return &ledgerService{baseRepo: baseRepo}
 }
@@ -113,7 +115,12 @@ func (s *ledgerService) TransferToAccount(ctx context.Context, command TransferT
 	}
 
 	if err := s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
-		alreadyApplied, err := s.ensureLedgerPostingsState(ctx, txRepos, []expectedLedgerPosting{
+		accounts, err := s.loadLedgerAccounts(ctx, txRepos, booking.FromAccountID, booking.ToAccountID)
+		if err != nil {
+			return stackErr.Error(err)
+		}
+
+		alreadyApplied, err := s.ensureLedgerPostingsState(accounts, []expectedLedgerPosting{
 			{accountID: booking.FromAccountID, posting: fromPosting},
 			{accountID: booking.ToAccountID, posting: toPosting},
 		})
@@ -124,14 +131,8 @@ func (s *ledgerService) TransferToAccount(ctx context.Context, command TransferT
 			return nil
 		}
 
-		fromAgg, err := s.loadLedgerAccount(ctx, txRepos, booking.FromAccountID)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		toAgg, err := s.loadLedgerAccount(ctx, txRepos, booking.ToAccountID)
-		if err != nil {
-			return stackErr.Error(err)
-		}
+		fromAgg := accounts.account(booking.FromAccountID)
+		toAgg := accounts.account(booking.ToAccountID)
 
 		fromApplied, err := fromAgg.TransferToAccount(
 			transaction.TransactionID,
@@ -308,19 +309,35 @@ func (s *ledgerService) RecordLedgerEvents(ctx context.Context, command RecordLe
 	}
 
 	return stackErr.Error(s.baseRepo.WithTransaction(ctx, func(txRepos ledgerrepos.Repos) error {
-		aggregates := make(map[string]*ledgeraggregate.LedgerAccountAggregate, len(command.Events))
+		accountIDs := make([]string, 0, len(command.Events))
+		seen := make(map[string]struct{}, len(command.Events))
+		for _, evt := range command.Events {
+			accountID := strings.TrimSpace(evt.AggregateID)
+			if accountID == "" {
+				return stackErr.Error(fmt.Errorf("ledger event aggregate_id is required"))
+			}
+			if _, exists := seen[accountID]; exists {
+				continue
+			}
+			seen[accountID] = struct{}{}
+			accountIDs = append(accountIDs, accountID)
+		}
+
+		aggregates, err := s.loadLedgerAccounts(ctx, txRepos, accountIDs...)
+		if err != nil {
+			return stackErr.Error(err)
+		}
+
 		saveOrder := make([]string, 0, len(command.Events))
 		appliedCount := 0
 		for _, evt := range command.Events {
 			accountID := strings.TrimSpace(evt.AggregateID)
-			agg, ok := aggregates[accountID]
-			if !ok {
-				loadedAgg, err := s.loadLedgerAccount(ctx, txRepos, accountID)
-				if err != nil {
-					return stackErr.Error(err)
-				}
-				aggregates[accountID] = loadedAgg
-				agg = loadedAgg
+			agg := aggregates.account(accountID)
+			if agg == nil {
+				return stackErr.Error(fmt.Errorf("ledger aggregate not loaded: %s", accountID))
+			}
+			if _, exists := seen[accountID]; exists {
+				delete(seen, accountID)
 				saveOrder = append(saveOrder, accountID)
 			}
 
@@ -413,16 +430,12 @@ func (s *ledgerService) loadLedgerAccount(
 }
 
 func (s *ledgerService) ensureLedgerPostingsState(
-	ctx context.Context,
-	repos ledgerrepos.Repos,
+	accounts loadedLedgerAccounts,
 	expected []expectedLedgerPosting,
 ) (bool, error) {
 	matchedCount := 0
 	for _, item := range expected {
-		account, err := repos.LedgerAccountAggregateRepository().Load(ctx, item.accountID)
-		if err != nil {
-			return false, stackErr.Error(err)
-		}
+		account := accounts.account(item.accountID)
 		if account == nil {
 			continue
 		}
@@ -454,6 +467,37 @@ func (s *ledgerService) ensureLedgerPostingsState(
 	}
 
 	return true, nil
+}
+
+func (s *ledgerService) loadLedgerAccounts(
+	ctx context.Context,
+	repos ledgerrepos.Repos,
+	accountIDs ...string,
+) (loadedLedgerAccounts, error) {
+	accounts := make(loadedLedgerAccounts, len(accountIDs))
+	for _, accountID := range accountIDs {
+		accountID = strings.TrimSpace(accountID)
+		if accountID == "" {
+			continue
+		}
+		if _, exists := accounts[accountID]; exists {
+			continue
+		}
+
+		account, err := s.loadLedgerAccount(ctx, repos, accountID)
+		if err != nil {
+			return nil, stackErr.Error(err)
+		}
+		accounts[accountID] = account
+	}
+	return accounts, nil
+}
+
+func (a loadedLedgerAccounts) account(accountID string) *ledgeraggregate.LedgerAccountAggregate {
+	if a == nil {
+		return nil
+	}
+	return a[strings.TrimSpace(accountID)]
 }
 
 func (s *ledgerService) saveLedgerAccount(

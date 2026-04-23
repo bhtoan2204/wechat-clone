@@ -11,7 +11,6 @@ import (
 	"wechat-clone/core/modules/notification/domain/aggregate"
 	notificationrepos "wechat-clone/core/modules/notification/domain/repos"
 	notificationtypes "wechat-clone/core/modules/notification/types"
-	roomprojection "wechat-clone/core/modules/room/application/projection"
 	"wechat-clone/core/shared/contracts"
 	sharedevents "wechat-clone/core/shared/contracts/events"
 	"wechat-clone/core/shared/pkg/logging"
@@ -36,7 +35,7 @@ func (h *messageHandler) handleRoomOutboxEvent(ctx context.Context, value []byte
 	switch event.EventName {
 	case sharedevents.EventRoomMessageCreated:
 		return h.handleRoomMentionNotificationEvent(ctx, event.EventData)
-	case roomprojection.EventMessageAggregateProjectionSynced:
+	case sharedevents.EventMessageAggregateProjectionSynced:
 		return h.handleRoomMessageProjectionEvent(ctx, event.EventData)
 	default:
 		return nil
@@ -104,7 +103,7 @@ func (h *messageHandler) handleRoomMentionNotificationEvent(ctx context.Context,
 }
 
 func (h *messageHandler) handleRoomMessageProjectionEvent(ctx context.Context, raw json.RawMessage) error {
-	payloadAny, err := decodeEventPayload(ctx, roomprojection.EventMessageAggregateProjectionSynced, raw)
+	payloadAny, err := decodeEventPayload(ctx, sharedevents.EventMessageAggregateProjectionSynced, raw)
 	if err != nil {
 		return stackErr.Error(fmt.Errorf("decode room message projection payload failed: %w", err))
 	}
@@ -112,9 +111,9 @@ func (h *messageHandler) handleRoomMessageProjectionEvent(ctx context.Context, r
 		return nil
 	}
 
-	payload, ok := payloadAny.(*roomprojection.MessageAggregateSync)
+	payload, ok := payloadAny.(*sharedevents.RoomMessageAggregateSyncedEvent)
 	if !ok {
-		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", roomprojection.EventMessageAggregateProjectionSynced))
+		return stackErr.Error(fmt.Errorf("invalid payload type for event %s", sharedevents.EventMessageAggregateProjectionSynced))
 	}
 	if payload.Message == nil {
 		return nil
@@ -232,7 +231,7 @@ func buildRoomMentionBody(payload *sharedevents.RoomMessageCreatedEvent) string 
 	return buildRawMessagePreview(payload.MessageType, payload.MessageContent, payload.FileName)
 }
 
-func buildRoomMessageSubject(message *roomprojection.MessageProjection) string {
+func buildRoomMessageSubject(message *sharedevents.RoomMessageProjection) string {
 	if message == nil {
 		return "New message"
 	}
@@ -246,14 +245,14 @@ func buildRoomMessageSubject(message *roomprojection.MessageProjection) string {
 	return fmt.Sprintf("%s sent a message in %s", resolveProjectionSenderName(message), roomName)
 }
 
-func buildRoomMessageBody(message *roomprojection.MessageProjection) string {
+func buildRoomMessageBody(message *sharedevents.RoomMessageProjection) string {
 	if message == nil {
 		return "You have a new message"
 	}
 	return buildRawMessagePreview(message.MessageType, message.MessageContent, message.FileName)
 }
 
-func buildRoomMessagePreview(message *roomprojection.MessageProjection) string {
+func buildRoomMessagePreview(message *sharedevents.RoomMessageProjection) string {
 	if message == nil {
 		return ""
 	}
@@ -298,7 +297,7 @@ func resolveRoomSenderName(payload *sharedevents.RoomMessageCreatedEvent) string
 	}
 }
 
-func resolveProjectionSenderName(message *roomprojection.MessageProjection) string {
+func resolveProjectionSenderName(message *sharedevents.RoomMessageProjection) string {
 	if message == nil {
 		return "Someone"
 	}
