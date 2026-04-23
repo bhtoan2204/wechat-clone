@@ -183,6 +183,7 @@ func (t *HTTPTransport) Start() error {
 
 	handler := chain(
 		proxy,
+		middleware.CORSMiddleware(),
 		middleware.AuthMiddleware(publicKey),
 		middleware.RateLimitMiddleware(t.cacheClient),
 		middleware.IdempotencyMiddleware(idemManager),
