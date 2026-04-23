@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -155,6 +156,43 @@ func TestCORSMiddlewareHandlesPreflightBeforeAuth(t *testing.T) {
 	}
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
 		t.Fatalf("expected allow origin header, got %q", got)
+	}
+}
+
+func TestCORSMiddlewareAllowsAccountDeviceHeaders(t *testing.T) {
+	publicKey, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("generate ed25519 key: %v", err)
+	}
+
+	handler := CORSMiddleware()(AuthMiddleware(publicKey)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/auth/login", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	req.Header.Set("Access-Control-Request-Headers", "content-type,x-device-uid,x-device-name,x-device-type,x-device-os-name,x-device-os-version,x-device-app-version")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected preflight to return 204, got %d", rec.Code)
+	}
+
+	got := rec.Header().Get("Access-Control-Allow-Headers")
+	for _, expected := range []string{
+		"X-Device-UID",
+		"X-Device-Name",
+		"X-Device-Type",
+		"X-Device-OS-Name",
+		"X-Device-OS-Version",
+		"X-Device-App-Version",
+	} {
+		if !strings.Contains(got, expected) {
+			t.Fatalf("expected allow headers to contain %s, got %q", expected, got)
+		}
 	}
 }
 

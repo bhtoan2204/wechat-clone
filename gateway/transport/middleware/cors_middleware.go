@@ -7,7 +7,7 @@ import (
 
 const (
 	corsAllowMethods  = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-	corsAllowHeaders  = "Authorization, Content-Type, Accept, Idempotency-Key, X-Requested-With"
+	corsAllowHeaders  = "Authorization, Content-Type, Accept, Idempotency-Key, X-Requested-With, X-Device-UID, X-Device-Name, X-Device-Type, X-Device-OS-Name, X-Device-OS-Version, X-Device-App-Version"
 	corsExposeHeaders = "Content-Length, Content-Type"
 )
 
