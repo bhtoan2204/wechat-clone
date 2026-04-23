@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 	"wechat-clone/core/shared/infra/smtp"
+	"wechat-clone/core/shared/pkg/logging"
+
+	"go.uber.org/zap"
 )
 
 //go:generate mockgen -package=service -destination=email_verification_service_mock.go -source=email_verification_service.go
@@ -54,5 +57,9 @@ func (s *emailVerificationService) SendVerificationEmail(
 }
 
 func (s *emailVerificationService) SendTemplate(ctx context.Context, to, subject, templateName string, data any) error {
-	return s.smtp.SendTemplate(ctx, to, subject, templateName, data)
+	log := logging.FromContext(ctx).Named("SendTemplate")
+	if err := s.smtp.SendTemplate(ctx, to, subject, templateName, data); err != nil {
+		log.Warnw("SendTemplate failed", zap.Error(err))
+	}
+	return nil
 }
