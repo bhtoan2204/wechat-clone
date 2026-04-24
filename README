@@ -70,10 +70,7 @@ The important architectural point is that business rules are meant to live in do
 
 ## 4. Run Locally
 
-The local workflow now defaults to the full development stack.
-
-- `docker-compose.dev-min.yml`: base infra shared by local development
-- `docker-compose.full.yml`: overlay that adds Kafka, Debezium Connect, and Elasticsearch
+The local workflow now defaults to the infra stack defined in `docker-compose.infra.yml`, with app containers in `docker-compose.app.yml`.
 
 Recommended first run:
 
@@ -87,7 +84,8 @@ make run
 
 What each step does:
 
-- `make up` starts the full local stack: PostgreSQL, Redis, Cassandra, MinIO, Kafka, Debezium Connect, and Elasticsearch
+- `make up` starts the core local stack with RAM-lean defaults: PostgreSQL, Redis, Cassandra, MinIO, Kafka, Debezium Connect, Elasticsearch, and Temporal
+- `make up-ui` starts the optional operator UIs and admin tools: Kibana, Temporal UI, and Temporal admin tools
 - `make bootstrap` prepares derived infra needed for local dev, such as bootstrap storage and Cassandra setup
 - `make migrate` applies PostgreSQL migrations without starting the HTTP server
 - `make connector` registers the PostgreSQL Debezium connectors after the outbox/event tables exist
@@ -97,15 +95,19 @@ Useful follow-ups:
 
 ```bash
 make up-full
+make up-ui
 make run-full
 make connector
 make run-gateway
 ```
 
 - `make up-full` is an alias of `make up`
+- `make up-ui` enables the optional `ops-ui` compose profile for local inspection tools
 - `make run-full` is an alias of `make run`
 - `make connector` registers the PostgreSQL Debezium connectors after the full stack is healthy
 - `make run-gateway` starts the optional reverse proxy in `gateway/`
+
+If you need to tune memory further, adjust the heap and `*_MEMORY_LIMIT` variables in `secret/.env`. The biggest local RAM consumers are Cassandra, Kafka, Debezium Connect, Elasticsearch, and Temporal.
 
 Default local URLs:
 

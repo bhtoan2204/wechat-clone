@@ -1,8 +1,8 @@
 .DEFAULT_GOAL := help
 
-INFRA_COMPOSE := docker compose -p wechat-infra -f docker-compose.infra.yml
-APP_COMPOSE := docker compose -p wechat-app -f docker-compose.app.yml
-FULL_COMPOSE := docker compose -p wechat-full -f docker-compose.infra.yml -f docker-compose.app.yml
+INFRA_COMPOSE := docker compose -f docker-compose.infra.yml
+APP_COMPOSE := docker compose -f docker-compose.app.yml
+FULL_COMPOSE := docker compose -f docker-compose.infra.yml -f docker-compose.app.yml
 
 BASE_ENV_FILE := secret/.env
 
@@ -15,6 +15,7 @@ help:
 	@printf "Available targets:\n"
 	@printf "  make up             Start the local infra stack\n"
 	@printf "  make up-infra       Alias of make up\n"
+	@printf "  make up-ui          Start optional infra UIs and admin tools\n"
 	@printf "  make up-app         Start app services only\n"
 	@printf "  make up-full        Start infra + app stack\n"
 	@printf "  make down           Stop infra containers\n"
@@ -43,6 +44,11 @@ up:
 up-infra:
 	@bash -c '$(LOAD_BASE_ENV) $(INFRA_COMPOSE) up -d --build'
 .PHONY: up-infra
+
+## Start optional infra UIs and admin tools
+up-ui:
+	@bash -c '$(LOAD_BASE_ENV) COMPOSE_PROFILES=ops-ui $(INFRA_COMPOSE) up -d --build'
+.PHONY: up-ui
 
 ## Start app stack only
 up-app:

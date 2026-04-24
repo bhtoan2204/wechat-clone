@@ -94,7 +94,10 @@ func LoadAppCtx(ctx context.Context, cfg *config.Config) (*AppContext, error) {
 	}
 	opts = append(opts, WithWebPush(webPushService))
 
-	temporalClient := temporalclient.NewTemporalClient(ctx, cfg)
+	temporalClient, err := temporalclient.NewTemporalClient(ctx, cfg)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
 	opts = append(opts, WithTemporalClient(temporalClient))
 
 	return NewAppContext(ctx, opts...)
