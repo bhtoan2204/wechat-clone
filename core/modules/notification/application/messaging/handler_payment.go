@@ -19,6 +19,8 @@ func (h *messageHandler) handlePaymentOutboxEvent(ctx context.Context, value []b
 	}
 
 	switch event.EventName {
+	case sharedevents.EventPaymentWithdrawalRequested:
+		return stackErr.Error(h.handlePaymentWithdrawalRequestedEvent(ctx, event.EventData))
 	case sharedevents.EventPaymentSucceeded:
 		return stackErr.Error(h.handlePaymentSucceededEvent(ctx, event.EventData))
 	case sharedevents.EventPaymentFailed:
@@ -26,6 +28,22 @@ func (h *messageHandler) handlePaymentOutboxEvent(ctx context.Context, value []b
 	default:
 		return nil
 	}
+}
+
+func (h *messageHandler) handlePaymentWithdrawalRequestedEvent(ctx context.Context, raw json.RawMessage) error {
+	var payload sharedevents.PaymentWithdrawalRequestedEvent
+	if err := contracts.UnmarshalEventData(raw, &payload); err != nil {
+		return stackErr.Error(fmt.Errorf("decode payment withdrawal requested payload failed: %w", err))
+	}
+
+	return stackErr.Error(h.createGeneralNotificationAndEmit(ctx, generalNotificationSpec{
+		NotificationID: aggregate.PaymentNotificationID(notificationtypes.NotificationTypeWithdrawalRequested, payload.PaymentID, payload.DebitAccountID),
+		AccountID:      payload.DebitAccountID,
+		Type:           notificationtypes.NotificationTypeWithdrawalRequested,
+		Subject:        "Withdrawal requested",
+		Body:           fmt.Sprintf("Your withdrawal request for %d %s has been received and is being processed.", payload.Amount, payload.Currency),
+		OccurredAt:     payload.RequestedAt,
+	}))
 }
 
 func (h *messageHandler) handlePaymentSucceededEvent(ctx context.Context, raw json.RawMessage) error {

@@ -45,6 +45,20 @@ func TestAssemblyBuilderTemplateFormats(t *testing.T) {
 			calls:    "buildProjectionRuntime(cfg, appContext)",
 			imported: `"wechat-clone/core/shared/runtime"`,
 		},
+		{
+			name:     "task",
+			kind:     models.AssemblyKindTask,
+			function: "BuildTaskRuntime",
+			calls:    "buildTaskRuntime(cfg, appContext)",
+			imported: `"wechat-clone/core/shared/runtime"`,
+		},
+		{
+			name:     "cron",
+			kind:     models.AssemblyKindCron,
+			function: "BuildCronRuntime",
+			calls:    "buildCronRuntime(cfg, appContext)",
+			imported: `"wechat-clone/core/shared/runtime"`,
+		},
 	}
 
 	for _, tc := range cases {

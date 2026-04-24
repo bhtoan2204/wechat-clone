@@ -17,6 +17,8 @@ modules:
   - name: payment
     kinds:
       - http
+      - task
+      - cron
 
   - name: room
     kinds:
@@ -26,3 +28,8 @@ modules:
   - name: relationship
     kinds:
       - http
+
+  - name: foreign_exchange
+    kinds:
+      - http
+      - messaging

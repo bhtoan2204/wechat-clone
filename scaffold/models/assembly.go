@@ -24,6 +24,8 @@ const (
 	AssemblyKindHTTP       AssemblyKind = "http"
 	AssemblyKindMessaging  AssemblyKind = "messaging"
 	AssemblyKindProjection AssemblyKind = "projection"
+	AssemblyKindTask       AssemblyKind = "task"
+	AssemblyKindCron       AssemblyKind = "cron"
 )
 
 func LoadAssemblySpec(path string) (*AssemblySpec, error) {
@@ -59,7 +61,7 @@ func (s *AssemblySpec) Validate() error {
 		}
 		for _, kind := range module.Kinds {
 			switch kind {
-			case AssemblyKindHTTP, AssemblyKindMessaging, AssemblyKindProjection:
+			case AssemblyKindHTTP, AssemblyKindMessaging, AssemblyKindProjection, AssemblyKindTask, AssemblyKindCron:
 			default:
 				return fmt.Errorf("assembly module %s has unsupported kind %s", module.Name, kind)
 			}

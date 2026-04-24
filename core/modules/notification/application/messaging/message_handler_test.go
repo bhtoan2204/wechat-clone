@@ -252,3 +252,65 @@ func TestHandlePaymentEventCreatesWithdrawalSuccessNotification(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 }
+
+func TestHandlePaymentEventCreatesWithdrawalRequestedNotification(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	repo := notificationrepos.NewMockNotificationRepository(ctrl)
+	realtime := notificationservice.NewMockRealtimeService(ctrl)
+	baseRepo := notificationrepos.NewMockRepos(ctrl)
+	baseRepo.EXPECT().NotificationRepository().Return(repo).AnyTimes()
+
+	accountID := "acc-withdraw"
+	paymentID := "pay-withdraw-req-1"
+	notificationID := aggregate.PaymentNotificationID(notificationtypes.NotificationTypeWithdrawalRequested, paymentID, accountID)
+
+	repo.EXPECT().Load(gomock.Any(), notificationID).Return(nil, notificationrepos.ErrNotificationNotFound)
+	repo.EXPECT().Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.NotificationAggregate{})).DoAndReturn(func(_ context.Context, agg *aggregate.NotificationAggregate) error {
+		snapshot, err := agg.Snapshot()
+		if err != nil {
+			t.Fatalf("Snapshot() error = %v", err)
+		}
+		if snapshot.AccountID != accountID {
+			t.Fatalf("AccountID = %s, want %s", snapshot.AccountID, accountID)
+		}
+		if snapshot.Type != notificationtypes.NotificationTypeWithdrawalRequested {
+			t.Fatalf("Type = %s, want %s", snapshot.Type, notificationtypes.NotificationTypeWithdrawalRequested)
+		}
+		return nil
+	})
+	repo.EXPECT().CountUnread(gomock.Any(), accountID).Return(1, nil)
+	realtime.EXPECT().EmitMessage(gomock.Any(), gomock.Any()).Return(nil)
+
+	handler := &messageHandler{
+		baseRepo: baseRepo,
+		realtime: realtime,
+	}
+
+	raw := []byte(`{
+		"id": 20,
+		"aggregate_id": "pay-withdraw-req-1",
+		"aggregate_type": "PaymentIntentAggregate",
+		"version": 2,
+		"event_name": "PaymentWithdrawalRequestedEvent",
+		"event_data": {
+			"payment_id":"pay-withdraw-req-1",
+			"transaction_id":"txn-withdraw-req-1",
+			"provider":"stripe",
+			"debit_account_id":"acc-withdraw",
+			"destination_account_id":"bank:dest-1",
+			"amount":100,
+			"fee_amount":5,
+			"provider_amount":100,
+			"currency":"VND",
+			"status":"CREATING",
+			"requested_at":"2026-04-24T10:00:00Z"
+		},
+		"created_at": "2026-04-24T10:00:00Z"
+	}`)
+
+	if err := handler.handlePaymentOutboxEvent(context.Background(), raw); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}

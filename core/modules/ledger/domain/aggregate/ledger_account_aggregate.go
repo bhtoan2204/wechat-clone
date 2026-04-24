@@ -53,6 +53,10 @@ func (a *LedgerAccountAggregate) RegisterEvents(register event.RegisterEventsFun
 		&EventLedgerAccountWithdrawFromRefund{},
 		&EventLedgerAccountDepositFromChargeback{},
 		&EventLedgerAccountWithdrawFromChargeback{},
+		&EventLedgerAccountReserveWithdrawal{},
+		&EventLedgerAccountReceiveWithdrawalHold{},
+		&EventLedgerAccountReleaseWithdrawal{},
+		&EventLedgerAccountWithdrawReleasedHold{},
 		&EventLedgerAccountTransferredToAccount{},
 		&EventLedgerAccountReceivedTransfer{},
 	)
@@ -72,6 +76,14 @@ func (a *LedgerAccountAggregate) Transition(evt event.Event) error {
 		return a.applyDepositFromChargeback(evt.AggregateID, data)
 	case *EventLedgerAccountWithdrawFromChargeback:
 		return a.applyWithdrawFromChargeback(evt.AggregateID, data)
+	case *EventLedgerAccountReserveWithdrawal:
+		return a.applyReserveWithdrawal(evt.AggregateID, data)
+	case *EventLedgerAccountReceiveWithdrawalHold:
+		return a.applyReceiveWithdrawalHold(evt.AggregateID, data)
+	case *EventLedgerAccountReleaseWithdrawal:
+		return a.applyReleaseWithdrawal(evt.AggregateID, data)
+	case *EventLedgerAccountWithdrawReleasedHold:
+		return a.applyWithdrawReleasedHold(evt.AggregateID, data)
 	case *EventLedgerAccountTransferredToAccount:
 		return a.applyTransferredToAccount(evt.AggregateID, data)
 	case *EventLedgerAccountReceivedTransfer:
@@ -365,6 +377,22 @@ func (a *LedgerAccountAggregate) applyWithdrawFromChargeback(accountID string, d
 	return a.applyEventPosting(accountID, data, "ledger withdraw from chargeback event is unsupported")
 }
 
+func (a *LedgerAccountAggregate) applyReserveWithdrawal(accountID string, data *EventLedgerAccountReserveWithdrawal) error {
+	return a.applyEventPosting(accountID, data, "ledger reserve withdrawal event is unsupported")
+}
+
+func (a *LedgerAccountAggregate) applyReceiveWithdrawalHold(accountID string, data *EventLedgerAccountReceiveWithdrawalHold) error {
+	return a.applyEventPosting(accountID, data, "ledger receive withdrawal hold event is unsupported")
+}
+
+func (a *LedgerAccountAggregate) applyReleaseWithdrawal(accountID string, data *EventLedgerAccountReleaseWithdrawal) error {
+	return a.applyEventPosting(accountID, data, "ledger release withdrawal event is unsupported")
+}
+
+func (a *LedgerAccountAggregate) applyWithdrawReleasedHold(accountID string, data *EventLedgerAccountWithdrawReleasedHold) error {
+	return a.applyEventPosting(accountID, data, "ledger withdraw released hold event is unsupported")
+}
+
 func (a *LedgerAccountAggregate) applyEventPosting(accountID string, eventData interface{}, unsupportedErr string) error {
 	posting, ok, err := previewLedgerPostingFromEvent(accountID, eventData)
 	if err != nil {
@@ -444,7 +472,9 @@ func requiresNonNegativeBalance(referenceType string) bool {
 		EventNameLedgerAccountDepositFromRefund,
 		EventNameLedgerAccountWithdrawFromRefund,
 		EventNameLedgerAccountDepositFromChargeback,
-		EventNameLedgerAccountWithdrawFromChargeback:
+		EventNameLedgerAccountWithdrawFromChargeback,
+		EventNameLedgerAccountReceiveWithdrawalHold,
+		EventNameLedgerAccountWithdrawReleasedHold:
 		return false
 	default:
 		return true
@@ -489,6 +519,10 @@ func normalizeLedgerAccountPosting(accountID string, posting entity.LedgerAccoun
 		EventNameLedgerAccountWithdrawFromRefund,
 		EventNameLedgerAccountDepositFromChargeback,
 		EventNameLedgerAccountWithdrawFromChargeback,
+		EventNameLedgerAccountReserveWithdrawal,
+		EventNameLedgerAccountReceiveWithdrawalHold,
+		EventNameLedgerAccountReleaseWithdrawal,
+		EventNameLedgerAccountWithdrawReleasedHold,
 		entity.LedgerReferenceInternalTransfer:
 	default:
 		return "", entity.LedgerAccountPosting{}, ErrLedgerAccountReferenceTypeInvalid
@@ -604,6 +638,14 @@ func previewLedgerPostingFromEvent(accountID string, eventData interface{}) (ent
 		return newLedgerPostingFromPaymentEvent(accountID, data, EventNameLedgerAccountDepositFromChargeback, 1, "ledger deposit from chargeback event is nil")
 	case *EventLedgerAccountWithdrawFromChargeback:
 		return newLedgerPostingFromPaymentEvent(accountID, data, EventNameLedgerAccountWithdrawFromChargeback, -1, "ledger withdraw from chargeback event is nil")
+	case *EventLedgerAccountReserveWithdrawal:
+		return newLedgerPostingFromPaymentEvent(accountID, data, EventNameLedgerAccountReserveWithdrawal, -1, "ledger reserve withdrawal event is nil")
+	case *EventLedgerAccountReceiveWithdrawalHold:
+		return newLedgerPostingFromPaymentEvent(accountID, data, EventNameLedgerAccountReceiveWithdrawalHold, 1, "ledger receive withdrawal hold event is nil")
+	case *EventLedgerAccountReleaseWithdrawal:
+		return newLedgerPostingFromPaymentEvent(accountID, data, EventNameLedgerAccountReleaseWithdrawal, 1, "ledger release withdrawal event is nil")
+	case *EventLedgerAccountWithdrawReleasedHold:
+		return newLedgerPostingFromPaymentEvent(accountID, data, EventNameLedgerAccountWithdrawReleasedHold, -1, "ledger withdraw released hold event is nil")
 	case *EventLedgerAccountTransferredToAccount:
 		if data == nil {
 			return entity.LedgerAccountPosting{}, false, stackErr.Error(errors.New("ledger transfer to account event is nil"))
@@ -704,6 +746,42 @@ func newLedgerPaymentEvent(posting entity.LedgerAccountPosting) interface{} {
 		}
 	case EventNameLedgerAccountWithdrawFromChargeback:
 		return &EventLedgerAccountWithdrawFromChargeback{
+			TransactionID:         base.transactionID,
+			PaymentID:             base.paymentID,
+			CounterpartyAccountID: base.counterpartyAccountID,
+			Currency:              base.currency,
+			Amount:                base.amount,
+			BookedAt:              base.bookedAt,
+		}
+	case EventNameLedgerAccountReserveWithdrawal:
+		return &EventLedgerAccountReserveWithdrawal{
+			TransactionID:         base.transactionID,
+			PaymentID:             base.paymentID,
+			CounterpartyAccountID: base.counterpartyAccountID,
+			Currency:              base.currency,
+			Amount:                base.amount,
+			BookedAt:              base.bookedAt,
+		}
+	case EventNameLedgerAccountReceiveWithdrawalHold:
+		return &EventLedgerAccountReceiveWithdrawalHold{
+			TransactionID:         base.transactionID,
+			PaymentID:             base.paymentID,
+			CounterpartyAccountID: base.counterpartyAccountID,
+			Currency:              base.currency,
+			Amount:                base.amount,
+			BookedAt:              base.bookedAt,
+		}
+	case EventNameLedgerAccountReleaseWithdrawal:
+		return &EventLedgerAccountReleaseWithdrawal{
+			TransactionID:         base.transactionID,
+			PaymentID:             base.paymentID,
+			CounterpartyAccountID: base.counterpartyAccountID,
+			Currency:              base.currency,
+			Amount:                base.amount,
+			BookedAt:              base.bookedAt,
+		}
+	case EventNameLedgerAccountWithdrawReleasedHold:
+		return &EventLedgerAccountWithdrawReleasedHold{
 			TransactionID:         base.transactionID,
 			PaymentID:             base.paymentID,
 			CounterpartyAccountID: base.counterpartyAccountID,

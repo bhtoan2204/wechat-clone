@@ -223,7 +223,7 @@ func TestHandlePaymentOutboxEventLocksPaymentChargebackByAffectedAccounts(t *tes
 	}
 }
 
-func TestHandlePaymentOutboxEventBooksWithdrawalReservationOnCreated(t *testing.T) {
+func TestHandlePaymentOutboxEventBooksWithdrawalReservationOnRequested(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	locker := sharedlock.NewMockLock(ctrl)
 	ledgerService := ledgerservice.NewMockLedgerService(ctrl)
@@ -236,17 +236,17 @@ func TestHandlePaymentOutboxEventBooksWithdrawalReservationOnCreated(t *testing.
 
 	messageValue := mustMarshalOutboxMessage(t, paymentOutboxMessage{
 		AggregateID: "pay-withdrawal-1",
-		EventName:   sharedevents.EventPaymentCreated,
-		EventData: mustMarshalRawMessage(t, sharedevents.PaymentCreatedEvent{
-			Workflow:           "WITHDRAWAL",
-			PaymentID:          "pay-withdrawal-1",
-			TransactionID:      "txn-withdrawal-1",
-			ClearingAccountKey: "provider:stripe",
-			DebitAccountID:     "wallet:available",
-			Currency:           "VND",
-			Amount:             100,
-			FeeAmount:          5,
-			CreatedAt:          time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC),
+		EventName:   sharedevents.EventPaymentWithdrawalRequested,
+		EventData: mustMarshalRawMessage(t, sharedevents.PaymentWithdrawalRequestedEvent{
+			PaymentID:            "pay-withdrawal-1",
+			TransactionID:        "txn-withdrawal-1",
+			Provider:             "stripe",
+			DebitAccountID:       "wallet:available",
+			DestinationAccountID: "acct_1QdrKFJLKs7Pc3Qr",
+			Currency:             "VND",
+			Amount:               100,
+			FeeAmount:            5,
+			RequestedAt:          time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC),
 		}),
 	})
 
@@ -263,10 +263,10 @@ func TestHandlePaymentOutboxEventBooksWithdrawalReservationOnCreated(t *testing.
 		ledgerService.EXPECT().
 			RecordLedgerEvents(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, command ledgerservice.RecordLedgerEventsCommand) error {
-				assertLedgerPaymentEvent(t, command.Events, 0, "wallet:available", ledgeraggregate.EventNameLedgerAccountTransferredToAccount)
-				assertLedgerPaymentEvent(t, command.Events, 1, "ledger:clearing:provider:stripe", ledgeraggregate.EventNameLedgerAccountReceivedTransfer)
-				assertLedgerPaymentEvent(t, command.Events, 2, "wallet:available", ledgeraggregate.EventNameLedgerAccountTransferredToAccount)
-				assertLedgerPaymentEvent(t, command.Events, 3, "ledger:fee:provider:stripe", ledgeraggregate.EventNameLedgerAccountReceivedTransfer)
+				assertLedgerPaymentEvent(t, command.Events, 0, "wallet:available", ledgeraggregate.EventNameLedgerAccountReserveWithdrawal)
+				assertLedgerPaymentEvent(t, command.Events, 1, "ledger:clearing:provider:stripe", ledgeraggregate.EventNameLedgerAccountReceiveWithdrawalHold)
+				assertLedgerPaymentEvent(t, command.Events, 2, "wallet:available", ledgeraggregate.EventNameLedgerAccountReserveWithdrawal)
+				assertLedgerPaymentEvent(t, command.Events, 3, "ledger:fee:provider:stripe", ledgeraggregate.EventNameLedgerAccountReceiveWithdrawalHold)
 				return nil
 			}),
 		locker.EXPECT().
@@ -325,10 +325,10 @@ func TestHandlePaymentOutboxEventReversesWithdrawalReservationOnFailed(t *testin
 		ledgerService.EXPECT().
 			RecordLedgerEvents(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, command ledgerservice.RecordLedgerEventsCommand) error {
-				assertLedgerPaymentEvent(t, command.Events, 0, "ledger:clearing:provider:stripe", ledgeraggregate.EventNameLedgerAccountTransferredToAccount)
-				assertLedgerPaymentEvent(t, command.Events, 1, "wallet:available", ledgeraggregate.EventNameLedgerAccountReceivedTransfer)
-				assertLedgerPaymentEvent(t, command.Events, 2, "ledger:fee:provider:stripe", ledgeraggregate.EventNameLedgerAccountTransferredToAccount)
-				assertLedgerPaymentEvent(t, command.Events, 3, "wallet:available", ledgeraggregate.EventNameLedgerAccountReceivedTransfer)
+				assertLedgerPaymentEvent(t, command.Events, 0, "wallet:available", ledgeraggregate.EventNameLedgerAccountReleaseWithdrawal)
+				assertLedgerPaymentEvent(t, command.Events, 1, "ledger:clearing:provider:stripe", ledgeraggregate.EventNameLedgerAccountWithdrawReleasedHold)
+				assertLedgerPaymentEvent(t, command.Events, 2, "wallet:available", ledgeraggregate.EventNameLedgerAccountReleaseWithdrawal)
+				assertLedgerPaymentEvent(t, command.Events, 3, "ledger:fee:provider:stripe", ledgeraggregate.EventNameLedgerAccountWithdrawReleasedHold)
 				return nil
 			}),
 		locker.EXPECT().

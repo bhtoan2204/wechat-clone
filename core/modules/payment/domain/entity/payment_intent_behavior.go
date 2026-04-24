@@ -319,6 +319,28 @@ func (p *PaymentIntent) IsWithdrawal() bool {
 	return p != nil && p.Workflow == PaymentWorkflowWithdrawal
 }
 
+func (p *PaymentIntent) BuildWithdrawalRequestedEventData(occurredAt time.Time) sharedevents.PaymentWithdrawalRequestedEvent {
+	if p == nil {
+		return sharedevents.PaymentWithdrawalRequestedEvent{}
+	}
+
+	occurredAt = normalizePaymentTime(occurredAt)
+	return sharedevents.PaymentWithdrawalRequestedEvent{
+		PaymentID:            p.TransactionID,
+		TransactionID:        p.TransactionID,
+		Provider:             p.Provider,
+		ClearingAccountKey:   p.ClearingAccountKey,
+		DebitAccountID:       p.DebitAccountID,
+		DestinationAccountID: p.DestinationAccountID,
+		Amount:               p.Amount,
+		FeeAmount:            p.FeeAmount,
+		ProviderAmount:       p.ProviderAmount,
+		Currency:             p.Currency,
+		Status:               p.Status,
+		RequestedAt:          occurredAt,
+	}
+}
+
 func (p *PaymentIntent) IsFailed() bool {
 	return p != nil && p.Status == PaymentStatusFailed
 }

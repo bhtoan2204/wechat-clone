@@ -48,6 +48,45 @@ func TestNewProviderTopUpAggregateQueuesCreatedEvent(t *testing.T) {
 	}
 }
 
+func TestNewProviderWithdrawalAggregateQueuesCreatedAndRequestedEvents(t *testing.T) {
+	now := time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC)
+	agg, err := NewProviderWithdrawalAggregate(
+		"txn-2",
+		"stripe",
+		100,
+		5,
+		"VND",
+		"bank:dest-1",
+		"acc-user-1",
+		map[string]string{"source": "test"},
+		now,
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	outbox := agg.PendingOutboxEvents()
+	if len(outbox) != 2 {
+		t.Fatalf("expected 2 outbox events, got %d", len(outbox))
+	}
+	if outbox[0].EventName != sharedevents.EventPaymentCreated {
+		t.Fatalf("unexpected first event name: %s", outbox[0].EventName)
+	}
+	if outbox[1].EventName != sharedevents.EventPaymentWithdrawalRequested {
+		t.Fatalf("unexpected second event name: %s", outbox[1].EventName)
+	}
+	payload, ok := outbox[1].EventData.(sharedevents.PaymentWithdrawalRequestedEvent)
+	if !ok {
+		t.Fatalf("unexpected payload type: %T", outbox[1].EventData)
+	}
+	if payload.DebitAccountID != "acc-user-1" {
+		t.Fatalf("unexpected debit account id: %s", payload.DebitAccountID)
+	}
+	if payload.DestinationAccountID != "bank:dest-1" {
+		t.Fatalf("unexpected destination account id: %s", payload.DestinationAccountID)
+	}
+}
+
 func TestPaymentIntentAggregateApplySuccessQueuesProcessedAndOutbox(t *testing.T) {
 	intent, err := entity.NewProviderTopUpIntent("txn-1", "stripe", 100, 0, "VND", "wallet:available", time.Now().UTC())
 	if err != nil {

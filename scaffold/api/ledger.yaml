@@ -4,7 +4,7 @@ basePath: /api/v1
 endpoints:
   - name: LedgerGetAccountBalance
     method: GET
-    path: /ledger/accounts/:account_id/balance
+    path: /ledger/wallet/balance
     handler: GetAccountBalanceHandler
     auth: true
     usecase:
@@ -13,9 +13,6 @@ endpoints:
     request:
       struct: GetAccountBalanceRequest
       fields:
-        - name: account_id
-          type: string
-          required: true
         - name: currency
           type: string
           required: true

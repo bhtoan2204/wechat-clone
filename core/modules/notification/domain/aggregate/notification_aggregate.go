@@ -343,6 +343,8 @@ func normalizeNotificationType(value types.NotificationType) (types.Notification
 		return types.NotificationTypeFriendRequestAccepted, nil
 	case types.NotificationTypeFriendRequestRejected:
 		return types.NotificationTypeFriendRequestRejected, nil
+	case types.NotificationTypeWithdrawalRequested:
+		return types.NotificationTypeWithdrawalRequested, nil
 	case types.NotificationTypeWithdrawalSucceeded:
 		return types.NotificationTypeWithdrawalSucceeded, nil
 	case types.NotificationTypeWithdrawalFailed:

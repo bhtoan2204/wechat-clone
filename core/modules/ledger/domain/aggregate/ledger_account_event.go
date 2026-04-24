@@ -15,6 +15,10 @@ var (
 	EventNameLedgerAccountWithdrawFromRefund     = event.EventName((*EventLedgerAccountWithdrawFromRefund)(nil))
 	EventNameLedgerAccountDepositFromChargeback  = event.EventName((*EventLedgerAccountDepositFromChargeback)(nil))
 	EventNameLedgerAccountWithdrawFromChargeback = event.EventName((*EventLedgerAccountWithdrawFromChargeback)(nil))
+	EventNameLedgerAccountReserveWithdrawal      = event.EventName((*EventLedgerAccountReserveWithdrawal)(nil))
+	EventNameLedgerAccountReceiveWithdrawalHold  = event.EventName((*EventLedgerAccountReceiveWithdrawalHold)(nil))
+	EventNameLedgerAccountReleaseWithdrawal      = event.EventName((*EventLedgerAccountReleaseWithdrawal)(nil))
+	EventNameLedgerAccountWithdrawReleasedHold   = event.EventName((*EventLedgerAccountWithdrawReleasedHold)(nil))
 	EventNameLedgerAccountTransferredToAccount   = event.EventName((*EventLedgerAccountTransferredToAccount)(nil))
 	EventNameLedgerAccountReceivedTransfer       = event.EventName((*EventLedgerAccountReceivedTransfer)(nil))
 )
@@ -65,6 +69,42 @@ type EventLedgerAccountDepositFromChargeback struct {
 }
 
 type EventLedgerAccountWithdrawFromChargeback struct {
+	TransactionID         string    `json:"transaction_id"`
+	PaymentID             string    `json:"payment_id"`
+	CounterpartyAccountID string    `json:"counterparty_account_id"`
+	Currency              string    `json:"currency"`
+	Amount                int64     `json:"amount"`
+	BookedAt              time.Time `json:"booked_at"`
+}
+
+type EventLedgerAccountReserveWithdrawal struct {
+	TransactionID         string    `json:"transaction_id"`
+	PaymentID             string    `json:"payment_id"`
+	CounterpartyAccountID string    `json:"counterparty_account_id"`
+	Currency              string    `json:"currency"`
+	Amount                int64     `json:"amount"`
+	BookedAt              time.Time `json:"booked_at"`
+}
+
+type EventLedgerAccountReceiveWithdrawalHold struct {
+	TransactionID         string    `json:"transaction_id"`
+	PaymentID             string    `json:"payment_id"`
+	CounterpartyAccountID string    `json:"counterparty_account_id"`
+	Currency              string    `json:"currency"`
+	Amount                int64     `json:"amount"`
+	BookedAt              time.Time `json:"booked_at"`
+}
+
+type EventLedgerAccountReleaseWithdrawal struct {
+	TransactionID         string    `json:"transaction_id"`
+	PaymentID             string    `json:"payment_id"`
+	CounterpartyAccountID string    `json:"counterparty_account_id"`
+	Currency              string    `json:"currency"`
+	Amount                int64     `json:"amount"`
+	BookedAt              time.Time `json:"booked_at"`
+}
+
+type EventLedgerAccountWithdrawReleasedHold struct {
 	TransactionID         string    `json:"transaction_id"`
 	PaymentID             string    `json:"payment_id"`
 	CounterpartyAccountID string    `json:"counterparty_account_id"`
@@ -129,6 +169,50 @@ func (e *EventLedgerAccountDepositFromChargeback) paymentEvent() ledgerPaymentEv
 }
 
 func (e *EventLedgerAccountWithdrawFromChargeback) paymentEvent() ledgerPaymentEventData {
+	return ledgerPaymentEventData{
+		transactionID:         e.TransactionID,
+		paymentID:             e.PaymentID,
+		counterpartyAccountID: e.CounterpartyAccountID,
+		currency:              e.Currency,
+		amount:                e.Amount,
+		bookedAt:              e.BookedAt,
+	}
+}
+
+func (e *EventLedgerAccountReserveWithdrawal) paymentEvent() ledgerPaymentEventData {
+	return ledgerPaymentEventData{
+		transactionID:         e.TransactionID,
+		paymentID:             e.PaymentID,
+		counterpartyAccountID: e.CounterpartyAccountID,
+		currency:              e.Currency,
+		amount:                e.Amount,
+		bookedAt:              e.BookedAt,
+	}
+}
+
+func (e *EventLedgerAccountReceiveWithdrawalHold) paymentEvent() ledgerPaymentEventData {
+	return ledgerPaymentEventData{
+		transactionID:         e.TransactionID,
+		paymentID:             e.PaymentID,
+		counterpartyAccountID: e.CounterpartyAccountID,
+		currency:              e.Currency,
+		amount:                e.Amount,
+		bookedAt:              e.BookedAt,
+	}
+}
+
+func (e *EventLedgerAccountReleaseWithdrawal) paymentEvent() ledgerPaymentEventData {
+	return ledgerPaymentEventData{
+		transactionID:         e.TransactionID,
+		paymentID:             e.PaymentID,
+		counterpartyAccountID: e.CounterpartyAccountID,
+		currency:              e.Currency,
+		amount:                e.Amount,
+		bookedAt:              e.BookedAt,
+	}
+}
+
+func (e *EventLedgerAccountWithdrawReleasedHold) paymentEvent() ledgerPaymentEventData {
 	return ledgerPaymentEventData{
 		transactionID:         e.TransactionID,
 		paymentID:             e.PaymentID,

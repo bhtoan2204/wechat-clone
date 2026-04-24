@@ -107,6 +107,24 @@ func buildAssemblyTemplateData(kind models.AssemblyKind) assemblyTemplateData {
 			ReturnType:       "modruntime.Module",
 			UsesConfig:       true,
 		}
+	case models.AssemblyKindTask:
+		return assemblyTemplateData{
+			FunctionName:     "BuildTaskRuntime",
+			ImplFunctionName: "buildTaskRuntime",
+			Signature:        "cfg *config.Config, appContext *appCtx.AppContext",
+			Arguments:        "cfg, appContext",
+			ReturnType:       "modruntime.Module",
+			UsesConfig:       true,
+		}
+	case models.AssemblyKindCron:
+		return assemblyTemplateData{
+			FunctionName:     "BuildCronRuntime",
+			ImplFunctionName: "buildCronRuntime",
+			Signature:        "cfg *config.Config, appContext *appCtx.AppContext",
+			Arguments:        "cfg, appContext",
+			ReturnType:       "modruntime.Module",
+			UsesConfig:       true,
+		}
 	default:
 		return assemblyTemplateData{}
 	}

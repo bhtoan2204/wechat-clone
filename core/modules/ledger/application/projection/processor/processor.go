@@ -158,6 +158,14 @@ func unmarshalLedgerAggregateEvent(eventName string, data json.RawMessage) (inte
 		return unmarshalLedgerEventData[ledgeraggregate.EventLedgerAccountDepositFromChargeback](data, "unmarshal ledger deposit from chargeback payload failed")
 	case ledgeraggregate.EventNameLedgerAccountWithdrawFromChargeback:
 		return unmarshalLedgerEventData[ledgeraggregate.EventLedgerAccountWithdrawFromChargeback](data, "unmarshal ledger withdraw from chargeback payload failed")
+	case ledgeraggregate.EventNameLedgerAccountReserveWithdrawal:
+		return unmarshalLedgerEventData[ledgeraggregate.EventLedgerAccountReserveWithdrawal](data, "unmarshal ledger reserve withdrawal payload failed")
+	case ledgeraggregate.EventNameLedgerAccountReceiveWithdrawalHold:
+		return unmarshalLedgerEventData[ledgeraggregate.EventLedgerAccountReceiveWithdrawalHold](data, "unmarshal ledger receive withdrawal hold payload failed")
+	case ledgeraggregate.EventNameLedgerAccountReleaseWithdrawal:
+		return unmarshalLedgerEventData[ledgeraggregate.EventLedgerAccountReleaseWithdrawal](data, "unmarshal ledger release withdrawal payload failed")
+	case ledgeraggregate.EventNameLedgerAccountWithdrawReleasedHold:
+		return unmarshalLedgerEventData[ledgeraggregate.EventLedgerAccountWithdrawReleasedHold](data, "unmarshal ledger withdraw released hold payload failed")
 	case ledgeraggregate.EventNameLedgerAccountTransferredToAccount:
 		return unmarshalLedgerEventData[ledgeraggregate.EventLedgerAccountTransferredToAccount](data, "unmarshal ledger transfer out payload failed")
 	case ledgeraggregate.EventNameLedgerAccountReceivedTransfer:

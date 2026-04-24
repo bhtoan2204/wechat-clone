@@ -44,11 +44,6 @@ func NewMessageHandler(cfg *config.Config, repos repos.Repos, svc service.Realti
 			return instance.handleAccountEvent(ctx, value)
 		}
 	}
-	if topic := strings.TrimSpace(cfg.KafkaConfig.KafkaRoomConsumer.LedgerOutboxTopic); topic != "" {
-		topicHandlers[topic] = func(ctx context.Context, value []byte) error {
-			return instance.handleLedgerEvent(ctx, value)
-		}
-	}
 
 	for topic, handler := range topicHandlers {
 		consumer, err := infraMessaging.NewConsumer(&infraMessaging.Config{
@@ -97,25 +92,6 @@ func (h *messageHandler) handleAccountEvent(ctx context.Context, value []byte) e
 	case sharedevents.EventAccountProfileUpdated:
 		if err := h.handleAccountUpdatedEvent(ctx, event.EventData); err != nil {
 			log.Errorw("handle account updated event failed", zap.Error(err))
-			return stackErr.Error(err)
-		}
-	}
-
-	return nil
-}
-
-func (h *messageHandler) handleLedgerEvent(ctx context.Context, value []byte) error {
-	log := logging.FromContext(ctx).Named("handleLedgerEvent")
-	var event contracts.OutboxMessage
-	if err := json.Unmarshal(value, &event); err != nil {
-		return stackErr.Error(fmt.Errorf("unmarshal ledger outbox event failed: %w", err))
-	}
-	log.Infow("handle ledger event", zap.String("event_name", event.EventName))
-	switch event.EventName {
-	case sharedevents.EventLedgerAccountTransferredToAccount:
-		ctx = context.WithValue(ctx, ledgerTransferSenderAccountIDKey{}, strings.TrimSpace(event.AggregateID))
-		if err := h.handleLedgerAccountTransferredToAccount(ctx, event.EventData); err != nil {
-			log.Errorw("handle ledger account transferred event failed", zap.Error(err))
 			return stackErr.Error(err)
 		}
 	}

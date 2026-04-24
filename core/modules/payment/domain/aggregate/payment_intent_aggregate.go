@@ -89,6 +89,7 @@ func NewProviderWithdrawalAggregate(
 
 	agg := &PaymentIntentAggregate{intent: intent}
 	agg.recordOutboxEvent(sharedevents.EventPaymentCreated, intent.BuildCreatedEventData(metadata, now), now)
+	agg.recordOutboxEvent(sharedevents.EventPaymentWithdrawalRequested, intent.BuildWithdrawalRequestedEventData(now), now)
 	return agg, nil
 }
 

@@ -18,6 +18,7 @@ import (
 	eventpkg "wechat-clone/core/shared/pkg/event"
 	"wechat-clone/core/shared/pkg/logging"
 	"wechat-clone/core/shared/pkg/stackErr"
+	"wechat-clone/core/shared/utils"
 
 	"go.uber.org/zap"
 )
@@ -41,13 +42,15 @@ func (h *messageHandler) handlePaymentOutboxEvent(ctx context.Context, value []b
 	)
 
 	switch event.EventName {
-	case sharedevents.EventPaymentCreated:
-		payload, decodeErr := unmarshalPaymentCreatedPayload(event.EventData)
+	case sharedevents.EventPaymentWithdrawalRequested:
+		payload, decodeErr := unmarshalPaymentWithdrawalRequestedPayload(event.EventData)
 		if decodeErr != nil {
 			return stackErr.Error(decodeErr)
 		}
-		payload.PaymentID = resolvePaymentCreatedID(event.AggregateID, payload)
-		events, err = h.paymentCreatedLedgerEvents(payload)
+		payload.PaymentID = resolvePaymentWithdrawalRequestedID(event.AggregateID, payload)
+		events, err = h.paymentWithdrawalRequestedLedgerEvents(payload)
+	case sharedevents.EventPaymentCreated:
+		return nil
 	case sharedevents.EventPaymentSucceeded:
 		payload, decodeErr := unmarshalPaymentSucceededPayload(event.EventData)
 		if decodeErr != nil {
@@ -132,6 +135,14 @@ func unmarshalPaymentCreatedPayload(data json.RawMessage) (sharedevents.PaymentC
 	return payload, nil
 }
 
+func unmarshalPaymentWithdrawalRequestedPayload(data json.RawMessage) (sharedevents.PaymentWithdrawalRequestedEvent, error) {
+	var payload sharedevents.PaymentWithdrawalRequestedEvent
+	if err := contracts.UnmarshalEventData(data, &payload); err != nil {
+		return sharedevents.PaymentWithdrawalRequestedEvent{}, stackErr.Error(fmt.Errorf("unmarshal payment withdrawal requested payload failed: %w", err))
+	}
+	return payload, nil
+}
+
 func unmarshalPaymentSucceededPayload(data json.RawMessage) (sharedevents.PaymentSucceededEvent, error) {
 	var payload sharedevents.PaymentSucceededEvent
 	if err := contracts.UnmarshalEventData(data, &payload); err != nil {
@@ -165,53 +176,95 @@ func unmarshalPaymentChargebackPayload(data json.RawMessage) (sharedevents.Payme
 }
 
 func resolvePaymentCreatedID(aggregateID string, payload sharedevents.PaymentCreatedEvent) string {
-	return firstNonEmpty(strings.TrimSpace(payload.PaymentID), strings.TrimSpace(aggregateID), strings.TrimSpace(payload.TransactionID))
+	return utils.FirstNonEmpty(strings.TrimSpace(payload.PaymentID), strings.TrimSpace(aggregateID), strings.TrimSpace(payload.TransactionID))
+}
+
+func resolvePaymentWithdrawalRequestedID(aggregateID string, payload sharedevents.PaymentWithdrawalRequestedEvent) string {
+	return utils.FirstNonEmpty(strings.TrimSpace(payload.PaymentID), strings.TrimSpace(aggregateID), strings.TrimSpace(payload.TransactionID))
 }
 
 func resolvePaymentSucceededID(aggregateID string, payload sharedevents.PaymentSucceededEvent) string {
-	return firstNonEmpty(strings.TrimSpace(payload.PaymentID), strings.TrimSpace(aggregateID), strings.TrimSpace(payload.TransactionID))
+	return utils.FirstNonEmpty(strings.TrimSpace(payload.PaymentID), strings.TrimSpace(aggregateID), strings.TrimSpace(payload.TransactionID))
 }
 
 func resolvePaymentFailedID(aggregateID string, payload sharedevents.PaymentFailedEvent) string {
-	return firstNonEmpty(strings.TrimSpace(payload.PaymentID), strings.TrimSpace(aggregateID), strings.TrimSpace(payload.TransactionID))
+	return utils.FirstNonEmpty(strings.TrimSpace(payload.PaymentID), strings.TrimSpace(aggregateID), strings.TrimSpace(payload.TransactionID))
 }
 
 func resolvePaymentRefundedID(aggregateID string, payload sharedevents.PaymentRefundedEvent) string {
-	return firstNonEmpty(strings.TrimSpace(payload.PaymentID), strings.TrimSpace(aggregateID), strings.TrimSpace(payload.TransactionID))
+	return utils.FirstNonEmpty(strings.TrimSpace(payload.PaymentID), strings.TrimSpace(aggregateID), strings.TrimSpace(payload.TransactionID))
 }
 
 func resolvePaymentChargebackID(aggregateID string, payload sharedevents.PaymentChargebackEvent) string {
-	return firstNonEmpty(strings.TrimSpace(payload.PaymentID), strings.TrimSpace(aggregateID), strings.TrimSpace(payload.TransactionID))
+	return utils.FirstNonEmpty(strings.TrimSpace(payload.PaymentID), strings.TrimSpace(aggregateID), strings.TrimSpace(payload.TransactionID))
 }
 
-func (h *messageHandler) paymentCreatedLedgerEvents(payload sharedevents.PaymentCreatedEvent) ([]eventpkg.Event, error) {
-	if paymententity.NormalizePaymentWorkflow(payload.Workflow) != paymententity.PaymentWorkflowWithdrawal {
-		return nil, nil
-	}
-
+func (h *messageHandler) paymentWithdrawalRequestedLedgerEvents(payload sharedevents.PaymentWithdrawalRequestedEvent) ([]eventpkg.Event, error) {
 	events := make([]eventpkg.Event, 0, 4)
-	principalEvents, err := transferLedgerEvents(
-		fmt.Sprintf("payment:%s:withdrawal:principal", strings.TrimSpace(payload.PaymentID)),
-		strings.TrimSpace(payload.DebitAccountID),
-		ledgerClearingAccountID(payload.ClearingAccountKey),
-		payload.Currency,
-		payload.Amount,
-		payload.CreatedAt,
-	)
+	clearingAccountID := ledgerClearingAccountID(utils.FirstNonEmpty(strings.TrimSpace(payload.ClearingAccountKey), providerClearingAccountKey(payload.Provider)))
+
+	principalEvents, err := paymentLedgerEventsFromPostings([]ledgerPostingEventInput{
+		{
+			accountID: strings.TrimSpace(payload.DebitAccountID),
+			posting: newPaymentPosting(
+				strings.TrimSpace(payload.DebitAccountID),
+				fmt.Sprintf("payment:%s:withdrawal:principal", strings.TrimSpace(payload.PaymentID)),
+				ledgeraggregate.EventNameLedgerAccountReserveWithdrawal,
+				strings.TrimSpace(payload.PaymentID),
+				clearingAccountID,
+				payload.Currency,
+				-payload.Amount,
+				payload.RequestedAt,
+			),
+		},
+		{
+			accountID: clearingAccountID,
+			posting: newPaymentPosting(
+				clearingAccountID,
+				fmt.Sprintf("payment:%s:withdrawal:principal", strings.TrimSpace(payload.PaymentID)),
+				ledgeraggregate.EventNameLedgerAccountReceiveWithdrawalHold,
+				strings.TrimSpace(payload.PaymentID),
+				strings.TrimSpace(payload.DebitAccountID),
+				payload.Currency,
+				payload.Amount,
+				payload.RequestedAt,
+			),
+		},
+	})
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 	events = append(events, principalEvents...)
 
 	if payload.FeeAmount > 0 && strings.TrimSpace(h.feeAccountID) != "" {
-		feeEvents, err := transferLedgerEvents(
-			fmt.Sprintf("payment:%s:withdrawal:fee", strings.TrimSpace(payload.PaymentID)),
-			strings.TrimSpace(payload.DebitAccountID),
-			strings.TrimSpace(h.feeAccountID),
-			payload.Currency,
-			payload.FeeAmount,
-			payload.CreatedAt,
-		)
+		feeEvents, err := paymentLedgerEventsFromPostings([]ledgerPostingEventInput{
+			{
+				accountID: strings.TrimSpace(payload.DebitAccountID),
+				posting: newPaymentPosting(
+					strings.TrimSpace(payload.DebitAccountID),
+					fmt.Sprintf("payment:%s:withdrawal:fee", strings.TrimSpace(payload.PaymentID)),
+					ledgeraggregate.EventNameLedgerAccountReserveWithdrawal,
+					strings.TrimSpace(payload.PaymentID),
+					strings.TrimSpace(h.feeAccountID),
+					payload.Currency,
+					-payload.FeeAmount,
+					payload.RequestedAt,
+				),
+			},
+			{
+				accountID: strings.TrimSpace(h.feeAccountID),
+				posting: newPaymentPosting(
+					strings.TrimSpace(h.feeAccountID),
+					fmt.Sprintf("payment:%s:withdrawal:fee", strings.TrimSpace(payload.PaymentID)),
+					ledgeraggregate.EventNameLedgerAccountReceiveWithdrawalHold,
+					strings.TrimSpace(payload.PaymentID),
+					strings.TrimSpace(payload.DebitAccountID),
+					payload.Currency,
+					payload.FeeAmount,
+					payload.RequestedAt,
+				),
+			},
+		})
 		if err != nil {
 			return nil, stackErr.Error(err)
 		}
@@ -280,28 +333,68 @@ func (h *messageHandler) paymentFailedLedgerEvents(payload sharedevents.PaymentF
 	}
 
 	events := make([]eventpkg.Event, 0, 4)
-	principalEvents, err := transferLedgerEvents(
-		fmt.Sprintf("payment:%s:withdrawal:principal:failed", strings.TrimSpace(payload.PaymentID)),
-		ledgerClearingAccountID(payload.ClearingAccountKey),
-		strings.TrimSpace(payload.DebitAccountID),
-		payload.Currency,
-		payload.Amount,
-		payload.OccurredAt,
-	)
+	principalEvents, err := paymentLedgerEventsFromPostings([]ledgerPostingEventInput{
+		{
+			accountID: strings.TrimSpace(payload.DebitAccountID),
+			posting: newPaymentPosting(
+				strings.TrimSpace(payload.DebitAccountID),
+				fmt.Sprintf("payment:%s:withdrawal:principal:failed", strings.TrimSpace(payload.PaymentID)),
+				ledgeraggregate.EventNameLedgerAccountReleaseWithdrawal,
+				strings.TrimSpace(payload.PaymentID),
+				ledgerClearingAccountID(payload.ClearingAccountKey),
+				payload.Currency,
+				payload.Amount,
+				payload.OccurredAt,
+			),
+		},
+		{
+			accountID: ledgerClearingAccountID(payload.ClearingAccountKey),
+			posting: newPaymentPosting(
+				ledgerClearingAccountID(payload.ClearingAccountKey),
+				fmt.Sprintf("payment:%s:withdrawal:principal:failed", strings.TrimSpace(payload.PaymentID)),
+				ledgeraggregate.EventNameLedgerAccountWithdrawReleasedHold,
+				strings.TrimSpace(payload.PaymentID),
+				strings.TrimSpace(payload.DebitAccountID),
+				payload.Currency,
+				-payload.Amount,
+				payload.OccurredAt,
+			),
+		},
+	})
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 	events = append(events, principalEvents...)
 
 	if payload.FeeAmount > 0 && strings.TrimSpace(h.feeAccountID) != "" {
-		feeEvents, err := transferLedgerEvents(
-			fmt.Sprintf("payment:%s:withdrawal:fee:failed", strings.TrimSpace(payload.PaymentID)),
-			strings.TrimSpace(h.feeAccountID),
-			strings.TrimSpace(payload.DebitAccountID),
-			payload.Currency,
-			payload.FeeAmount,
-			payload.OccurredAt,
-		)
+		feeEvents, err := paymentLedgerEventsFromPostings([]ledgerPostingEventInput{
+			{
+				accountID: strings.TrimSpace(payload.DebitAccountID),
+				posting: newPaymentPosting(
+					strings.TrimSpace(payload.DebitAccountID),
+					fmt.Sprintf("payment:%s:withdrawal:fee:failed", strings.TrimSpace(payload.PaymentID)),
+					ledgeraggregate.EventNameLedgerAccountReleaseWithdrawal,
+					strings.TrimSpace(payload.PaymentID),
+					strings.TrimSpace(h.feeAccountID),
+					payload.Currency,
+					payload.FeeAmount,
+					payload.OccurredAt,
+				),
+			},
+			{
+				accountID: strings.TrimSpace(h.feeAccountID),
+				posting: newPaymentPosting(
+					strings.TrimSpace(h.feeAccountID),
+					fmt.Sprintf("payment:%s:withdrawal:fee:failed", strings.TrimSpace(payload.PaymentID)),
+					ledgeraggregate.EventNameLedgerAccountWithdrawReleasedHold,
+					strings.TrimSpace(payload.PaymentID),
+					strings.TrimSpace(payload.DebitAccountID),
+					payload.Currency,
+					-payload.FeeAmount,
+					payload.OccurredAt,
+				),
+			},
+		})
 		if err != nil {
 			return nil, stackErr.Error(err)
 		}
@@ -415,6 +508,52 @@ func paymentLedgerEventsFromBooking(transactionID, paymentID, currency string, a
 	return []eventpkg.Event{debitEvent, creditEvent}, nil
 }
 
+type ledgerPostingEventInput struct {
+	accountID string
+	posting   ledgerentity.LedgerAccountPosting
+}
+
+func paymentLedgerEventsFromPostings(inputs []ledgerPostingEventInput) ([]eventpkg.Event, error) {
+	events := make([]eventpkg.Event, 0, len(inputs))
+	for _, item := range inputs {
+		evt, ok, err := ledgeraggregate.NewLedgerAccountEventFromPosting(item.accountID, item.posting)
+		if err != nil {
+			return nil, stackErr.Error(err)
+		}
+		if !ok {
+			return nil, stackErr.Error(fmt.Errorf("unsupported ledger posting reference_type=%s", item.posting.ReferenceType))
+		}
+		events = append(events, evt)
+	}
+	return events, nil
+}
+
+func newPaymentPosting(
+	accountID string,
+	transactionID string,
+	referenceType string,
+	referenceID string,
+	counterpartyAccountID string,
+	currency string,
+	amountDelta int64,
+	bookedAt time.Time,
+) ledgerentity.LedgerAccountPosting {
+	posting, err := ledgeraggregate.NewLedgerAccountPaymentPosting(valueobject.LedgerAccountPostingInput{
+		AccountID:             accountID,
+		TransactionID:         transactionID,
+		ReferenceType:         referenceType,
+		ReferenceID:           referenceID,
+		CounterpartyAccountID: counterpartyAccountID,
+		Currency:              currency,
+		AmountDelta:           amountDelta,
+		BookedAt:              bookedAt,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return posting
+}
+
 func transferLedgerEvents(transactionID, fromAccountID, toAccountID, currency string, amount int64, bookedAt time.Time) ([]eventpkg.Event, error) {
 	if bookedAt.IsZero() {
 		bookedAt = time.Now().UTC()
@@ -520,6 +659,14 @@ func ledgerClearingAccountID(clearingAccountKey string) string {
 	return fmt.Sprintf("ledger:clearing:%s", strings.ToLower(strings.TrimSpace(clearingAccountKey)))
 }
 
+func providerClearingAccountKey(provider string) string {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" {
+		return ""
+	}
+	return fmt.Sprintf("provider:%s", provider)
+}
+
 func reversalSuffix(reversalType string) string {
 	switch strings.TrimSpace(reversalType) {
 	case sharedevents.EventPaymentRefunded:
@@ -529,13 +676,4 @@ func reversalSuffix(reversalType string) string {
 	default:
 		return "reversed"
 	}
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if value = strings.TrimSpace(value); value != "" {
-			return value
-		}
-	}
-	return ""
 }

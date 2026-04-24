@@ -19,7 +19,7 @@ func RegisterPrivateRoutes(
 	transferTransaction cqrs.Dispatcher[*in.TransferTransactionRequest, *out.TransactionTransactionResponse],
 	listTransaction cqrs.Dispatcher[*in.ListTransactionRequest, *out.ListTransactionResponse],
 ) {
-	routes.GET("/ledger/accounts/:account_id/balance", httpx.Wrap(handler.NewGetAccountBalanceHandler(getAccountBalance)))
+	routes.GET("/ledger/wallet/balance", httpx.Wrap(handler.NewGetAccountBalanceHandler(getAccountBalance)))
 	routes.GET("/ledger/transactions/:transaction_id", httpx.Wrap(handler.NewGetTransactionHandler(getTransaction)))
 	routes.POST("/ledger/transfers", httpx.Wrap(handler.NewTransferTransactionHandler(transferTransaction)))
 	routes.GET("/ledger/transactions", httpx.Wrap(handler.NewListTransactionHandler(listTransaction)))

@@ -107,9 +107,14 @@ func (s *appServer) buildModuleRuntimes(appContext *appCtx.AppContext) error {
 		return stackErr.Error(fmt.Errorf("build relationship messaging runtime failed: %w", err))
 	}
 
-	paymentMessagingRuntime, err := paymentassembly.BuildMessagingRuntime(s.cfg, appContext)
+	paymentTaskRuntime, err := paymentassembly.BuildTaskRuntime(s.cfg, appContext)
 	if err != nil {
-		return stackErr.Error(fmt.Errorf("build payment messaging runtime failed: %w", err))
+		return stackErr.Error(fmt.Errorf("build payment task runtime failed: %w", err))
+	}
+
+	paymentCronRuntime, err := paymentassembly.BuildCronRuntime(s.cfg, appContext)
+	if err != nil {
+		return stackErr.Error(fmt.Errorf("build payment cron runtime failed: %w", err))
 	}
 
 	s.moduleRuntimes = []modruntime.Module{
@@ -118,7 +123,8 @@ func (s *appServer) buildModuleRuntimes(appContext *appCtx.AppContext) error {
 		roomProjectionRuntime,
 		relationshipMessagingRuntime,
 		ledgerProjectionRuntime,
-		paymentMessagingRuntime,
+		paymentTaskRuntime,
+		paymentCronRuntime,
 	}
 	return nil
 }

@@ -23,6 +23,21 @@ type PaymentCreatedEvent struct {
 	CreatedAt          time.Time         `json:"created_at"`
 }
 
+type PaymentWithdrawalRequestedEvent struct {
+	PaymentID            string    `json:"payment_id"`
+	TransactionID        string    `json:"transaction_id"`
+	Provider             string    `json:"provider"`
+	ClearingAccountKey   string    `json:"clearing_account_key"`
+	DebitAccountID       string    `json:"debit_account_id"`
+	DestinationAccountID string    `json:"destination_account_id"`
+	Amount               int64     `json:"amount"`
+	FeeAmount            int64     `json:"fee_amount"`
+	ProviderAmount       int64     `json:"provider_amount"`
+	Currency             string    `json:"currency"`
+	Status               string    `json:"status"`
+	RequestedAt          time.Time `json:"requested_at"`
+}
+
 type PaymentCheckoutSessionCreatedEvent struct {
 	Workflow           string    `json:"workflow"`
 	PaymentID          string    `json:"payment_id"`
@@ -116,6 +131,7 @@ type PaymentChargebackEvent struct {
 
 var (
 	EventPaymentCreated                = event.EventName((*PaymentCreatedEvent)(nil))
+	EventPaymentWithdrawalRequested    = event.EventName((*PaymentWithdrawalRequestedEvent)(nil))
 	EventPaymentCheckoutSessionCreated = event.EventName((*PaymentCheckoutSessionCreatedEvent)(nil))
 	EventPaymentSucceeded              = event.EventName((*PaymentSucceededEvent)(nil))
 	EventPaymentFailed                 = event.EventName((*PaymentFailedEvent)(nil))

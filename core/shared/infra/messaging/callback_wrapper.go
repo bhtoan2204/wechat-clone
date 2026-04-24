@@ -32,7 +32,7 @@ func WrapConsumerCallback(consumer Consumer, failureMessage string) CallBack {
 			return stackErr.Error(fmt.Errorf("consumer handler is nil"))
 		}
 
-		if err = handler(ctx, vals); err != nil {
+		if err := handler(ctx, vals); err != nil {
 			logger.Errorw(failureMessage, zap.Error(err), zap.String("topic", topic), zap.String("vals", string(vals)))
 			return stackErr.Error(err)
 		}

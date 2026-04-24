@@ -13,6 +13,10 @@ var ledgerTransactionProjectionEventNames = map[string]struct{}{
 	ledgeraggregate.EventNameLedgerAccountWithdrawFromRefund:     {},
 	ledgeraggregate.EventNameLedgerAccountDepositFromChargeback:  {},
 	ledgeraggregate.EventNameLedgerAccountWithdrawFromChargeback: {},
+	ledgeraggregate.EventNameLedgerAccountReserveWithdrawal:      {},
+	ledgeraggregate.EventNameLedgerAccountReceiveWithdrawalHold:  {},
+	ledgeraggregate.EventNameLedgerAccountReleaseWithdrawal:      {},
+	ledgeraggregate.EventNameLedgerAccountWithdrawReleasedHold:   {},
 	ledgeraggregate.EventNameLedgerAccountTransferredToAccount:   {},
 	ledgeraggregate.EventNameLedgerAccountReceivedTransfer:       {},
 }
