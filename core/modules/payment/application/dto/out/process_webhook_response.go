@@ -13,5 +13,5 @@ type ProcessWebhookResponse struct {
 
 type PaymentIntegrationEvent struct {
 	Name     string `json:"name,omitempty"`
-	DataJSON string `json:"data_json,omitempty"`
+	DataJson string `json:"data_json,omitempty"`
 }

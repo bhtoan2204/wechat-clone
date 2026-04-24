@@ -391,7 +391,7 @@ func paymentIntegrationEventsFromDomainEvents(events []eventpkg.Event) ([]out.Pa
 		}
 		items = append(items, out.PaymentIntegrationEvent{
 			Name:     evt.EventName,
-			DataJSON: string(data),
+			DataJson: string(data),
 		})
 	}
 	return items, nil
@@ -463,14 +463,10 @@ func (s *paymentCommandService) resolveCreatePaymentCreditAccount(
 	ctx context.Context,
 	req *in.CreatePaymentRequest,
 ) (string, error) {
+	_ = req
 	actorAccountID, err := actorctx.AccountIDFromContext(ctx)
 	if err != nil {
 		return "", stackErr.Error(ErrPaymentUnauthorized)
-	}
-
-	requestedCreditAccountID := strings.TrimSpace(req.CreditAccountID)
-	if requestedCreditAccountID != "" {
-		return "", stackErr.Error(fmt.Errorf("%w: credit_account_id is server-owned and must not be provided", ErrValidation))
 	}
 
 	return actorAccountID, nil

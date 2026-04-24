@@ -17,7 +17,6 @@ type ProcessWebhookRequest struct {
 func (r *ProcessWebhookRequest) Normalize() {
 	r.Provider = strings.TrimSpace(r.Provider)
 	r.Signature = strings.TrimSpace(r.Signature)
-	r.Payload = strings.TrimSpace(r.Payload)
 }
 
 func (r *ProcessWebhookRequest) Validate() error {

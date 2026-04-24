@@ -180,9 +180,10 @@ func (a *stripeTopUpActivities) CreateTopUpIntent(ctx context.Context, input wor
 		return nil, stackErr.Error(errors.New("payment grpc client is unavailable"))
 	}
 
-	response, err := a.payment.CreateStripeTopUpIntent(
+	response, err := a.payment.CreatePaymentIntent(
 		actorOutgoingContext(ctx, input.Actor),
-		&paymentv1.CreateStripeTopUpIntentRequest{
+		&paymentv1.CreatePaymentIntentRequest{
+			Provider: "stripe",
 			Amount:   input.Amount,
 			Currency: input.Currency,
 			Metadata: input.Metadata,
@@ -210,7 +211,8 @@ func (a *stripeTopUpActivities) ProcessWebhook(ctx context.Context, input workfl
 		return nil, stackErr.Error(errors.New("payment grpc client is unavailable"))
 	}
 
-	response, err := a.payment.ProcessStripeWebhook(ctx, &paymentv1.ProcessStripeWebhookRequest{
+	response, err := a.payment.ProcessProviderWebhook(ctx, &paymentv1.ProcessProviderWebhookRequest{
+		Provider:  "stripe",
 		Signature: input.Signature,
 		Payload:   input.Payload,
 	})

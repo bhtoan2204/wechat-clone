@@ -4,8 +4,8 @@ package handler
 import (
 	"net/http"
 
-	"wechat-clone/core/modules/workflow/application/dto/in"
-	"wechat-clone/core/modules/workflow/application/dto/out"
+	"wechat-clone/core/modules/payment/application/dto/in"
+	"wechat-clone/core/modules/payment/application/dto/out"
 	"wechat-clone/core/shared/pkg/cqrs"
 	"wechat-clone/core/shared/pkg/logging"
 	"wechat-clone/core/shared/pkg/stackErr"
@@ -14,22 +14,22 @@ import (
 	"go.uber.org/zap"
 )
 
-type createStripeTopUpHandler struct {
-	createStripeTopUp cqrs.Dispatcher[*in.CreateStripeTopUpRequest, *out.StripeTopUpResponse]
+type createPaymentHandler struct {
+	createPayment cqrs.Dispatcher[*in.CreatePaymentRequest, *out.CreatePaymentResponse]
 }
 
-func NewCreateStripeTopUpHandler(
-	createStripeTopUp cqrs.Dispatcher[*in.CreateStripeTopUpRequest, *out.StripeTopUpResponse],
-) *createStripeTopUpHandler {
-	return &createStripeTopUpHandler{
-		createStripeTopUp: createStripeTopUp,
+func NewCreatePaymentHandler(
+	createPayment cqrs.Dispatcher[*in.CreatePaymentRequest, *out.CreatePaymentResponse],
+) *createPaymentHandler {
+	return &createPaymentHandler{
+		createPayment: createPayment,
 	}
 }
 
-func (h *createStripeTopUpHandler) Handle(c *gin.Context) (interface{}, error) {
+func (h *createPaymentHandler) Handle(c *gin.Context) (interface{}, error) {
 	ctx := c.Request.Context()
 	logger := logging.FromContext(ctx)
-	var request in.CreateStripeTopUpRequest
+	var request in.CreatePaymentRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		logger.Errorw("Unmarshal request failed", zap.Error(err))
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -42,9 +42,9 @@ func (h *createStripeTopUpHandler) Handle(c *gin.Context) (interface{}, error) {
 		return nil, stackErr.Error(err)
 	}
 
-	result, err := h.createStripeTopUp.Dispatch(ctx, &request)
+	result, err := h.createPayment.Dispatch(ctx, &request)
 	if err != nil {
-		logger.Errorw("CreateStripeTopUp failed", zap.Error(err))
+		logger.Errorw("CreatePayment failed", zap.Error(err))
 		return nil, stackErr.Error(err)
 	}
 	c.JSON(201, result)

@@ -38,11 +38,11 @@ func NewServer(
 	}
 }
 
-func (s *paymentGRPCServer) CreateStripeTopUpIntent(ctx context.Context, req *paymentv1.CreateStripeTopUpIntentRequest) (*paymentv1.CreateStripeTopUpIntentResponse, error) {
+func (s *paymentGRPCServer) CreatePaymentIntent(ctx context.Context, req *paymentv1.CreatePaymentIntentRequest) (*paymentv1.CreatePaymentIntentResponse, error) {
 	ctx = withActorFromMetadata(ctx)
 
 	response, err := s.createPayment.Dispatch(ctx, &in.CreatePaymentRequest{
-		Provider: "stripe",
+		Provider: req.GetProvider(),
 		Amount:   req.GetAmount(),
 		Currency: req.GetCurrency(),
 		Metadata: req.GetMetadata(),
@@ -51,7 +51,7 @@ func (s *paymentGRPCServer) CreateStripeTopUpIntent(ctx context.Context, req *pa
 		return nil, mapGRPCError(err)
 	}
 
-	return &paymentv1.CreateStripeTopUpIntentResponse{
+	return &paymentv1.CreatePaymentIntentResponse{
 		Provider:       response.Provider,
 		Workflow:       response.Workflow,
 		TransactionId:  response.TransactionID,
@@ -64,9 +64,9 @@ func (s *paymentGRPCServer) CreateStripeTopUpIntent(ctx context.Context, req *pa
 	}, nil
 }
 
-func (s *paymentGRPCServer) ProcessStripeWebhook(ctx context.Context, req *paymentv1.ProcessStripeWebhookRequest) (*paymentv1.ProcessStripeWebhookResponse, error) {
+func (s *paymentGRPCServer) ProcessProviderWebhook(ctx context.Context, req *paymentv1.ProcessProviderWebhookRequest) (*paymentv1.ProcessProviderWebhookResponse, error) {
 	response, err := s.processWebhook.Dispatch(ctx, &in.ProcessWebhookRequest{
-		Provider:  "stripe",
+		Provider:  req.GetProvider(),
 		Signature: req.GetSignature(),
 		Payload:   req.GetPayload(),
 	})
@@ -74,7 +74,7 @@ func (s *paymentGRPCServer) ProcessStripeWebhook(ctx context.Context, req *payme
 		return nil, mapGRPCError(err)
 	}
 
-	return &paymentv1.ProcessStripeWebhookResponse{
+	return &paymentv1.ProcessProviderWebhookResponse{
 		Provider:      response.Provider,
 		TransactionId: response.TransactionID,
 		ExternalRef:   response.ExternalRef,
@@ -94,7 +94,7 @@ func paymentIntegrationEvents(events []out.PaymentIntegrationEvent) []*paymentv1
 	for _, event := range events {
 		items = append(items, &paymentv1.PaymentIntegrationEvent{
 			Name:     event.Name,
-			DataJson: event.DataJSON,
+			DataJson: event.DataJson,
 		})
 	}
 	return items

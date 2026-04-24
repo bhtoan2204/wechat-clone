@@ -19,16 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	PaymentService_CreateStripeTopUpIntent_FullMethodName = "/payment.v1.PaymentService/CreateStripeTopUpIntent"
-	PaymentService_ProcessStripeWebhook_FullMethodName    = "/payment.v1.PaymentService/ProcessStripeWebhook"
+	PaymentService_CreatePaymentIntent_FullMethodName    = "/payment.v1.PaymentService/CreatePaymentIntent"
+	PaymentService_ProcessProviderWebhook_FullMethodName = "/payment.v1.PaymentService/ProcessProviderWebhook"
 )
 
 // PaymentServiceClient is the client API for PaymentService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PaymentServiceClient interface {
-	CreateStripeTopUpIntent(ctx context.Context, in *CreateStripeTopUpIntentRequest, opts ...grpc.CallOption) (*CreateStripeTopUpIntentResponse, error)
-	ProcessStripeWebhook(ctx context.Context, in *ProcessStripeWebhookRequest, opts ...grpc.CallOption) (*ProcessStripeWebhookResponse, error)
+	CreatePaymentIntent(ctx context.Context, in *CreatePaymentIntentRequest, opts ...grpc.CallOption) (*CreatePaymentIntentResponse, error)
+	ProcessProviderWebhook(ctx context.Context, in *ProcessProviderWebhookRequest, opts ...grpc.CallOption) (*ProcessProviderWebhookResponse, error)
 }
 
 type paymentServiceClient struct {
@@ -39,18 +39,18 @@ func NewPaymentServiceClient(cc grpc.ClientConnInterface) PaymentServiceClient {
 	return &paymentServiceClient{cc}
 }
 
-func (c *paymentServiceClient) CreateStripeTopUpIntent(ctx context.Context, in *CreateStripeTopUpIntentRequest, opts ...grpc.CallOption) (*CreateStripeTopUpIntentResponse, error) {
-	out := new(CreateStripeTopUpIntentResponse)
-	err := c.cc.Invoke(ctx, PaymentService_CreateStripeTopUpIntent_FullMethodName, in, out, opts...)
+func (c *paymentServiceClient) CreatePaymentIntent(ctx context.Context, in *CreatePaymentIntentRequest, opts ...grpc.CallOption) (*CreatePaymentIntentResponse, error) {
+	out := new(CreatePaymentIntentResponse)
+	err := c.cc.Invoke(ctx, PaymentService_CreatePaymentIntent_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *paymentServiceClient) ProcessStripeWebhook(ctx context.Context, in *ProcessStripeWebhookRequest, opts ...grpc.CallOption) (*ProcessStripeWebhookResponse, error) {
-	out := new(ProcessStripeWebhookResponse)
-	err := c.cc.Invoke(ctx, PaymentService_ProcessStripeWebhook_FullMethodName, in, out, opts...)
+func (c *paymentServiceClient) ProcessProviderWebhook(ctx context.Context, in *ProcessProviderWebhookRequest, opts ...grpc.CallOption) (*ProcessProviderWebhookResponse, error) {
+	out := new(ProcessProviderWebhookResponse)
+	err := c.cc.Invoke(ctx, PaymentService_ProcessProviderWebhook_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -61,8 +61,8 @@ func (c *paymentServiceClient) ProcessStripeWebhook(ctx context.Context, in *Pro
 // All implementations must embed UnimplementedPaymentServiceServer
 // for forward compatibility
 type PaymentServiceServer interface {
-	CreateStripeTopUpIntent(context.Context, *CreateStripeTopUpIntentRequest) (*CreateStripeTopUpIntentResponse, error)
-	ProcessStripeWebhook(context.Context, *ProcessStripeWebhookRequest) (*ProcessStripeWebhookResponse, error)
+	CreatePaymentIntent(context.Context, *CreatePaymentIntentRequest) (*CreatePaymentIntentResponse, error)
+	ProcessProviderWebhook(context.Context, *ProcessProviderWebhookRequest) (*ProcessProviderWebhookResponse, error)
 	mustEmbedUnimplementedPaymentServiceServer()
 }
 
@@ -70,11 +70,11 @@ type PaymentServiceServer interface {
 type UnimplementedPaymentServiceServer struct {
 }
 
-func (UnimplementedPaymentServiceServer) CreateStripeTopUpIntent(context.Context, *CreateStripeTopUpIntentRequest) (*CreateStripeTopUpIntentResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateStripeTopUpIntent not implemented")
+func (UnimplementedPaymentServiceServer) CreatePaymentIntent(context.Context, *CreatePaymentIntentRequest) (*CreatePaymentIntentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreatePaymentIntent not implemented")
 }
-func (UnimplementedPaymentServiceServer) ProcessStripeWebhook(context.Context, *ProcessStripeWebhookRequest) (*ProcessStripeWebhookResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ProcessStripeWebhook not implemented")
+func (UnimplementedPaymentServiceServer) ProcessProviderWebhook(context.Context, *ProcessProviderWebhookRequest) (*ProcessProviderWebhookResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessProviderWebhook not implemented")
 }
 func (UnimplementedPaymentServiceServer) mustEmbedUnimplementedPaymentServiceServer() {}
 
@@ -89,38 +89,38 @@ func RegisterPaymentServiceServer(s grpc.ServiceRegistrar, srv PaymentServiceSer
 	s.RegisterService(&PaymentService_ServiceDesc, srv)
 }
 
-func _PaymentService_CreateStripeTopUpIntent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateStripeTopUpIntentRequest)
+func _PaymentService_CreatePaymentIntent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePaymentIntentRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PaymentServiceServer).CreateStripeTopUpIntent(ctx, in)
+		return srv.(PaymentServiceServer).CreatePaymentIntent(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: PaymentService_CreateStripeTopUpIntent_FullMethodName,
+		FullMethod: PaymentService_CreatePaymentIntent_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PaymentServiceServer).CreateStripeTopUpIntent(ctx, req.(*CreateStripeTopUpIntentRequest))
+		return srv.(PaymentServiceServer).CreatePaymentIntent(ctx, req.(*CreatePaymentIntentRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _PaymentService_ProcessStripeWebhook_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ProcessStripeWebhookRequest)
+func _PaymentService_ProcessProviderWebhook_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProcessProviderWebhookRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PaymentServiceServer).ProcessStripeWebhook(ctx, in)
+		return srv.(PaymentServiceServer).ProcessProviderWebhook(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: PaymentService_ProcessStripeWebhook_FullMethodName,
+		FullMethod: PaymentService_ProcessProviderWebhook_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PaymentServiceServer).ProcessStripeWebhook(ctx, req.(*ProcessStripeWebhookRequest))
+		return srv.(PaymentServiceServer).ProcessProviderWebhook(ctx, req.(*ProcessProviderWebhookRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -133,12 +133,12 @@ var PaymentService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*PaymentServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CreateStripeTopUpIntent",
-			Handler:    _PaymentService_CreateStripeTopUpIntent_Handler,
+			MethodName: "CreatePaymentIntent",
+			Handler:    _PaymentService_CreatePaymentIntent_Handler,
 		},
 		{
-			MethodName: "ProcessStripeWebhook",
-			Handler:    _PaymentService_ProcessStripeWebhook_Handler,
+			MethodName: "ProcessProviderWebhook",
+			Handler:    _PaymentService_ProcessProviderWebhook_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

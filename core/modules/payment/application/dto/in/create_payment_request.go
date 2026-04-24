@@ -9,17 +9,15 @@ import (
 )
 
 type CreatePaymentRequest struct {
-	Provider        string            `json:"provider" form:"provider" binding:"required"`
-	Amount          int64             `json:"amount" form:"amount" binding:"required"`
-	Currency        string            `json:"currency" form:"currency" binding:"required"`
-	CreditAccountID string            `json:"credit_account_id" form:"credit_account_id"`
-	Metadata        map[string]string `json:"metadata" form:"metadata"`
+	Provider string            `json:"provider" form:"provider" binding:"required"`
+	Amount   int64             `json:"amount" form:"amount" binding:"required"`
+	Currency string            `json:"currency" form:"currency" binding:"required"`
+	Metadata map[string]string `json:"metadata" form:"metadata"`
 }
 
 func (r *CreatePaymentRequest) Normalize() {
 	r.Provider = strings.TrimSpace(r.Provider)
 	r.Currency = strings.TrimSpace(r.Currency)
-	r.CreditAccountID = strings.TrimSpace(r.CreditAccountID)
 	for key, value := range r.Metadata {
 		r.Metadata[key] = strings.TrimSpace(value)
 	}

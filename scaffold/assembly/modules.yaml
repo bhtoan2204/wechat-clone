@@ -17,13 +17,10 @@ modules:
 
   - name: payment
     kinds:
+      - http
       - grpc
       - task
       - cron
-
-  - name: workflow
-    kinds:
-      - http
 
   - name: room
     kinds:

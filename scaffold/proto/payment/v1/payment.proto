@@ -5,17 +5,18 @@ package payment.v1;
 option go_package = "wechat-clone/core/shared/transport/grpc/gen/payment/v1;paymentv1";
 
 service PaymentService {
-  rpc CreateStripeTopUpIntent(CreateStripeTopUpIntentRequest) returns (CreateStripeTopUpIntentResponse);
-  rpc ProcessStripeWebhook(ProcessStripeWebhookRequest) returns (ProcessStripeWebhookResponse);
+  rpc CreatePaymentIntent(CreatePaymentIntentRequest) returns (CreatePaymentIntentResponse);
+  rpc ProcessProviderWebhook(ProcessProviderWebhookRequest) returns (ProcessProviderWebhookResponse);
 }
 
-message CreateStripeTopUpIntentRequest {
-  int64 amount = 1;
-  string currency = 2;
-  map<string, string> metadata = 3;
+message CreatePaymentIntentRequest {
+  string provider = 1;
+  int64 amount = 2;
+  string currency = 3;
+  map<string, string> metadata = 4;
 }
 
-message CreateStripeTopUpIntentResponse {
+message CreatePaymentIntentResponse {
   string provider = 1;
   string workflow = 2;
   string transaction_id = 3;
@@ -27,12 +28,13 @@ message CreateStripeTopUpIntentResponse {
   string checkout_url = 9;
 }
 
-message ProcessStripeWebhookRequest {
-  string signature = 1;
-  string payload = 2;
+message ProcessProviderWebhookRequest {
+  string provider = 1;
+  string signature = 2;
+  string payload = 3;
 }
 
-message ProcessStripeWebhookResponse {
+message ProcessProviderWebhookResponse {
   string provider = 1;
   string transaction_id = 2;
   string external_ref = 3;

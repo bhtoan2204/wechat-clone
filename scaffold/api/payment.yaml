@@ -1,4 +1,94 @@
 version: 1
 basePath: /api/v1
 
-endpoints: []
+endpoints:
+  - name: PaymentCreatePayment
+    method: POST
+    path: /payment/intents
+    handler: CreatePaymentHandler
+    auth: true
+    successStatus: 201
+    usecase:
+      name: PaymentUsecase
+      method: CreatePayment
+    request:
+      struct: CreatePaymentRequest
+      fields:
+        - name: provider
+          type: string
+          required: true
+        - name: amount
+          type: int64
+          required: true
+        - name: currency
+          type: string
+          required: true
+        - name: metadata
+          type: object
+    response:
+      struct: CreatePaymentResponse
+      fields:
+        - name: provider
+          type: string
+        - name: workflow
+          type: string
+        - name: transaction_id
+          type: string
+        - name: external_ref
+          type: string
+        - name: amount
+          type: int64
+        - name: fee_amount
+          type: int64
+        - name: provider_amount
+          type: int64
+        - name: status
+          type: string
+        - name: checkout_url
+          type: string
+
+  - name: PaymentProcessWebhook
+    method: POST
+    path: /payment/webhooks/:provider
+    handler: ProcessWebhookHandler
+    usecase:
+      name: PaymentUsecase
+      method: ProcessWebhook
+    request:
+      struct: ProcessWebhookRequest
+      fields:
+        - name: provider
+          type: string
+          required: true
+          source: path
+        - name: signature
+          type: string
+          source: header
+          header: Stripe-Signature
+        - name: payload
+          type: string
+          source: raw_body
+    response:
+      struct: ProcessWebhookResponse
+      fields:
+        - name: provider
+          type: string
+        - name: transaction_id
+          type: string
+        - name: external_ref
+          type: string
+        - name: status
+          type: string
+        - name: duplicate
+          type: bool
+        - name: ledger_posted
+          type: bool
+        - name: events
+          type: array
+          items:
+            struct: PaymentIntegrationEvent
+            fields:
+              - name: name
+                type: string
+              - name: data_json
+                type: string

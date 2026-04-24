@@ -13,41 +13,21 @@ import (
 	domainservice "wechat-clone/core/modules/payment/domain/service"
 	sharedevents "wechat-clone/core/shared/contracts/events"
 	sharedlock "wechat-clone/core/shared/infra/lock"
-	"wechat-clone/core/shared/pkg/actorctx"
 
 	"go.uber.org/mock/gomock"
 )
 
-func TestCreatePaymentRejectsUnauthorizedOrCrossAccountRequests(t *testing.T) {
-	t.Run("rejects client supplied credit account id", func(t *testing.T) {
-		svc := &paymentCommandService{}
+func TestCreatePaymentRequiresAuthenticatedActor(t *testing.T) {
+	svc := &paymentCommandService{}
 
-		_, err := svc.CreatePayment(
-			actorctx.WithActor(context.Background(), actorctx.Actor{AccountID: "acc-user-1"}),
-			&in.CreatePaymentRequest{
-				Provider:        "stripe",
-				Amount:          100,
-				Currency:        "VND",
-				CreditAccountID: "acc-user-1",
-			},
-		)
-		if !errors.Is(err, ErrValidation) {
-			t.Fatalf("expected validation error, got %v", err)
-		}
+	_, err := svc.CreatePayment(context.Background(), &in.CreatePaymentRequest{
+		Provider: "stripe",
+		Amount:   100,
+		Currency: "VND",
 	})
-
-	t.Run("requires authenticated actor for create payment", func(t *testing.T) {
-		svc := &paymentCommandService{}
-
-		_, err := svc.CreatePayment(context.Background(), &in.CreatePaymentRequest{
-			Provider: "stripe",
-			Amount:   100,
-			Currency: "VND",
-		})
-		if !errors.Is(err, ErrPaymentUnauthorized) {
-			t.Fatalf("expected unauthorized error, got %v", err)
-		}
-	})
+	if !errors.Is(err, ErrPaymentUnauthorized) {
+		t.Fatalf("expected unauthorized error, got %v", err)
+	}
 }
 
 func TestProcessWebhookLocksByTransactionIDAndFinalizesSuccess(t *testing.T) {

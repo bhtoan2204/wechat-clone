@@ -49,16 +49,16 @@ func New(ctx context.Context, cfg *config.Config) (PaymentGrpc, error) {
 	}, nil
 }
 
-func (p paymentGrpc) CreateStripeTopUpIntent(ctx context.Context, req *paymentv1.CreateStripeTopUpIntentRequest, opts ...grpc.CallOption) (*paymentv1.CreateStripeTopUpIntentResponse, error) {
-	response, err := p.grpcClient.CreateStripeTopUpIntent(ctx, req, opts...)
+func (p paymentGrpc) CreatePaymentIntent(ctx context.Context, req *paymentv1.CreatePaymentIntentRequest, opts ...grpc.CallOption) (*paymentv1.CreatePaymentIntentResponse, error) {
+	response, err := p.grpcClient.CreatePaymentIntent(ctx, req, opts...)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 	return response, nil
 }
 
-func (p paymentGrpc) ProcessStripeWebhook(ctx context.Context, req *paymentv1.ProcessStripeWebhookRequest, opts ...grpc.CallOption) (*paymentv1.ProcessStripeWebhookResponse, error) {
-	response, err := p.grpcClient.ProcessStripeWebhook(ctx, req, opts...)
+func (p paymentGrpc) ProcessProviderWebhook(ctx context.Context, req *paymentv1.ProcessProviderWebhookRequest, opts ...grpc.CallOption) (*paymentv1.ProcessProviderWebhookResponse, error) {
+	response, err := p.grpcClient.ProcessProviderWebhook(ctx, req, opts...)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

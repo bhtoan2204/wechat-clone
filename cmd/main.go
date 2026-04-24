@@ -15,7 +15,6 @@ import (
 	paymentassembly "wechat-clone/core/modules/payment/assembly"
 	relationassembly "wechat-clone/core/modules/relationship/assembly"
 	roomassembly "wechat-clone/core/modules/room/assembly"
-	workflowassembly "wechat-clone/core/modules/workflow/assembly"
 	"wechat-clone/core/shared/config"
 	"wechat-clone/core/shared/infra/db"
 	"wechat-clone/core/shared/pkg/logging"
@@ -61,8 +60,8 @@ func main() {
 		accountassembly.BuildHTTPServer,
 		ledgerassembly.BuildHTTPServer,
 		notificationassembly.BuildHTTPServer,
+		paymentassembly.BuildHTTPServer,
 		roomassembly.BuildHTTPServer,
-		workflowassembly.BuildHTTPServer,
 		relationassembly.BuildHTTPServer,
 	), apptransport.WithGRPCModuleBuilders(
 		ledgerassembly.BuildGRPCServer,
