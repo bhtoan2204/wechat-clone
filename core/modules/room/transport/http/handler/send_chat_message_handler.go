@@ -15,11 +15,11 @@ import (
 )
 
 type sendChatMessageHandler struct {
-	sendChatMessage cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageResponse]
+	sendChatMessage cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageCommandResponse]
 }
 
 func NewSendChatMessageHandler(
-	sendChatMessage cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageResponse],
+	sendChatMessage cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageCommandResponse],
 ) *sendChatMessageHandler {
 	return &sendChatMessageHandler{
 		sendChatMessage: sendChatMessage,

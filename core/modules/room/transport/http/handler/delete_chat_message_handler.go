@@ -15,11 +15,11 @@ import (
 )
 
 type deleteChatMessageHandler struct {
-	deleteChatMessage cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse]
+	deleteChatMessage cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.ChatMessageCommandResponse]
 }
 
 func NewDeleteChatMessageHandler(
-	deleteChatMessage cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse],
+	deleteChatMessage cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.ChatMessageCommandResponse],
 ) *deleteChatMessageHandler {
 	return &deleteChatMessageHandler{
 		deleteChatMessage: deleteChatMessage,

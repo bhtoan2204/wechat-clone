@@ -15,11 +15,11 @@ import (
 )
 
 type addChatMemberHandler struct {
-	addChatMember cqrs.Dispatcher[*in.AddChatMemberRequest, *out.ChatConversationResponse]
+	addChatMember cqrs.Dispatcher[*in.AddChatMemberRequest, *out.ChatRoomCommandResponse]
 }
 
 func NewAddChatMemberHandler(
-	addChatMember cqrs.Dispatcher[*in.AddChatMemberRequest, *out.ChatConversationResponse],
+	addChatMember cqrs.Dispatcher[*in.AddChatMemberRequest, *out.ChatRoomCommandResponse],
 ) *addChatMemberHandler {
 	return &addChatMemberHandler{
 		addChatMember: addChatMember,

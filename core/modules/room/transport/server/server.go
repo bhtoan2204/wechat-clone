@@ -15,9 +15,9 @@ import (
 )
 
 type roomHTTPServer struct {
-	createDirectConversation      cqrs.Dispatcher[*in.CreateDirectConversationRequest, *out.ChatConversationResponse]
-	createGroupChat               cqrs.Dispatcher[*in.CreateGroupChatRequest, *out.ChatConversationResponse]
-	updateGroupChat               cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatConversationResponse]
+	createDirectConversation      cqrs.Dispatcher[*in.CreateDirectConversationRequest, *out.ChatRoomCommandResponse]
+	createGroupChat               cqrs.Dispatcher[*in.CreateGroupChatRequest, *out.ChatRoomCommandResponse]
+	updateGroupChat               cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatRoomCommandResponse]
 	listChatConversations         cqrs.Dispatcher[*in.ListChatConversationsRequest, []*out.ChatConversationResponse]
 	getChatConversation           cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationResponse]
 	getChatConversationMetadata   cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationMetadataResponse]
@@ -25,24 +25,24 @@ type roomHTTPServer struct {
 	searchChatMentions            cqrs.Dispatcher[*in.SearchChatMentionsRequest, []*out.ChatMentionCandidateResponse]
 	createChatMessagePresignedURL cqrs.Dispatcher[*in.CreateChatMessagePresignedURLRequest, *out.CreateChatMessagePresignedURLResponse]
 	getChatMessageMedia           cqrs.Dispatcher[*in.GetChatMessageMediaRequest, *out.GetChatMessageMediaResponse]
-	sendChatMessage               cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageResponse]
-	toggleChatMessageReaction     cqrs.Dispatcher[*in.ToggleChatMessageReactionRequest, *out.ChatMessageResponse]
-	editChatMessage               cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageResponse]
-	deleteChatMessage             cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse]
-	forwardChatMessage            cqrs.Dispatcher[*in.ForwardChatMessageRequest, *out.ChatMessageResponse]
-	markChatMessageStatus         cqrs.Dispatcher[*in.MarkChatMessageStatusRequest, *out.MarkChatMessageStatusResponse]
-	addChatMember                 cqrs.Dispatcher[*in.AddChatMemberRequest, *out.ChatConversationResponse]
-	removeChatMember              cqrs.Dispatcher[*in.RemoveChatMemberRequest, *out.ChatConversationResponse]
-	pinChatMessage                cqrs.Dispatcher[*in.PinChatMessageRequest, *out.ChatConversationResponse]
+	sendChatMessage               cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageCommandResponse]
+	toggleChatMessageReaction     cqrs.Dispatcher[*in.ToggleChatMessageReactionRequest, *out.ChatMessageCommandResponse]
+	editChatMessage               cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageCommandResponse]
+	deleteChatMessage             cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.ChatMessageCommandResponse]
+	forwardChatMessage            cqrs.Dispatcher[*in.ForwardChatMessageRequest, *out.ChatMessageCommandResponse]
+	markChatMessageStatus         cqrs.Dispatcher[*in.MarkChatMessageStatusRequest, *out.ChatMessageCommandResponse]
+	addChatMember                 cqrs.Dispatcher[*in.AddChatMemberRequest, *out.ChatRoomCommandResponse]
+	removeChatMember              cqrs.Dispatcher[*in.RemoveChatMemberRequest, *out.ChatRoomCommandResponse]
+	pinChatMessage                cqrs.Dispatcher[*in.PinChatMessageRequest, *out.ChatRoomCommandResponse]
 	getChatPresence               cqrs.Dispatcher[*in.GetChatPresenceRequest, *out.ChatPresenceResponse]
 	socketHandler                 gin.HandlerFunc
 	socketStopper                 func(context.Context)
 }
 
 func NewHTTPServer(
-	createDirectConversation cqrs.Dispatcher[*in.CreateDirectConversationRequest, *out.ChatConversationResponse],
-	createGroupChat cqrs.Dispatcher[*in.CreateGroupChatRequest, *out.ChatConversationResponse],
-	updateGroupChat cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatConversationResponse],
+	createDirectConversation cqrs.Dispatcher[*in.CreateDirectConversationRequest, *out.ChatRoomCommandResponse],
+	createGroupChat cqrs.Dispatcher[*in.CreateGroupChatRequest, *out.ChatRoomCommandResponse],
+	updateGroupChat cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatRoomCommandResponse],
 	listChatConversations cqrs.Dispatcher[*in.ListChatConversationsRequest, []*out.ChatConversationResponse],
 	getChatConversation cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationResponse],
 	getChatConversationMetadata cqrs.Dispatcher[*in.GetChatConversationRequest, *out.ChatConversationMetadataResponse],
@@ -50,15 +50,15 @@ func NewHTTPServer(
 	searchChatMentions cqrs.Dispatcher[*in.SearchChatMentionsRequest, []*out.ChatMentionCandidateResponse],
 	createChatMessagePresignedURL cqrs.Dispatcher[*in.CreateChatMessagePresignedURLRequest, *out.CreateChatMessagePresignedURLResponse],
 	getChatMessageMedia cqrs.Dispatcher[*in.GetChatMessageMediaRequest, *out.GetChatMessageMediaResponse],
-	sendChatMessage cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageResponse],
-	toggleChatMessageReaction cqrs.Dispatcher[*in.ToggleChatMessageReactionRequest, *out.ChatMessageResponse],
-	editChatMessage cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageResponse],
-	deleteChatMessage cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.DeleteChatMessageResponse],
-	forwardChatMessage cqrs.Dispatcher[*in.ForwardChatMessageRequest, *out.ChatMessageResponse],
-	markChatMessageStatus cqrs.Dispatcher[*in.MarkChatMessageStatusRequest, *out.MarkChatMessageStatusResponse],
-	addChatMember cqrs.Dispatcher[*in.AddChatMemberRequest, *out.ChatConversationResponse],
-	removeChatMember cqrs.Dispatcher[*in.RemoveChatMemberRequest, *out.ChatConversationResponse],
-	pinChatMessage cqrs.Dispatcher[*in.PinChatMessageRequest, *out.ChatConversationResponse],
+	sendChatMessage cqrs.Dispatcher[*in.SendChatMessageRequest, *out.ChatMessageCommandResponse],
+	toggleChatMessageReaction cqrs.Dispatcher[*in.ToggleChatMessageReactionRequest, *out.ChatMessageCommandResponse],
+	editChatMessage cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageCommandResponse],
+	deleteChatMessage cqrs.Dispatcher[*in.DeleteChatMessageRequest, *out.ChatMessageCommandResponse],
+	forwardChatMessage cqrs.Dispatcher[*in.ForwardChatMessageRequest, *out.ChatMessageCommandResponse],
+	markChatMessageStatus cqrs.Dispatcher[*in.MarkChatMessageStatusRequest, *out.ChatMessageCommandResponse],
+	addChatMember cqrs.Dispatcher[*in.AddChatMemberRequest, *out.ChatRoomCommandResponse],
+	removeChatMember cqrs.Dispatcher[*in.RemoveChatMemberRequest, *out.ChatRoomCommandResponse],
+	pinChatMessage cqrs.Dispatcher[*in.PinChatMessageRequest, *out.ChatRoomCommandResponse],
 	getChatPresence cqrs.Dispatcher[*in.GetChatPresenceRequest, *out.ChatPresenceResponse],
 	socketHandler gin.HandlerFunc,
 	socketStopper func(context.Context),

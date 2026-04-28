@@ -24,19 +24,15 @@ type createDirectConversationHandler struct {
 	baseRepo roomrepos.Repos
 }
 
-func NewCreateDirectConversationHandler(baseRepo roomrepos.Repos) cqrs.Handler[*in.CreateDirectConversationRequest, *out.ChatConversationResponse] {
+func NewCreateDirectConversationHandler(baseRepo roomrepos.Repos) cqrs.Handler[*in.CreateDirectConversationRequest, *out.ChatRoomCommandResponse] {
 	return &createDirectConversationHandler{baseRepo: baseRepo}
 }
 
-func (h *createDirectConversationHandler) Handle(ctx context.Context, req *in.CreateDirectConversationRequest) (*out.ChatConversationResponse, error) {
+func (h *createDirectConversationHandler) Handle(ctx context.Context, req *in.CreateDirectConversationRequest) (*out.ChatRoomCommandResponse, error) {
 	accountID, err := roomsupport.AccountIDFromCtx(ctx)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	// if err := ensureProjectedAccountsExist(ctx, h.baseRepo, accountID, req.PeerAccountID); err != nil {
-	// 	return nil, stackErr.Error(err)
-	// }
-
 	now := time.Now().UTC()
 	room, err := entity.NewDirectConversationRoom(uuid.NewString(), accountID, req.PeerAccountID, now)
 	if err != nil {
@@ -45,11 +41,7 @@ func (h *createDirectConversationHandler) Handle(ctx context.Context, req *in.Cr
 
 	existing, err := h.baseRepo.RoomAggregateRepository().LoadByDirectKey(ctx, room.DirectKey)
 	if err == nil && existing != nil {
-		res, buildErr := roomsupport.BuildConversationResultFromState(ctx, h.baseRepo, accountID, existing.Room(), existing.Members(), nil, true)
-		if buildErr != nil {
-			return nil, stackErr.Error(buildErr)
-		}
-		return roomsupport.ToConversationResponse(res), nil
+		return &out.ChatRoomCommandResponse{RoomID: existing.Room().ID, Status: CommandStatusAlreadyExists}, nil
 	}
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, stackErr.Error(err)
@@ -75,17 +67,11 @@ func (h *createDirectConversationHandler) Handle(ctx context.Context, req *in.Cr
 		return nil, stackErr.Error(err)
 	}
 
-	lastMessage := lastPendingMessage(agg.PendingMessages())
-
 	if err := h.baseRepo.WithTransaction(ctx, func(txRepos roomrepos.Repos) error {
 		return stackErr.Error(txRepos.RoomAggregateRepository().Save(ctx, agg))
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
 
-	res, err := roomsupport.BuildConversationResultFromState(ctx, h.baseRepo, accountID, room, agg.Members(), lastMessage, true)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-	return roomsupport.ToConversationResponse(res), nil
+	return &out.ChatRoomCommandResponse{RoomID: room.ID, Status: CommandStatusCreated}, nil
 }

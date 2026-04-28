@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"reflect"
 
 	"time"
 
@@ -11,12 +10,8 @@ import (
 	"wechat-clone/core/modules/room/application/service"
 	roomsupport "wechat-clone/core/modules/room/application/support"
 	roomrepos "wechat-clone/core/modules/room/domain/repos"
-	"wechat-clone/core/modules/room/types"
 	"wechat-clone/core/shared/pkg/cqrs"
-	"wechat-clone/core/shared/pkg/logging"
 	"wechat-clone/core/shared/pkg/stackErr"
-
-	"go.uber.org/zap"
 )
 
 type removeChatMemberHandler struct {
@@ -24,10 +19,10 @@ type removeChatMemberHandler struct {
 	realtime service.RealtimeService
 }
 
-func NewRemoveChatMemberHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.RemoveChatMemberRequest, *out.ChatConversationResponse] {
+func NewRemoveChatMemberHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.RemoveChatMemberRequest, *out.ChatRoomCommandResponse] {
 	return &removeChatMemberHandler{baseRepo: baseRepo, realtime: realtime}
 }
-func (h *removeChatMemberHandler) Handle(ctx context.Context, req *in.RemoveChatMemberRequest) (*out.ChatConversationResponse, error) {
+func (h *removeChatMemberHandler) Handle(ctx context.Context, req *in.RemoveChatMemberRequest) (*out.ChatRoomCommandResponse, error) {
 	accountID, err := roomsupport.AccountIDFromCtx(ctx)
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -42,7 +37,6 @@ func (h *removeChatMemberHandler) Handle(ctx context.Context, req *in.RemoveChat
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	lastMessage := lastPendingMessage(agg.PendingMessages())
 	if removed {
 		if err := h.baseRepo.WithTransaction(ctx, func(txRepos roomrepos.Repos) error {
 			return stackErr.Error(txRepos.RoomAggregateRepository().Save(ctx, agg))
@@ -51,17 +45,5 @@ func (h *removeChatMemberHandler) Handle(ctx context.Context, req *in.RemoveChat
 		}
 	}
 
-	res, err := roomsupport.BuildConversationResultFromState(ctx, h.baseRepo, accountID, agg.Room(), agg.Members(), lastMessage, true)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-	out := roomsupport.ToConversationResponse(res)
-	if err := h.realtime.EmitMessage(ctx, types.MessagePayload{
-		RoomId:  out.RoomID,
-		Type:    reflect.TypeOf(out).Elem().Name(),
-		Payload: out,
-	}); err != nil {
-		logging.FromContext(ctx).Warnw("failed to emit realtime message after removing chat member", zap.Error(err), "room_id", req.RoomID)
-	}
-	return out, nil
+	return &out.ChatRoomCommandResponse{RoomID: agg.Room().ID, Status: commandStatus(removed)}, nil
 }

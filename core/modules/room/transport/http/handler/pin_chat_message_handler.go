@@ -15,11 +15,11 @@ import (
 )
 
 type pinChatMessageHandler struct {
-	pinChatMessage cqrs.Dispatcher[*in.PinChatMessageRequest, *out.ChatConversationResponse]
+	pinChatMessage cqrs.Dispatcher[*in.PinChatMessageRequest, *out.ChatRoomCommandResponse]
 }
 
 func NewPinChatMessageHandler(
-	pinChatMessage cqrs.Dispatcher[*in.PinChatMessageRequest, *out.ChatConversationResponse],
+	pinChatMessage cqrs.Dispatcher[*in.PinChatMessageRequest, *out.ChatRoomCommandResponse],
 ) *pinChatMessageHandler {
 	return &pinChatMessageHandler{
 		pinChatMessage: pinChatMessage,

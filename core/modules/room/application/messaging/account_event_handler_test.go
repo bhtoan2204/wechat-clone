@@ -37,7 +37,7 @@ func TestHandleAccountEventProfileUpdatedProjectsUsernameAndAvatar(t *testing.T)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	accountRepo := repos.NewMockRoomAccountProjectionRepository(ctrl)
+	accountRepo := repos.NewMockRoomAccountRepository(ctrl)
 	handler := &messageHandler{accountRepo: accountRepo}
 
 	raw := []byte(`{
@@ -87,7 +87,7 @@ func TestHandleAccountEventCreatedFallsBackToEmailWhenDisplayNameMissing(t *test
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	accountRepo := repos.NewMockRoomAccountProjectionRepository(ctrl)
+	accountRepo := repos.NewMockRoomAccountRepository(ctrl)
 	handler := &messageHandler{accountRepo: accountRepo}
 
 	raw := []byte(`{

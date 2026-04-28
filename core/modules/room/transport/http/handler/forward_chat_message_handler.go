@@ -15,11 +15,11 @@ import (
 )
 
 type forwardChatMessageHandler struct {
-	forwardChatMessage cqrs.Dispatcher[*in.ForwardChatMessageRequest, *out.ChatMessageResponse]
+	forwardChatMessage cqrs.Dispatcher[*in.ForwardChatMessageRequest, *out.ChatMessageCommandResponse]
 }
 
 func NewForwardChatMessageHandler(
-	forwardChatMessage cqrs.Dispatcher[*in.ForwardChatMessageRequest, *out.ChatMessageResponse],
+	forwardChatMessage cqrs.Dispatcher[*in.ForwardChatMessageRequest, *out.ChatMessageCommandResponse],
 ) *forwardChatMessageHandler {
 	return &forwardChatMessageHandler{
 		forwardChatMessage: forwardChatMessage,

@@ -15,11 +15,11 @@ import (
 )
 
 type editChatMessageHandler struct {
-	editChatMessage cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageResponse]
+	editChatMessage cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageCommandResponse]
 }
 
 func NewEditChatMessageHandler(
-	editChatMessage cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageResponse],
+	editChatMessage cqrs.Dispatcher[*in.EditChatMessageRequest, *out.ChatMessageCommandResponse],
 ) *editChatMessageHandler {
 	return &editChatMessageHandler{
 		editChatMessage: editChatMessage,

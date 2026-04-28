@@ -15,11 +15,11 @@ import (
 )
 
 type markChatMessageStatusHandler struct {
-	markChatMessageStatus cqrs.Dispatcher[*in.MarkChatMessageStatusRequest, *out.MarkChatMessageStatusResponse]
+	markChatMessageStatus cqrs.Dispatcher[*in.MarkChatMessageStatusRequest, *out.ChatMessageCommandResponse]
 }
 
 func NewMarkChatMessageStatusHandler(
-	markChatMessageStatus cqrs.Dispatcher[*in.MarkChatMessageStatusRequest, *out.MarkChatMessageStatusResponse],
+	markChatMessageStatus cqrs.Dispatcher[*in.MarkChatMessageStatusRequest, *out.ChatMessageCommandResponse],
 ) *markChatMessageStatusHandler {
 	return &markChatMessageStatusHandler{
 		markChatMessageStatus: markChatMessageStatus,

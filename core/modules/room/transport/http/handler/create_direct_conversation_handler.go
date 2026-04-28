@@ -15,11 +15,11 @@ import (
 )
 
 type createDirectConversationHandler struct {
-	createDirectConversation cqrs.Dispatcher[*in.CreateDirectConversationRequest, *out.ChatConversationResponse]
+	createDirectConversation cqrs.Dispatcher[*in.CreateDirectConversationRequest, *out.ChatRoomCommandResponse]
 }
 
 func NewCreateDirectConversationHandler(
-	createDirectConversation cqrs.Dispatcher[*in.CreateDirectConversationRequest, *out.ChatConversationResponse],
+	createDirectConversation cqrs.Dispatcher[*in.CreateDirectConversationRequest, *out.ChatRoomCommandResponse],
 ) *createDirectConversationHandler {
 	return &createDirectConversationHandler{
 		createDirectConversation: createDirectConversation,

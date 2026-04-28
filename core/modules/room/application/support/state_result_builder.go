@@ -1,21 +1,17 @@
 package support
 
 import (
-	"context"
 	"errors"
 	"time"
 
 	apptypes "wechat-clone/core/modules/room/application/types"
 	"wechat-clone/core/modules/room/domain/entity"
-	roomrepos "wechat-clone/core/modules/room/domain/repos"
 	"wechat-clone/core/shared/pkg/stackErr"
 
 	"github.com/samber/lo"
 )
 
 func BuildConversationResultFromState(
-	ctx context.Context,
-	baseRepo roomrepos.Repos,
 	viewerID string,
 	room *entity.Room,
 	members []*entity.RoomMemberEntity,
@@ -27,38 +23,25 @@ func BuildConversationResultFromState(
 	}
 
 	var viewerMember *entity.RoomMemberEntity
-	accountIDs := lo.FilterMap(members, func(member *entity.RoomMemberEntity, _ int) (string, bool) {
+	for _, member := range members {
 		if member == nil {
-			return "", false
+			continue
 		}
 		if member.AccountID == viewerID {
 			viewerMember = member
+			break
 		}
-		return member.AccountID, true
-	})
+	}
 	if viewerMember == nil {
 		return nil, stackErr.Error(ErrViewerNotMemberOfRoom)
 	}
-
-	accountProjections, err := baseRepo.RoomAccountRepository().ListByAccountIDs(ctx, lo.Uniq(accountIDs))
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-
-	accountMap := lo.SliceToMap(accountProjections, func(acc *entity.AccountEntity) (string, *entity.AccountEntity) {
-		return acc.AccountID, acc
-	})
 
 	name := room.Name
 	if string(room.RoomType) == "direct" {
 		if otherMember, found := lo.Find(members, func(member *entity.RoomMemberEntity) bool {
 			return member != nil && member.AccountID != viewerID
 		}); found {
-			if acc, ok := accountMap[otherMember.AccountID]; ok && acc != nil {
-				name = firstNonEmpty(acc.DisplayName, acc.Username, otherMember.DisplayName, otherMember.Username, otherMember.AccountID)
-			} else {
-				name = firstNonEmpty(otherMember.DisplayName, otherMember.Username, otherMember.AccountID)
-			}
+			name = firstNonEmpty(otherMember.DisplayName, otherMember.Username, otherMember.AccountID)
 		}
 	}
 
@@ -89,18 +72,12 @@ func BuildConversationResultFromState(
 				AvatarObjectKey: member.AvatarObjectKey,
 			}
 
-			if acc, ok := accountMap[member.AccountID]; ok && acc != nil {
-				item.DisplayName = firstNonEmpty(acc.DisplayName, item.DisplayName)
-				item.Username = firstNonEmpty(acc.Username, item.Username)
-				item.AvatarObjectKey = firstNonEmpty(acc.AvatarObjectKey, item.AvatarObjectKey)
-			}
-
 			return item, true
 		})
 	}
 
 	if lastMessage != nil {
-		messageResult, err := BuildMessageResultFromState(ctx, baseRepo, viewerID, lastMessage)
+		messageResult, err := BuildMessageResultFromState(viewerID, lastMessage)
 		if err != nil {
 			return nil, stackErr.Error(err)
 		}
@@ -111,8 +88,6 @@ func BuildConversationResultFromState(
 }
 
 func BuildMessageResultFromState(
-	ctx context.Context,
-	baseRepo roomrepos.Repos,
 	viewerID string,
 	message *entity.MessageEntity,
 ) (*apptypes.MessageResult, error) {
@@ -159,30 +134,6 @@ func BuildMessageResultFromState(
 				Username:    mention.Username,
 			}
 		})
-	}
-
-	if message.ReplyToMessageID != "" {
-		replyTo, err := baseRepo.MessageRepository().GetMessageByID(ctx, message.ReplyToMessageID)
-		if err == nil && replyTo != nil {
-			result.ReplyTo = &apptypes.MessagePreviewResult{
-				ID:          replyTo.ID,
-				SenderID:    replyTo.SenderID,
-				Message:     replyTo.Message,
-				MessageType: replyTo.MessageType,
-			}
-		}
-	}
-
-	if message.ForwardedFromMessageID != "" {
-		forwardedFrom, err := baseRepo.MessageRepository().GetMessageByID(ctx, message.ForwardedFromMessageID)
-		if err == nil && forwardedFrom != nil {
-			result.ForwardedFrom = &apptypes.MessagePreviewResult{
-				ID:          forwardedFrom.ID,
-				SenderID:    forwardedFrom.SenderID,
-				Message:     forwardedFrom.Message,
-				MessageType: forwardedFrom.MessageType,
-			}
-		}
 	}
 
 	return result, nil

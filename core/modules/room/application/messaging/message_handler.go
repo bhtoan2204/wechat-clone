@@ -30,11 +30,11 @@ type messageHandler struct {
 	svc         service.RealtimeService
 }
 
-func NewMessageHandler(cfg *config.Config, repos repos.Repos, svc service.RealtimeService) (MessageHandler, error) {
+func NewMessageHandler(cfg *config.Config, baseRepo repos.Repos, accountRepo repos.RoomAccountRepository, svc service.RealtimeService) (MessageHandler, error) {
 	instance := &messageHandler{
 		consumer:    make([]infraMessaging.Consumer, 0),
-		accountRepo: repos.RoomAccountRepository(),
-		baseRepo:    repos,
+		accountRepo: accountRepo,
+		baseRepo:    baseRepo,
 		svc:         svc,
 	}
 

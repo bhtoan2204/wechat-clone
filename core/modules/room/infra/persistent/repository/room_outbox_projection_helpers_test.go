@@ -17,7 +17,7 @@ func TestEnrichRoomMembersWithAccountProjectionsFillsProfileFields(t *testing.T)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	accountRepo := reposmock.NewMockRoomAccountProjectionRepository(ctrl)
+	accountRepo := reposmock.NewMockRoomAccountRepository(ctrl)
 
 	now := time.Date(2026, time.April, 14, 2, 15, 0, 0, time.UTC)
 	members := []*entity.RoomMemberEntity{

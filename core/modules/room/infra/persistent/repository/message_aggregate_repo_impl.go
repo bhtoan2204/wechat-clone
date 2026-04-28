@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"wechat-clone/core/modules/room/domain/aggregate"
 	"wechat-clone/core/modules/room/domain/entity"
@@ -44,6 +45,23 @@ func (r *messageAggregateRepoImpl) Load(ctx context.Context, messageID string) (
 		return nil, stackErr.Error(err)
 	}
 	return aggregate.NewMessageStateAggregate(message)
+}
+
+func (r *messageAggregateRepoImpl) LoadForRecipient(ctx context.Context, messageID, recipientAccountID string) (*aggregate.MessageStateAggregate, error) {
+	message, err := r.messageRepo.GetMessageByID(ctx, messageID)
+	if err != nil {
+		return nil, stackErr.Error(err)
+	}
+
+	member, err := r.roomMemberRepo.GetRoomMemberByAccount(ctx, message.RoomID, recipientAccountID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return aggregate.NewMessageStateAggregateForRecipient(message, nil)
+		}
+		return nil, stackErr.Error(err)
+	}
+
+	return aggregate.NewMessageStateAggregateForRecipient(message, member)
 }
 
 func (r *messageAggregateRepoImpl) Save(ctx context.Context, agg *aggregate.MessageStateAggregate) error {

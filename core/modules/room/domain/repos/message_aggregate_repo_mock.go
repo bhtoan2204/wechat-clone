@@ -56,6 +56,21 @@ func (mr *MockMessageAggregateRepositoryMockRecorder) Load(ctx, messageID any) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockMessageAggregateRepository)(nil).Load), ctx, messageID)
 }
 
+// LoadForRecipient mocks base method.
+func (m *MockMessageAggregateRepository) LoadForRecipient(ctx context.Context, messageID, recipientAccountID string) (*aggregate.MessageStateAggregate, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LoadForRecipient", ctx, messageID, recipientAccountID)
+	ret0, _ := ret[0].(*aggregate.MessageStateAggregate)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LoadForRecipient indicates an expected call of LoadForRecipient.
+func (mr *MockMessageAggregateRepositoryMockRecorder) LoadForRecipient(ctx, messageID, recipientAccountID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadForRecipient", reflect.TypeOf((*MockMessageAggregateRepository)(nil).LoadForRecipient), ctx, messageID, recipientAccountID)
+}
+
 // Save mocks base method.
 func (m *MockMessageAggregateRepository) Save(ctx context.Context, agg *aggregate.MessageStateAggregate) error {
 	m.ctrl.T.Helper()

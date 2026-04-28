@@ -1,7 +1,10 @@
 package httpx
 
 import (
+	"errors"
 	"net/http"
+
+	"wechat-clone/core/shared/pkg/apperr"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,7 +22,12 @@ func Wrap(h interface {
 			return
 		}
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			var appError *apperr.Error
+			if errors.As(err, &appError) {
+				c.JSON(appError.HTTPStatus(), gin.H{"code": appError.Code(), "message": appError.Message()})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"code": "internal_error", "message": "internal server error"})
 			return
 		}
 		c.JSON(http.StatusOK, data)

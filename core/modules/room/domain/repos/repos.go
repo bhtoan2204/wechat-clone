@@ -9,12 +9,5 @@ type Repos interface {
 	RoomAggregateRepository() RoomAggregateRepository
 	MessageAggregateRepository() MessageAggregateRepository
 
-	RoomRepository() RoomRepository
-	MessageRepository() MessageRepository
-	RoomMemberRepository() RoomMemberRepository
-	RoomOutboxEventsRepository() RoomOutboxEventsRepository
-
-	RoomAccountRepository() RoomAccountRepository
-
 	WithTransaction(ctx context.Context, fn func(Repos) error) error
 }

@@ -54,34 +54,6 @@ func (mr *MockReposMockRecorder) MessageAggregateRepository() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MessageAggregateRepository", reflect.TypeOf((*MockRepos)(nil).MessageAggregateRepository))
 }
 
-// MessageRepository mocks base method.
-func (m *MockRepos) MessageRepository() MessageRepository {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MessageRepository")
-	ret0, _ := ret[0].(MessageRepository)
-	return ret0
-}
-
-// MessageRepository indicates an expected call of MessageRepository.
-func (mr *MockReposMockRecorder) MessageRepository() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MessageRepository", reflect.TypeOf((*MockRepos)(nil).MessageRepository))
-}
-
-// RoomAccountRepository mocks base method.
-func (m *MockRepos) RoomAccountRepository() RoomAccountRepository {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RoomAccountRepository")
-	ret0, _ := ret[0].(RoomAccountRepository)
-	return ret0
-}
-
-// RoomAccountRepository indicates an expected call of RoomAccountRepository.
-func (mr *MockReposMockRecorder) RoomAccountRepository() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RoomAccountRepository", reflect.TypeOf((*MockRepos)(nil).RoomAccountRepository))
-}
-
 // RoomAggregateRepository mocks base method.
 func (m *MockRepos) RoomAggregateRepository() RoomAggregateRepository {
 	m.ctrl.T.Helper()
@@ -94,48 +66,6 @@ func (m *MockRepos) RoomAggregateRepository() RoomAggregateRepository {
 func (mr *MockReposMockRecorder) RoomAggregateRepository() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RoomAggregateRepository", reflect.TypeOf((*MockRepos)(nil).RoomAggregateRepository))
-}
-
-// RoomMemberRepository mocks base method.
-func (m *MockRepos) RoomMemberRepository() RoomMemberRepository {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RoomMemberRepository")
-	ret0, _ := ret[0].(RoomMemberRepository)
-	return ret0
-}
-
-// RoomMemberRepository indicates an expected call of RoomMemberRepository.
-func (mr *MockReposMockRecorder) RoomMemberRepository() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RoomMemberRepository", reflect.TypeOf((*MockRepos)(nil).RoomMemberRepository))
-}
-
-// RoomOutboxEventsRepository mocks base method.
-func (m *MockRepos) RoomOutboxEventsRepository() RoomOutboxEventsRepository {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RoomOutboxEventsRepository")
-	ret0, _ := ret[0].(RoomOutboxEventsRepository)
-	return ret0
-}
-
-// RoomOutboxEventsRepository indicates an expected call of RoomOutboxEventsRepository.
-func (mr *MockReposMockRecorder) RoomOutboxEventsRepository() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RoomOutboxEventsRepository", reflect.TypeOf((*MockRepos)(nil).RoomOutboxEventsRepository))
-}
-
-// RoomRepository mocks base method.
-func (m *MockRepos) RoomRepository() RoomRepository {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RoomRepository")
-	ret0, _ := ret[0].(RoomRepository)
-	return ret0
-}
-
-// RoomRepository indicates an expected call of RoomRepository.
-func (mr *MockReposMockRecorder) RoomRepository() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RoomRepository", reflect.TypeOf((*MockRepos)(nil).RoomRepository))
 }
 
 // WithTransaction mocks base method.

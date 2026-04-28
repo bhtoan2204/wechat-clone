@@ -33,6 +33,13 @@ func NewMessageStateAggregate(message *entity.MessageEntity) (*MessageStateAggre
 	return &MessageStateAggregate{message: message}, nil
 }
 
+func NewMessageStateAggregateForRecipient(message *entity.MessageEntity, recipientMember *entity.RoomMemberEntity) (*MessageStateAggregate, error) {
+	if message == nil {
+		return nil, stackErr.Error(ErrMessageAggregateNil)
+	}
+	return &MessageStateAggregate{message: message, recipientMember: recipientMember}, nil
+}
+
 func (a *MessageStateAggregate) Message() *entity.MessageEntity {
 	return a.message
 }
@@ -132,6 +139,9 @@ func (a *MessageStateAggregate) MarkStatus(accountID, status string, member *ent
 	deliveredAt := &deliveredValue
 	var seenAt *time.Time
 
+	if member == nil {
+		member = a.recipientMember
+	}
 	a.recipientMember = member
 	if member != nil {
 		appliedStatus, appliedDeliveredAt, appliedSeenAt, applyErr := member.ApplyReceiptStatus(normalizedStatus, now)

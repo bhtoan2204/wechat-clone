@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"reflect"
 
 	"wechat-clone/core/modules/room/application/dto/in"
 	"wechat-clone/core/modules/room/application/dto/out"
@@ -10,12 +9,8 @@ import (
 	roomsupport "wechat-clone/core/modules/room/application/support"
 	apptypes "wechat-clone/core/modules/room/application/types"
 	roomrepos "wechat-clone/core/modules/room/domain/repos"
-	"wechat-clone/core/modules/room/types"
 	"wechat-clone/core/shared/pkg/cqrs"
-	"wechat-clone/core/shared/pkg/logging"
 	"wechat-clone/core/shared/pkg/stackErr"
-
-	"go.uber.org/zap"
 )
 
 type sendChatMessageHandler struct {
@@ -23,11 +18,11 @@ type sendChatMessageHandler struct {
 	realtime service.RealtimeService
 }
 
-func NewSendChatMessageHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.SendChatMessageRequest, *out.ChatMessageResponse] {
+func NewSendChatMessageHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.SendChatMessageRequest, *out.ChatMessageCommandResponse] {
 	return &sendChatMessageHandler{baseRepo: baseRepo, realtime: realtime}
 }
 
-func (h *sendChatMessageHandler) Handle(ctx context.Context, req *in.SendChatMessageRequest) (*out.ChatMessageResponse, error) {
+func (h *sendChatMessageHandler) Handle(ctx context.Context, req *in.SendChatMessageRequest) (*out.ChatMessageCommandResponse, error) {
 	accountID, err := roomsupport.AccountIDFromCtx(ctx)
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -50,15 +45,7 @@ func (h *sendChatMessageHandler) Handle(ctx context.Context, req *in.SendChatMes
 		return nil, stackErr.Error(err)
 	}
 
-	out := roomsupport.ToMessageResponse(res)
-	if err := h.realtime.EmitMessage(ctx, types.MessagePayload{
-		RoomId:  out.RoomID,
-		Type:    reflect.TypeOf(out).Elem().Name(),
-		Payload: out,
-	}); err != nil {
-		logging.FromContext(ctx).Warnw("failed to emit realtime message after sending chat message", zap.Error(err), zap.String("room_id", res.RoomID))
-	}
-	return out, nil
+	return &out.ChatMessageCommandResponse{MessageID: res.ID, RoomID: res.RoomID, Status: CommandStatusCreated}, nil
 }
 
 func mapMentionCommands(items []in.SendChatMessageMentionRequest) []apptypes.SendMessageMentionCommand {

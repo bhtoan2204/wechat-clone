@@ -22,6 +22,7 @@ func buildProjectionHandler(cfg *config.Config, appCtx *appCtx.AppContext) (room
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
+	accountProjectionRepo := roomrepo.NewRoomAccountImpl(appCtx.GetDB())
 	roomService := roomservice.NewService(appCtx, roomReadRepos)
-	return roomprojection.NewMessageHandler(cfg, repos, roomService)
+	return roomprojection.NewMessageHandler(cfg, repos, accountProjectionRepo, roomService)
 }

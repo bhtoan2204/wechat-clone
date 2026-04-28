@@ -15,11 +15,11 @@ import (
 )
 
 type toggleChatMessageReactionHandler struct {
-	toggleChatMessageReaction cqrs.Dispatcher[*in.ToggleChatMessageReactionRequest, *out.ChatMessageResponse]
+	toggleChatMessageReaction cqrs.Dispatcher[*in.ToggleChatMessageReactionRequest, *out.ChatMessageCommandResponse]
 }
 
 func NewToggleChatMessageReactionHandler(
-	toggleChatMessageReaction cqrs.Dispatcher[*in.ToggleChatMessageReactionRequest, *out.ChatMessageResponse],
+	toggleChatMessageReaction cqrs.Dispatcher[*in.ToggleChatMessageReactionRequest, *out.ChatMessageCommandResponse],
 ) *toggleChatMessageReactionHandler {
 	return &toggleChatMessageReactionHandler{
 		toggleChatMessageReaction: toggleChatMessageReaction,

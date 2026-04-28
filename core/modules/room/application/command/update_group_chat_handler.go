@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"reflect"
 	"time"
 
 	"wechat-clone/core/modules/room/application/dto/in"
@@ -11,12 +10,8 @@ import (
 	roomsupport "wechat-clone/core/modules/room/application/support"
 	"wechat-clone/core/modules/room/domain/aggregate"
 	roomrepos "wechat-clone/core/modules/room/domain/repos"
-	"wechat-clone/core/modules/room/types"
 	"wechat-clone/core/shared/pkg/cqrs"
-	"wechat-clone/core/shared/pkg/logging"
 	"wechat-clone/core/shared/pkg/stackErr"
-
-	"go.uber.org/zap"
 )
 
 type updateGroupChatHandler struct {
@@ -24,10 +19,10 @@ type updateGroupChatHandler struct {
 	realtime service.RealtimeService
 }
 
-func NewUpdateGroupChatHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.UpdateGroupChatRequest, *out.ChatConversationResponse] {
+func NewUpdateGroupChatHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.UpdateGroupChatRequest, *out.ChatRoomCommandResponse] {
 	return &updateGroupChatHandler{baseRepo: baseRepo, realtime: realtime}
 }
-func (h *updateGroupChatHandler) Handle(ctx context.Context, req *in.UpdateGroupChatRequest) (*out.ChatConversationResponse, error) {
+func (h *updateGroupChatHandler) Handle(ctx context.Context, req *in.UpdateGroupChatRequest) (*out.ChatRoomCommandResponse, error) {
 	accountID, err := roomsupport.AccountIDFromCtx(ctx)
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -48,7 +43,6 @@ func (h *updateGroupChatHandler) Handle(ctx context.Context, req *in.UpdateGroup
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	lastMessage := lastPendingMessage(agg.PendingMessages())
 	if updated {
 		if err := h.baseRepo.WithTransaction(ctx, func(txRepos roomrepos.Repos) error {
 			return stackErr.Error(txRepos.RoomAggregateRepository().Save(ctx, agg))
@@ -57,19 +51,5 @@ func (h *updateGroupChatHandler) Handle(ctx context.Context, req *in.UpdateGroup
 		}
 	}
 
-	res, err := roomsupport.BuildConversationResultFromState(ctx, h.baseRepo, accountID, agg.Room(), agg.Members(), lastMessage, true)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-	out := roomsupport.ToConversationResponse(res)
-
-	if err := h.realtime.EmitMessage(ctx, types.MessagePayload{
-		RoomId:  out.RoomID,
-		Type:    reflect.TypeOf(out).Elem().Name(),
-		Payload: out,
-	}); err != nil {
-		logging.FromContext(ctx).Warnw("failed to emit realtime message after updating group chat", zap.Error(err), "room_id", req.RoomID)
-	}
-
-	return out, nil
+	return &out.ChatRoomCommandResponse{RoomID: agg.Room().ID, Status: commandStatus(updated)}, nil
 }

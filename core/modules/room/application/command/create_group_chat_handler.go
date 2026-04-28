@@ -22,20 +22,15 @@ type createGroupChatHandler struct {
 	baseRepo roomrepos.Repos
 }
 
-func NewCreateGroupChatHandler(baseRepo roomrepos.Repos) cqrs.Handler[*in.CreateGroupChatRequest, *out.ChatConversationResponse] {
+func NewCreateGroupChatHandler(baseRepo roomrepos.Repos) cqrs.Handler[*in.CreateGroupChatRequest, *out.ChatRoomCommandResponse] {
 	return &createGroupChatHandler{baseRepo: baseRepo}
 }
 
-func (h *createGroupChatHandler) Handle(ctx context.Context, req *in.CreateGroupChatRequest) (*out.ChatConversationResponse, error) {
+func (h *createGroupChatHandler) Handle(ctx context.Context, req *in.CreateGroupChatRequest) (*out.ChatRoomCommandResponse, error) {
 	accountID, err := roomsupport.AccountIDFromCtx(ctx)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
-	accountIDs := append([]string{accountID}, req.MemberIDs...)
-	if err := ensureProjectedAccountsExist(ctx, h.baseRepo, accountIDs...); err != nil {
-		return nil, stackErr.Error(err)
-	}
-
 	now := time.Now().UTC()
 	room, err := entity.NewRoom(uuid.NewString(), req.Name, req.Description, accountID, roomtypes.RoomTypeGroup, "", now)
 	if err != nil {
@@ -67,17 +62,11 @@ func (h *createGroupChatHandler) Handle(ctx context.Context, req *in.CreateGroup
 		return nil, stackErr.Error(err)
 	}
 
-	lastMessage := lastPendingMessage(agg.PendingMessages())
-
 	if err := h.baseRepo.WithTransaction(ctx, func(txRepos roomrepos.Repos) error {
 		return stackErr.Error(txRepos.RoomAggregateRepository().Save(ctx, agg))
 	}); err != nil {
 		return nil, stackErr.Error(err)
 	}
 
-	res, err := roomsupport.BuildConversationResultFromState(ctx, h.baseRepo, accountID, room, agg.Members(), lastMessage, true)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-	return roomsupport.ToConversationResponse(res), nil
+	return &out.ChatRoomCommandResponse{RoomID: room.ID, Status: CommandStatusCreated}, nil
 }

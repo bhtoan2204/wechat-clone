@@ -15,11 +15,11 @@ import (
 )
 
 type removeChatMemberHandler struct {
-	removeChatMember cqrs.Dispatcher[*in.RemoveChatMemberRequest, *out.ChatConversationResponse]
+	removeChatMember cqrs.Dispatcher[*in.RemoveChatMemberRequest, *out.ChatRoomCommandResponse]
 }
 
 func NewRemoveChatMemberHandler(
-	removeChatMember cqrs.Dispatcher[*in.RemoveChatMemberRequest, *out.ChatConversationResponse],
+	removeChatMember cqrs.Dispatcher[*in.RemoveChatMemberRequest, *out.ChatRoomCommandResponse],
 ) *removeChatMemberHandler {
 	return &removeChatMemberHandler{
 		removeChatMember: removeChatMember,

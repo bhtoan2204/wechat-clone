@@ -15,11 +15,11 @@ import (
 )
 
 type createGroupChatHandler struct {
-	createGroupChat cqrs.Dispatcher[*in.CreateGroupChatRequest, *out.ChatConversationResponse]
+	createGroupChat cqrs.Dispatcher[*in.CreateGroupChatRequest, *out.ChatRoomCommandResponse]
 }
 
 func NewCreateGroupChatHandler(
-	createGroupChat cqrs.Dispatcher[*in.CreateGroupChatRequest, *out.ChatConversationResponse],
+	createGroupChat cqrs.Dispatcher[*in.CreateGroupChatRequest, *out.ChatRoomCommandResponse],
 ) *createGroupChatHandler {
 	return &createGroupChatHandler{
 		createGroupChat: createGroupChat,

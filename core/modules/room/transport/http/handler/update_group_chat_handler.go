@@ -15,11 +15,11 @@ import (
 )
 
 type updateGroupChatHandler struct {
-	updateGroupChat cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatConversationResponse]
+	updateGroupChat cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatRoomCommandResponse]
 }
 
 func NewUpdateGroupChatHandler(
-	updateGroupChat cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatConversationResponse],
+	updateGroupChat cqrs.Dispatcher[*in.UpdateGroupChatRequest, *out.ChatRoomCommandResponse],
 ) *updateGroupChatHandler {
 	return &updateGroupChatHandler{
 		updateGroupChat: updateGroupChat,

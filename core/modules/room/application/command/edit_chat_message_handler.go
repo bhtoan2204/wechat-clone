@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"reflect"
 	"time"
 
 	"wechat-clone/core/modules/room/application/dto/in"
@@ -10,12 +9,8 @@ import (
 	"wechat-clone/core/modules/room/application/service"
 	roomsupport "wechat-clone/core/modules/room/application/support"
 	roomrepos "wechat-clone/core/modules/room/domain/repos"
-	"wechat-clone/core/modules/room/types"
 	"wechat-clone/core/shared/pkg/cqrs"
-	"wechat-clone/core/shared/pkg/logging"
 	"wechat-clone/core/shared/pkg/stackErr"
-
-	"go.uber.org/zap"
 )
 
 type editChatMessageHandler struct {
@@ -23,11 +18,11 @@ type editChatMessageHandler struct {
 	realtime service.RealtimeService
 }
 
-func NewEditChatMessageHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.EditChatMessageRequest, *out.ChatMessageResponse] {
+func NewEditChatMessageHandler(baseRepo roomrepos.Repos, realtime service.RealtimeService) cqrs.Handler[*in.EditChatMessageRequest, *out.ChatMessageCommandResponse] {
 	return &editChatMessageHandler{baseRepo: baseRepo, realtime: realtime}
 }
 
-func (h *editChatMessageHandler) Handle(ctx context.Context, req *in.EditChatMessageRequest) (*out.ChatMessageResponse, error) {
+func (h *editChatMessageHandler) Handle(ctx context.Context, req *in.EditChatMessageRequest) (*out.ChatMessageCommandResponse, error) {
 	accountID, err := roomsupport.AccountIDFromCtx(ctx)
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -47,17 +42,5 @@ func (h *editChatMessageHandler) Handle(ctx context.Context, req *in.EditChatMes
 		return nil, stackErr.Error(err)
 	}
 
-	res, err := roomsupport.BuildMessageResultFromState(ctx, h.baseRepo, accountID, agg.Message())
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-	out := roomsupport.ToMessageResponse(res)
-	if err := h.realtime.EmitMessage(ctx, types.MessagePayload{
-		RoomId:  out.RoomID,
-		Type:    reflect.TypeOf(out).Elem().Name(),
-		Payload: out,
-	}); err != nil {
-		logging.FromContext(ctx).Warnw("failed to emit realtime message after editing chat message", zap.Error(err), "message_id", req.MessageID)
-	}
-	return out, nil
+	return &out.ChatMessageCommandResponse{MessageID: agg.Message().ID, RoomID: agg.Message().RoomID, Status: CommandStatusUpdated}, nil
 }

@@ -2,7 +2,6 @@ package command
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -30,8 +29,6 @@ type resolvedMessageMentions struct {
 }
 
 func resolveMessageMentions(
-	ctx context.Context,
-	baseRepo repos.Repos,
 	room *entity.Room,
 	senderID string,
 	command apptypes.SendMessageCommand,
@@ -75,26 +72,21 @@ func resolveMessageMentions(
 		}, nil
 	}
 
-	accountProjections, err := baseRepo.RoomAccountRepository().ListByAccountIDs(ctx, filteredExplicitIDs)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-
-	accountMap := lo.SliceToMap(accountProjections, func(projection *entity.AccountEntity) (string, *entity.AccountEntity) {
-		if projection == nil {
+	memberMap := lo.SliceToMap(members, func(member *entity.RoomMemberEntity) (string, *entity.RoomMemberEntity) {
+		if member == nil {
 			return "", nil
 		}
-		return projection.AccountID, projection
+		return strings.TrimSpace(member.AccountID), member
 	})
 
 	mentions := make([]entity.MessageMention, 0, len(filteredExplicitIDs))
 	outboxMentions := make([]sharedevents.RoomMessageMention, 0, len(filteredExplicitIDs))
 	for _, accountID := range filteredExplicitIDs {
-		projection := accountMap[accountID]
-		displayName := resolveMentionDisplayName(projection, accountID)
+		member := memberMap[accountID]
+		displayName := resolveMemberDisplayName(member, accountID)
 		username := ""
-		if projection != nil {
-			username = strings.TrimSpace(projection.Username)
+		if member != nil {
+			username = strings.TrimSpace(member.Username)
 		}
 
 		mentions = append(mentions, entity.MessageMention{
@@ -132,11 +124,7 @@ func buildSenderIdentity(ctx context.Context, members []*entity.RoomMemberEntity
 		if member == nil || strings.TrimSpace(member.AccountID) != strings.TrimSpace(senderID) {
 			continue
 		}
-		if displayName := resolveMentionDisplayName(&entity.AccountEntity{
-			AccountID:   member.AccountID,
-			DisplayName: member.DisplayName,
-			Username:    member.Username,
-		}, senderID); displayName != "" {
+		if displayName := resolveMemberDisplayName(member, senderID); displayName != "" {
 			identity.Name = displayName
 		}
 		return identity
@@ -165,15 +153,15 @@ func hasMentionAllToken(message string) bool {
 	return mentionAllPattern.MatchString(strings.ToLower(strings.TrimSpace(message)))
 }
 
-func resolveMentionDisplayName(account *entity.AccountEntity, fallback string) string {
-	if account == nil {
+func resolveMemberDisplayName(member *entity.RoomMemberEntity, fallback string) string {
+	if member == nil {
 		return strings.TrimSpace(fallback)
 	}
 	switch {
-	case strings.TrimSpace(account.DisplayName) != "":
-		return strings.TrimSpace(account.DisplayName)
-	case strings.TrimSpace(account.Username) != "":
-		return strings.TrimSpace(account.Username)
+	case strings.TrimSpace(member.DisplayName) != "":
+		return strings.TrimSpace(member.DisplayName)
+	case strings.TrimSpace(member.Username) != "":
+		return strings.TrimSpace(member.Username)
 	default:
 		return strings.TrimSpace(fallback)
 	}
@@ -199,42 +187,13 @@ func lastPendingMessage(messages []*entity.MessageEntity) *entity.MessageEntity 
 	return messages[len(messages)-1]
 }
 
-func ensureProjectedAccountsExist(ctx context.Context, baseRepo repos.Repos, accountIDs ...string) error {
-	normalizedIDs := lo.Uniq(lo.FilterMap(accountIDs, func(accountID string, _ int) (string, bool) {
-		accountID = strings.TrimSpace(accountID)
-		return accountID, accountID != ""
-	}))
-	if len(normalizedIDs) == 0 {
-		return nil
-	}
-
-	accountProjections, err := baseRepo.RoomAccountRepository().ListByAccountIDs(ctx, normalizedIDs)
-	if err != nil {
-		return stackErr.Error(err)
-	}
-
-	projected := lo.SliceToMap(lo.Filter(accountProjections, func(projection *entity.AccountEntity, _ int) bool {
-		return projection != nil
-	}), func(projection *entity.AccountEntity) (string, struct{}) {
-		return strings.TrimSpace(projection.AccountID), struct{}{}
-	})
-
-	for _, accountID := range normalizedIDs {
-		if _, ok := projected[accountID]; ok {
-			continue
-		}
-		return stackErr.Error(fmt.Errorf("%v: %s", ErrRoomAccountNotFound, accountID))
-	}
-	return nil
-}
-
 func executeSendMessage(ctx context.Context, baseRepo repos.Repos, accountID string, command apptypes.SendMessageCommand) (*apptypes.MessageResult, error) {
 	roomAgg, err := baseRepo.RoomAggregateRepository().Load(ctx, strings.TrimSpace(command.RoomID))
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
 
-	mentions, err := resolveMessageMentions(ctx, baseRepo, roomAgg.Room(), accountID, command, roomAgg.Members())
+	mentions, err := resolveMessageMentions(roomAgg.Room(), accountID, command, roomAgg.Members())
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -273,5 +232,5 @@ func executeSendMessage(ctx context.Context, baseRepo repos.Repos, accountID str
 		return nil, stackErr.Error(err)
 	}
 
-	return roomsupport.BuildMessageResultFromState(ctx, baseRepo, accountID, message)
+	return roomsupport.BuildMessageResultFromState(accountID, message)
 }

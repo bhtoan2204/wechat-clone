@@ -17,12 +17,6 @@ type repoImpl struct {
 
 	roomAggregateRepo repos.RoomAggregateRepository
 	messageAggRepo    repos.MessageAggregateRepository
-
-	roomRepo       repos.RoomRepository
-	messageRepo    repos.MessageRepository
-	roomMemberRepo repos.RoomMemberRepository
-	roomOutboxRepo repos.RoomOutboxEventsRepository
-	accountRepo    repos.RoomAccountRepository
 }
 
 func NewRepoImpl(appCtx *appCtx.AppContext) (repos.Repos, error) {
@@ -43,11 +37,6 @@ func newRepoImplWithDB(appCtx *appCtx.AppContext, db *gorm.DB) (repos.Repos, err
 		messageAggRepo:    messageAggregateRepo,
 		db:                db,
 		appCtx:            appCtx,
-		roomRepo:          roomRepo,
-		messageRepo:       messageRepo,
-		roomMemberRepo:    roomMemberRepo,
-		roomOutboxRepo:    roomOutboxRepo,
-		accountRepo:       accountRepo,
 	}, nil
 }
 
@@ -57,26 +46,6 @@ func (r *repoImpl) RoomAggregateRepository() repos.RoomAggregateRepository {
 
 func (r *repoImpl) MessageAggregateRepository() repos.MessageAggregateRepository {
 	return r.messageAggRepo
-}
-
-func (r *repoImpl) RoomRepository() repos.RoomRepository {
-	return r.roomRepo
-}
-
-func (r *repoImpl) MessageRepository() repos.MessageRepository {
-	return r.messageRepo
-}
-
-func (r *repoImpl) RoomMemberRepository() repos.RoomMemberRepository {
-	return r.roomMemberRepo
-}
-
-func (r *repoImpl) RoomOutboxEventsRepository() repos.RoomOutboxEventsRepository {
-	return r.roomOutboxRepo
-}
-
-func (r *repoImpl) RoomAccountRepository() repos.RoomAccountRepository {
-	return r.accountRepo
 }
 
 func (r *repoImpl) WithTransaction(ctx context.Context, fn func(repos.Repos) error) (err error) {
