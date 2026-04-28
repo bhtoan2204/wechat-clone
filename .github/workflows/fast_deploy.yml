@@ -43,7 +43,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.66.0
+          version: latest
           args: --timeout=5m
 
       - name: Run unit tests with coverage
@@ -87,23 +87,23 @@ jobs:
       - name: Analyze
         uses: github/codeql-action/analyze@v3
 
-  deploy:
-    name: Deploy app
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: quality
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: SSH_KEY_SERVER
-    steps:
-      - name: Deploy to server via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_IP }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            set -e
-            cd ~/wechat-clone
-            git fetch --all --prune
-            git pull --ff-only origin main
-            make up-app
+  # deploy:
+  #   name: Deploy app
+  #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  #   needs: quality
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 15
+  #   environment: SSH_KEY_SERVER
+  #   steps:
+  #     - name: Deploy to server via SSH
+  #       uses: appleboy/ssh-action@v1
+  #       with:
+  #         host: ${{ secrets.SSH_IP }}
+  #         username: ${{ secrets.SSH_USER }}
+  #         key: ${{ secrets.SSH_KEY }}
+  #         script: |
+  #           set -e
+  #           cd ~/wechat-clone
+  #           git fetch --all --prune
+  #           git pull --ff-only origin main
+  #           make up-app
