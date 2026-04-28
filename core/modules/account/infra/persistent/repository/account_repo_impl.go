@@ -111,41 +111,6 @@ func (r *accountRepoImpl) GetAccountByEmail(ctx context.Context, email string) (
 	return accountEntity, nil
 }
 
-func (r *accountRepoImpl) IsEmailExists(ctx context.Context, email string) (bool, error) {
-	var count int64
-	if err := r.db.WithContext(ctx).
-		Model(&models.AccountModel{}).
-		Where("email = ?", email).
-		Count(&count).Error; err != nil {
-		return false, stackErr.Error(err)
-	}
-	return count > 0, nil
-}
-
-func (r *accountRepoImpl) ListAccountsByRoomID(ctx context.Context, roomID string) ([]*entity.Account, error) {
-	var accounts []*models.AccountModel
-	if err := r.db.WithContext(ctx).
-		Model(&models.AccountModel{}).
-		Select("accounts.*").
-		Joins("JOIN room_members rm ON rm.account_id = accounts.id").
-		Where("rm.room_id = ?", roomID).
-		Find(&accounts).Error; err != nil {
-		return nil, stackErr.Error(err)
-	}
-
-	result := make([]*entity.Account, 0, len(accounts))
-
-	for _, account := range accounts {
-		e, err := r.toEntity(account)
-		if err != nil {
-			return nil, stackErr.Error(err)
-		}
-		result = append(result, e)
-	}
-
-	return result, nil
-}
-
 func (r *accountRepoImpl) toEntity(m *models.AccountModel) (*entity.Account, error) {
 	return projectionModelToAccount(m)
 }

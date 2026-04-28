@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"wechat-clone/core/modules/account/domain/aggregate"
@@ -13,6 +14,7 @@ import (
 	accountcache "wechat-clone/core/modules/account/infra/cache"
 	"wechat-clone/core/modules/account/infra/persistent/models"
 	sharedcache "wechat-clone/core/shared/infra/cache"
+	shareddb "wechat-clone/core/shared/infra/db"
 	eventpkg "wechat-clone/core/shared/pkg/event"
 	"wechat-clone/core/shared/pkg/stackErr"
 
@@ -195,9 +197,28 @@ func (r *accountAggregateRepoImpl) saveProjection(ctx context.Context, db *gorm.
 			}),
 		}).
 		Create(accountToProjectionModel(snapshot)).Error; err != nil {
+		if shareddb.IsUniqueConstraintError(err) {
+			return stackErr.Error(mapAccountUniqueConstraintError(err))
+		}
 		return stackErr.Error(fmt.Errorf("save account projection failed: %w", err))
 	}
 	return nil
+}
+
+func mapAccountUniqueConstraintError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	errMsg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(errMsg, "username"):
+		return accountrepos.ErrAccountUsernameAlreadyExists
+	case strings.Contains(errMsg, "email"):
+		return accountrepos.ErrAccountEmailAlreadyExists
+	default:
+		return accountrepos.ErrAccountEmailAlreadyExists
+	}
 }
 
 func (r *accountAggregateRepoImpl) syncCacheAfterCommit(ctx context.Context, account *entity.Account) {

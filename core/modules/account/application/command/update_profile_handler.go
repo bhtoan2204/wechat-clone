@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	appCtx "wechat-clone/core/context"
@@ -58,6 +59,9 @@ func (u *updateProfileHandler) Handle(ctx context.Context, req *in.UpdateProfile
 	if txErr := u.baseRepo.WithTransaction(ctx, func(txRepos repos.Repos) error {
 		return txRepos.AccountAggregateRepository().Save(ctx, accountAggregate)
 	}); txErr != nil {
+		if errors.Is(txErr, repos.ErrAccountUsernameAlreadyExists) {
+			return nil, stackErr.Error(ErrUsernameExists)
+		}
 		log.Errorw("Failed to persist updated profile", zap.Error(txErr))
 		return nil, stackErr.Error(txErr)
 	}

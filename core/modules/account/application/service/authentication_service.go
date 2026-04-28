@@ -12,7 +12,6 @@ import (
 	"wechat-clone/core/modules/account/domain/entity"
 	repos "wechat-clone/core/modules/account/domain/repos"
 	valueobject "wechat-clone/core/modules/account/domain/value_object"
-	shareddb "wechat-clone/core/shared/infra/db"
 	"wechat-clone/core/shared/infra/xpaseto"
 	"wechat-clone/core/shared/pkg/hasher"
 	"wechat-clone/core/shared/pkg/stackErr"
@@ -168,7 +167,7 @@ func (s *authenticationService) Register(ctx context.Context, command RegisterAc
 		}
 		return nil
 	}); txErr != nil {
-		if shareddb.IsUniqueConstraintError(txErr) {
+		if errors.Is(txErr, repos.ErrAccountEmailAlreadyExists) {
 			return nil, stackErr.Error(ErrRegistrationAccountExists)
 		}
 		return nil, stackErr.Error(txErr)
@@ -244,7 +243,7 @@ func (s *authenticationService) OpenAuthenticate(ctx context.Context, command Op
 	var tokenPair *TokenPairResult
 	var accountSnapshot *entity.Account
 	if txErr := s.openAuthenticateTransaction(ctx, email, command, now, &tokenPair, &accountSnapshot); txErr != nil {
-		if shareddb.IsUniqueConstraintError(txErr) {
+		if errors.Is(txErr, repos.ErrAccountEmailAlreadyExists) {
 			txErr = s.openAuthenticateTransaction(ctx, email, command, now, &tokenPair, &accountSnapshot)
 		}
 		if txErr != nil {

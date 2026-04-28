@@ -472,7 +472,7 @@ func TestAuthenticationService_Register_ReturnsAccountExists(t *testing.T) {
 	txRepos.EXPECT().AccountAggregateRepository().Return(accountAggregateRepo)
 	accountAggregateRepo.EXPECT().
 		Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.AccountAggregate{})).
-		Return(errors.New("ERROR: duplicate key value violates unique constraint (SQLSTATE 23505)"))
+		Return(repos.ErrAccountEmailAlreadyExists)
 
 	service := &authenticationService{
 		baseRepo:             baseRepo,
@@ -537,7 +537,7 @@ func TestAuthenticationService_OpenAuthenticate_ReusesExistingAccountAfterUnique
 		Return(nil, gorm.ErrRecordNotFound)
 	firstAccountRepo.EXPECT().
 		Save(gomock.Any(), gomock.AssignableToTypeOf(&aggregate.AccountAggregate{})).
-		Return(errors.New("ERROR: duplicate key value violates unique constraint (SQLSTATE 23505)"))
+		Return(repos.ErrAccountEmailAlreadyExists)
 
 	secondTxRepos.EXPECT().AccountAggregateRepository().Return(secondAccountRepo)
 	secondAccountRepo.EXPECT().
