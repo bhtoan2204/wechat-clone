@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-	"wechat-clone/core/modules/room/domain/repos"
 	"wechat-clone/core/modules/room/infra/persistent/models"
 	eventpkg "wechat-clone/core/shared/pkg/event"
 	"wechat-clone/core/shared/pkg/stackErr"
@@ -17,7 +16,7 @@ type roomOutboxEventsRepoImpl struct {
 	serializer eventpkg.Serializer
 }
 
-func NewRoomOutboxEventsRepoImpl(db *gorm.DB) repos.RoomOutboxEventsRepository {
+func NewRoomOutboxEventsRepoImpl(db *gorm.DB) eventpkg.Store {
 	return &roomOutboxEventsRepoImpl{
 		db:         db,
 		serializer: eventpkg.NewSerializer(),
@@ -31,23 +30,6 @@ func (r *roomOutboxEventsRepoImpl) Append(ctx context.Context, evt eventpkg.Even
 	}
 
 	return stackErr.Error(r.db.WithContext(ctx).Create(model).Error)
-}
-
-func (r *roomOutboxEventsRepoImpl) AppendMany(ctx context.Context, events []eventpkg.Event) error {
-	if len(events) == 0 {
-		return nil
-	}
-
-	modelsList := make([]models.RoomOutboxEventModel, 0, len(events))
-	for _, evt := range events {
-		model, err := r.toModel(evt)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		modelsList = append(modelsList, *model)
-	}
-
-	return stackErr.Error(r.db.WithContext(ctx).Create(&modelsList).Error)
 }
 
 func (r *roomOutboxEventsRepoImpl) toModel(evt eventpkg.Event) (*models.RoomOutboxEventModel, error) {

@@ -20,31 +20,23 @@ import (
 const pendingExternalRefPrefix = "__pending__:"
 
 type providerPaymentRepoImpl struct {
+	db              *gorm.DB
+	outboxPublisher eventpkg.Publisher
+}
+
+type paymentOutboxEventStore struct {
 	db         *gorm.DB
 	serializer eventpkg.Serializer
 }
 
 func newProviderPaymentRepoImpl(db *gorm.DB) paymentrepos.ProviderPaymentRepository {
 	return &providerPaymentRepoImpl{
-		db:         db,
-		serializer: eventpkg.NewSerializer(),
+		db: db,
+		outboxPublisher: eventpkg.NewPublisher(&paymentOutboxEventStore{
+			db:         db,
+			serializer: eventpkg.NewSerializer(),
+		}),
 	}
-}
-
-func (r *providerPaymentRepoImpl) Create(ctx context.Context, aggregate *paymentaggregate.PaymentIntentAggregate) error {
-	intent := normalizeProviderPaymentIntent(aggregateSnapshot(aggregate))
-	if intent == nil {
-		return paymentrepos.ErrProviderPaymentNotFound
-	}
-
-	if err := r.createIntent(ctx, intent, aggregate.Version()); err != nil {
-		return stackErr.Error(err)
-	}
-	if err := r.appendOutboxEvents(ctx, aggregate.PendingOutboxEvents()...); err != nil {
-		return stackErr.Error(err)
-	}
-	aggregate.MarkPersisted()
-	return nil
 }
 
 func (r *providerPaymentRepoImpl) Save(ctx context.Context, aggregate *paymentaggregate.PaymentIntentAggregate) error {
@@ -58,7 +50,11 @@ func (r *providerPaymentRepoImpl) Save(ctx context.Context, aggregate *paymentag
 			return stackErr.Error(err)
 		}
 	}
-	if err := r.updateIntent(ctx, intent, aggregate.Version()); err != nil {
+	if aggregate.Root().BaseVersion() == 0 {
+		if err := r.createIntent(ctx, intent, aggregate.Version()); err != nil {
+			return stackErr.Error(err)
+		}
+	} else if err := r.updateIntent(ctx, intent, aggregate.Version()); err != nil {
 		return stackErr.Error(err)
 	}
 	if err := r.appendOutboxEvents(ctx, aggregate.PendingOutboxEvents()...); err != nil {
@@ -181,31 +177,40 @@ func (r *providerPaymentRepoImpl) appendOutboxEvents(ctx context.Context, events
 	if len(events) == 0 {
 		return nil
 	}
+	if r == nil || r.outboxPublisher == nil {
+		return stackErr.Error(eventpkg.ErrEventStoreNil)
+	}
+	return stackErr.Error(r.outboxPublisher.Publish(ctx, events...))
+}
 
-	models := make([]model.PaymentOutboxEventModel, 0, len(events))
-	for _, evt := range events {
-		data, err := r.serializer.Marshal(evt.EventData)
-		if err != nil {
-			return stackErr.Error(fmt.Errorf("marshal event data failed: %w", err))
-		}
-
-		createdAt := time.Now().UTC()
-		if evt.CreatedAt > 0 {
-			createdAt = time.Unix(evt.CreatedAt, 0).UTC()
-		}
-
-		models = append(models, model.PaymentOutboxEventModel{
-			AggregateID:   evt.AggregateID,
-			AggregateType: evt.AggregateType,
-			Version:       evt.Version,
-			EventName:     evt.EventName,
-			EventData:     string(data),
-			Metadata:      "{}",
-			CreatedAt:     createdAt,
-		})
+func (s *paymentOutboxEventStore) Append(ctx context.Context, evt eventpkg.Event) error {
+	if s == nil || s.db == nil {
+		return stackErr.Error(eventpkg.ErrEventStoreNil)
 	}
 
-	return stackErr.Error(r.db.WithContext(ctx).Create(&models).Error)
+	serializer := s.serializer
+	if serializer == nil {
+		serializer = eventpkg.NewSerializer()
+	}
+	data, err := serializer.Marshal(evt.EventData)
+	if err != nil {
+		return stackErr.Error(fmt.Errorf("marshal payment outbox event data failed: %w", err))
+	}
+
+	createdAt := time.Now().UTC()
+	if evt.CreatedAt > 0 {
+		createdAt = time.Unix(evt.CreatedAt, 0).UTC()
+	}
+
+	return stackErr.Error(s.db.WithContext(ctx).Create(&model.PaymentOutboxEventModel{
+		AggregateID:   evt.AggregateID,
+		AggregateType: evt.AggregateType,
+		Version:       evt.Version,
+		EventName:     evt.EventName,
+		EventData:     string(data),
+		Metadata:      "{}",
+		CreatedAt:     createdAt,
+	}).Error)
 }
 
 func toProviderPaymentAggregate(modelIntent *model.ProviderPaymentIntentModel) (*paymentaggregate.PaymentIntentAggregate, error) {

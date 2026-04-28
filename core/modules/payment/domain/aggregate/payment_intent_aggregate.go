@@ -248,7 +248,7 @@ func (a *PaymentIntentAggregate) MarkPersisted() {
 		return
 	}
 	a.processedEvents = nil
-	a.MarkPersisted()
+	a.AggregateRoot.MarkPersisted()
 }
 
 func (a *PaymentIntentAggregate) ApplyProviderOutcome(

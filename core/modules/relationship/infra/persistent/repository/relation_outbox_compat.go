@@ -28,36 +28,23 @@ func loadRelationOutboxAggregateVersion(db *gorm.DB, aggregateID, aggregateType 
 	return int(latest.Version), nil
 }
 
-func persistRelationOutboxEvents(
-	ctx context.Context,
-	db *gorm.DB,
-	serializer eventpkg.Serializer,
-	events []eventpkg.Event,
-) error {
-	if len(events) == 0 {
-		return nil
+func (s *relationOutboxEventStore) Append(ctx context.Context, ev eventpkg.Event) error {
+	if s == nil || s.db == nil {
+		return stackErr.Error(eventpkg.ErrEventStoreNil)
 	}
 
-	outboxModels := make([]models.RelationOutboxEvent, 0, len(events))
-	for _, ev := range events {
-		eventData, err := serializeRelationOutboxEventData(serializer, ev.EventData)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-
-		outboxModels = append(outboxModels, models.RelationOutboxEvent{
-			AggregateID:   ev.AggregateID,
-			AggregateType: ev.AggregateType,
-			Version:       int64(ev.Version),
-			EventName:     ev.EventName,
-			EventData:     eventData,
-		})
-	}
-
-	if err := db.WithContext(ctx).Create(&outboxModels).Error; err != nil {
+	eventData, err := serializeRelationOutboxEventData(s.serializer, ev.EventData)
+	if err != nil {
 		return stackErr.Error(err)
 	}
-	return nil
+
+	return stackErr.Error(s.db.WithContext(ctx).Create(&models.RelationOutboxEvent{
+		AggregateID:   ev.AggregateID,
+		AggregateType: ev.AggregateType,
+		Version:       int64(ev.Version),
+		EventName:     ev.EventName,
+		EventData:     eventData,
+	}).Error)
 }
 
 func serializeRelationOutboxEventData(serializer eventpkg.Serializer, data interface{}) (string, error) {

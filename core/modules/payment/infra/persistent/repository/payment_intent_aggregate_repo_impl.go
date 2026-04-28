@@ -24,13 +24,6 @@ func newPaymentIntentAggregateRepo(providerPaymentRepo repos.ProviderPaymentRepo
 	}
 }
 
-func (r *paymentIntentAggregateRepoImpl) Create(ctx context.Context, aggregate *aggregate.PaymentIntentAggregate) error {
-	if err := r.providerPaymentRepo.Create(ctx, aggregate); err != nil {
-		return stackErr.Error(err)
-	}
-	return nil
-}
-
 func (r *paymentIntentAggregateRepoImpl) Save(ctx context.Context, aggregate *aggregate.PaymentIntentAggregate) error {
 	if err := r.providerPaymentRepo.Save(ctx, aggregate); err != nil {
 		return stackErr.Error(err)

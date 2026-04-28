@@ -256,7 +256,7 @@ func (a *RelationshipPairAggregate) BlockCreated() *entity.BlockRelation {
 }
 
 func (a *RelationshipPairAggregate) MarkPersisted() {
-	a.MarkPersisted()
+	a.AggregateRoot.MarkPersisted()
 	a.changes.reset()
 }
 

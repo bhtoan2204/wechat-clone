@@ -17,6 +17,12 @@ import (
 )
 
 type friendRequestAggregateRepo struct {
+	db              *gorm.DB
+	serializer      eventpkg.Serializer
+	outboxPublisher eventpkg.Publisher
+}
+
+type relationOutboxEventStore struct {
 	db         *gorm.DB
 	serializer eventpkg.Serializer
 }
@@ -27,6 +33,10 @@ func newFriendRequestAggregateRepo(db *gorm.DB) repos.FriendRequestAggregateRepo
 	return &friendRequestAggregateRepo{
 		db:         db,
 		serializer: serializer,
+		outboxPublisher: eventpkg.NewPublisher(&relationOutboxEventStore{
+			db:         db,
+			serializer: serializer,
+		}),
 	}
 }
 
@@ -127,15 +137,20 @@ func (f *friendRequestAggregateRepo) Save(ctx context.Context, agg *aggregate.Fr
 		return stackErr.Error(err)
 	}
 
-	events := agg.Events()
-	if len(events) > 0 {
-		if err := persistRelationOutboxEvents(ctx, f.db, f.serializer, events); err != nil {
-			return stackErr.Error(err)
-		}
+	if err := f.publishOutboxEvents(ctx, agg); err != nil {
+		return stackErr.Error(err)
 	}
-
-	agg.MarkPersisted()
 	return nil
+}
+
+func (f *friendRequestAggregateRepo) publishOutboxEvents(ctx context.Context, agg *aggregate.FriendRequestAggregate) error {
+	if agg == nil || len(agg.Events()) == 0 {
+		return nil
+	}
+	if f == nil || f.outboxPublisher == nil {
+		return stackErr.Error(eventpkg.ErrEventStoreNil)
+	}
+	return stackErr.Error(f.outboxPublisher.PublishAggregate(ctx, agg))
 }
 
 func (f *friendRequestAggregateRepo) loadAggregateVersion(friendRequestID string) (int, error) {

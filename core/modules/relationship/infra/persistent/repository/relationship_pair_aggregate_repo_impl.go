@@ -19,6 +19,7 @@ import (
 type relationshipPairAggregateRepo struct {
 	db                          *gorm.DB
 	serializer                  eventpkg.Serializer
+	outboxPublisher             eventpkg.Publisher
 	friendRequestAggregateRepo  repos.FriendRequestAggregateRepository
 	friendshipRepo              repos.FriendshipRepository
 	followRelationRepo          repos.FollowRelationRepository
@@ -29,9 +30,14 @@ type relationshipPairAggregateRepo struct {
 }
 
 func newRelationshipPairAggregateRepo(db *gorm.DB) repos.RelationshipPairAggregateRepository {
+	serializer := eventpkg.NewSerializer()
 	return &relationshipPairAggregateRepo{
-		db:                          db,
-		serializer:                  eventpkg.NewSerializer(),
+		db:         db,
+		serializer: serializer,
+		outboxPublisher: eventpkg.NewPublisher(&relationOutboxEventStore{
+			db:         db,
+			serializer: serializer,
+		}),
 		friendRequestAggregateRepo:  newFriendRequestAggregateRepo(db),
 		friendshipRepo:              newFriendshipRepo(db),
 		followRelationRepo:          newFollowRelationRepo(db),
@@ -133,10 +139,22 @@ func (r *relationshipPairAggregateRepo) Save(ctx context.Context, agg *aggregate
 			return stackErr.Error(err)
 		}
 	}
-	if err := persistRelationOutboxEvents(ctx, r.db, r.serializer, agg.Events()); err != nil {
+	if err := r.publishOutboxEvents(ctx, agg); err != nil {
 		return stackErr.Error(err)
 	}
+	return nil
+}
 
+func (r *relationshipPairAggregateRepo) publishOutboxEvents(ctx context.Context, agg *aggregate.RelationshipPairAggregate) error {
+	if agg == nil || len(agg.Events()) == 0 {
+		return nil
+	}
+	if r == nil || r.outboxPublisher == nil {
+		return stackErr.Error(eventpkg.ErrEventStoreNil)
+	}
+	if err := r.outboxPublisher.PublishAggregate(ctx, agg); err != nil {
+		return stackErr.Error(err)
+	}
 	agg.MarkPersisted()
 	return nil
 }

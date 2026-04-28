@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	ledgerrepos "wechat-clone/core/modules/ledger/domain/repos"
 	"wechat-clone/core/modules/ledger/infra/persistent/model"
 	eventpkg "wechat-clone/core/shared/pkg/event"
 	"wechat-clone/core/shared/pkg/stackErr"
@@ -16,7 +15,7 @@ type ledgerOutboxEventsRepoImpl struct {
 	serializer eventpkg.Serializer
 }
 
-func NewLedgerOutboxEventsRepoImpl(dbTX dbTX) ledgerrepos.LedgerOutboxEventsRepository {
+func NewLedgerOutboxEventsRepoImpl(dbTX dbTX) eventpkg.Store {
 	return &ledgerOutboxEventsRepoImpl{
 		db:         dbTX,
 		serializer: eventpkg.NewSerializer(),

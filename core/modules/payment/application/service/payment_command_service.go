@@ -98,7 +98,7 @@ func (s *paymentCommandService) CreatePayment(
 	}
 
 	if err := s.baseRepo.WithTransaction(ctx, func(tx repos.Repos) error {
-		return stackErr.Error(tx.PaymentIntentAggregateRepository().Create(ctx, paymentAggregate))
+		return stackErr.Error(tx.PaymentIntentAggregateRepository().Save(ctx, paymentAggregate))
 	}); err != nil {
 		if errors.Is(err, repos.ErrProviderPaymentDuplicateIntent) {
 			return nil, stackErr.Error(fmt.Errorf("%w: %s", ErrDuplicatePayment, paymentAggregate.TransactionID()))
@@ -169,7 +169,7 @@ func (s *paymentCommandService) CreateWithdrawal(
 	}
 
 	if err := s.baseRepo.WithTransaction(ctx, func(tx repos.Repos) error {
-		return stackErr.Error(tx.PaymentIntentAggregateRepository().Create(ctx, paymentAggregate))
+		return stackErr.Error(tx.PaymentIntentAggregateRepository().Save(ctx, paymentAggregate))
 	}); err != nil {
 		if errors.Is(err, repos.ErrProviderPaymentDuplicateIntent) {
 			return nil, stackErr.Error(fmt.Errorf("%w: %s", ErrDuplicatePayment, paymentAggregate.TransactionID()))

@@ -24,6 +24,12 @@ type accountAggregateRepoImpl struct {
 	db               *gorm.DB
 	serializer       eventpkg.Serializer
 	projectionWriter *accountRepoImpl
+	outboxPublisher  eventpkg.Publisher
+}
+
+type accountOutboxEventStore struct {
+	db         *gorm.DB
+	serializer eventpkg.Serializer
 }
 
 func NewAccountAggregateRepoImpl(
@@ -39,14 +45,19 @@ func NewAccountAggregateRepoImpl(
 		}
 	}
 
+	serializer := newAccountAggregateSerializer()
 	return &accountAggregateRepoImpl{
 		db:         db,
-		serializer: newAccountAggregateSerializer(),
+		serializer: serializer,
 		projectionWriter: &accountRepoImpl{
 			db:           db,
 			accountCache: accountcache.NewAccountCache(cache),
 			afterCommit:  afterCommit,
 		},
+		outboxPublisher: eventpkg.NewPublisher(&accountOutboxEventStore{
+			db:         db,
+			serializer: serializer,
+		}),
 	}
 }
 
@@ -149,22 +160,9 @@ func (r *accountAggregateRepoImpl) Save(ctx context.Context, agg *aggregate.Acco
 	}
 	r.projectionWriter.syncCacheAfterCommit(ctx, snapshot)
 
-	events := agg.Root().CloneEvents()
-	if len(events) == 0 {
-		return nil
+	if err := r.publishOutboxEvents(ctx, agg); err != nil {
+		return stackErr.Error(err)
 	}
-
-	for _, evt := range events {
-		eventModel, err := r.buildEventModel(evt)
-		if err != nil {
-			return stackErr.Error(err)
-		}
-		if err := r.db.WithContext(ctx).Create(&eventModel).Error; err != nil {
-			return stackErr.Error(fmt.Errorf("create account event failed: %w", err))
-		}
-	}
-
-	agg.Root().MarkPersisted()
 	return nil
 }
 
@@ -192,10 +190,28 @@ func (r *accountAggregateRepoImpl) loadProjectionByEmail(ctx context.Context, em
 	return mapper.toEntity(&model)
 }
 
-func (r *accountAggregateRepoImpl) buildEventModel(evt eventpkg.Event) (models.AccountOutboxEventModel, error) {
-	data, err := r.serializer.Marshal(evt.EventData)
+func (r *accountAggregateRepoImpl) publishOutboxEvents(ctx context.Context, agg *aggregate.AccountAggregate) error {
+	if agg == nil || len(agg.Root().CloneEvents()) == 0 {
+		return nil
+	}
+	if r == nil || r.outboxPublisher == nil {
+		return stackErr.Error(eventpkg.ErrEventStoreNil)
+	}
+	return stackErr.Error(r.outboxPublisher.PublishAggregate(ctx, agg))
+}
+
+func (s *accountOutboxEventStore) Append(ctx context.Context, evt eventpkg.Event) error {
+	if s == nil || s.db == nil {
+		return stackErr.Error(eventpkg.ErrEventStoreNil)
+	}
+
+	serializer := s.serializer
+	if serializer == nil {
+		serializer = eventpkg.NewSerializer()
+	}
+	data, err := serializer.Marshal(evt.EventData)
 	if err != nil {
-		return models.AccountOutboxEventModel{}, stackErr.Error(fmt.Errorf("marshal account event data failed: %w", err))
+		return stackErr.Error(fmt.Errorf("marshal account event data failed: %w", err))
 	}
 
 	createdAt := time.Now().UTC()
@@ -203,14 +219,14 @@ func (r *accountAggregateRepoImpl) buildEventModel(evt eventpkg.Event) (models.A
 		createdAt = time.Unix(evt.CreatedAt, 0).UTC()
 	}
 
-	return models.AccountOutboxEventModel{
+	return stackErr.Error(s.db.WithContext(ctx).Create(&models.AccountOutboxEventModel{
 		AggregateID:   evt.AggregateID,
 		AggregateType: evt.AggregateType,
 		Version:       evt.Version,
 		EventName:     evt.EventName,
 		EventData:     string(data),
 		CreatedAt:     createdAt,
-	}, nil
+	}).Error)
 }
 
 func (r *accountAggregateRepoImpl) toDomainEvent(eventModel models.AccountOutboxEventModel) (eventpkg.Event, error) {

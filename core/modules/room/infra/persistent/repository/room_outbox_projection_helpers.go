@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -63,6 +62,13 @@ func loadLatestRoomOutboxVersion(ctx context.Context, db *gorm.DB, roomID string
 }
 
 func appendRoomOutboxEvents(ctx context.Context, outboxRepo repos.RoomOutboxEventsRepository, roomID string, baseVersion int, events []pendingRoomOutboxEvent) (int, error) {
+	if len(events) == 0 {
+		return baseVersion, nil
+	}
+	if outboxRepo == nil {
+		return baseVersion, stackErr.Error(eventpkg.ErrEventStoreNil)
+	}
+
 	nextVersion := baseVersion
 	batch := make([]eventpkg.Event, 0, len(events))
 	for _, pendingEvent := range events {
@@ -77,21 +83,9 @@ func appendRoomOutboxEvents(ctx context.Context, outboxRepo repos.RoomOutboxEven
 		})
 	}
 
-	type batchAppender interface {
-		AppendMany(ctx context.Context, events []eventpkg.Event) error
-	}
-
-	if repo, ok := outboxRepo.(batchAppender); ok {
-		if err := repo.AppendMany(ctx, batch); err != nil {
-			return baseVersion, stackErr.Error(fmt.Errorf("append room outbox events failed: %w", err))
-		}
-		return nextVersion, nil
-	}
-
-	for idx, evt := range batch {
-		if err := outboxRepo.Append(ctx, evt); err != nil {
-			return baseVersion, stackErr.Error(fmt.Errorf("append room outbox event #%d failed: %w", idx, err))
-		}
+	publisher := eventpkg.NewPublisher(outboxRepo)
+	if err := publisher.Publish(ctx, batch...); err != nil {
+		return baseVersion, stackErr.Error(err)
 	}
 	return nextVersion, nil
 }
