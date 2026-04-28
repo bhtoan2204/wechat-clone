@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"wechat-clone/core/modules/room/domain/entity"
-	"wechat-clone/core/modules/room/domain/repos"
 	roomcache "wechat-clone/core/modules/room/infra/cache"
 	"wechat-clone/core/modules/room/infra/persistent/models"
 	sharedcache "wechat-clone/core/shared/infra/cache"
@@ -22,7 +21,7 @@ type roomRepoImpl struct {
 	roomCache *roomcache.RoomCache
 }
 
-func NewRoomRepoImpl(db *gorm.DB, sharedCache sharedcache.Cache) repos.RoomRepository {
+func NewRoomRepoImpl(db *gorm.DB, sharedCache sharedcache.Cache) *roomRepoImpl {
 	return &roomRepoImpl{
 		db:        db,
 		roomCache: roomcache.NewRoomCache(sharedCache),

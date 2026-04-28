@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"wechat-clone/core/modules/room/domain/entity"
-	"wechat-clone/core/modules/room/domain/repos"
 	"wechat-clone/core/modules/room/infra/persistent/models"
 	"wechat-clone/core/shared/pkg/stackErr"
 
@@ -15,7 +14,7 @@ type roomMemberImpl struct {
 	db *gorm.DB
 }
 
-func NewRoomMemberImpl(db *gorm.DB) repos.RoomMemberRepository {
+func NewRoomMemberImpl(db *gorm.DB) *roomMemberImpl {
 	return &roomMemberImpl{db: db}
 }
 

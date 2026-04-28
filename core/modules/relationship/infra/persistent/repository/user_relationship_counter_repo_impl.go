@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"wechat-clone/core/modules/relationship/domain/entity"
-	"wechat-clone/core/modules/relationship/domain/repos"
 	"wechat-clone/core/modules/relationship/infra/persistent/models"
 	"wechat-clone/core/shared/pkg/stackErr"
 
@@ -16,7 +15,7 @@ type userRelationshipCounterRepo struct {
 	db *gorm.DB
 }
 
-func newUserRelationshipCounterRepo(db *gorm.DB) repos.UserRelationshipCounterRepository {
+func newUserRelationshipCounterRepo(db *gorm.DB) userRelationshipCounterStore {
 	return &userRelationshipCounterRepo{db: db}
 }
 

@@ -7,6 +7,7 @@ import (
 	"wechat-clone/core/modules/room/domain/aggregate"
 	"wechat-clone/core/modules/room/domain/entity"
 	"wechat-clone/core/modules/room/domain/repos"
+	eventpkg "wechat-clone/core/shared/pkg/event"
 	"wechat-clone/core/shared/pkg/stackErr"
 
 	"gorm.io/gorm"
@@ -14,20 +15,20 @@ import (
 
 type messageAggregateRepoImpl struct {
 	db             *gorm.DB
-	messageRepo    repos.MessageRepository
-	roomRepo       repos.RoomRepository
-	roomMemberRepo repos.RoomMemberRepository
-	accountRepo    repos.RoomAccountRepository
-	outboxRepo     repos.RoomOutboxEventsRepository
+	messageRepo    messageStore
+	roomRepo       roomStore
+	roomMemberRepo roomMemberStore
+	accountRepo    accountProjectionStore
+	outboxRepo     eventpkg.Store
 }
 
 func newMessageAggregateRepoImpl(
 	db *gorm.DB,
-	messageRepo repos.MessageRepository,
-	roomRepo repos.RoomRepository,
-	roomMemberRepo repos.RoomMemberRepository,
-	accountRepo repos.RoomAccountRepository,
-	outboxRepo repos.RoomOutboxEventsRepository,
+	messageRepo messageStore,
+	roomRepo roomStore,
+	roomMemberRepo roomMemberStore,
+	accountRepo accountProjectionStore,
+	outboxRepo eventpkg.Store,
 ) repos.MessageAggregateRepository {
 	return &messageAggregateRepoImpl{
 		db:             db,

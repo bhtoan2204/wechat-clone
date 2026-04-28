@@ -9,8 +9,8 @@ import (
 )
 
 func buildMessagingHandler(cfg *config.Config, appCtx *appCtx.AppContext) (relationshipmessaging.MessageHandler, error) {
-	repos := relationshiprepo.NewRepoImpl(appCtx)
-	handler, err := relationshipmessaging.NewMessageHandler(cfg, repos)
+	accountRepo := relationshiprepo.NewRelationshipAccountRepo(appCtx.GetDB())
+	handler, err := relationshipmessaging.NewMessageHandler(cfg, accountRepo)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}

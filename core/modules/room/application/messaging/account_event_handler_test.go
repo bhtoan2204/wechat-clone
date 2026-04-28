@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"wechat-clone/core/modules/room/domain/entity"
-	"wechat-clone/core/modules/room/domain/repos"
 	sharedevents "wechat-clone/core/shared/contracts/events"
 
 	"go.uber.org/mock/gomock"
@@ -37,7 +36,7 @@ func TestHandleAccountEventProfileUpdatedProjectsUsernameAndAvatar(t *testing.T)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	accountRepo := repos.NewMockRoomAccountRepository(ctrl)
+	accountRepo := NewMockAccountProjectionRepository(ctrl)
 	handler := &messageHandler{accountRepo: accountRepo}
 
 	raw := []byte(`{
@@ -87,7 +86,7 @@ func TestHandleAccountEventCreatedFallsBackToEmailWhenDisplayNameMissing(t *test
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	accountRepo := repos.NewMockRoomAccountRepository(ctrl)
+	accountRepo := NewMockAccountProjectionRepository(ctrl)
 	handler := &messageHandler{accountRepo: accountRepo}
 
 	raw := []byte(`{

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"wechat-clone/core/modules/relationship/application/dto/out"
-	"wechat-clone/core/modules/relationship/domain/repos"
 	"wechat-clone/core/shared/pkg/stackErr"
 
 	"gorm.io/gorm"
@@ -14,7 +13,7 @@ import (
 
 func mapRelationshipAccountSummaries(
 	ctx context.Context,
-	accountRepo repos.RelationshipAccountRepository,
+	accountRepo AccountReadRepository,
 	accountIDs []string,
 ) ([]out.RelationshipAccountSummaryResponse, error) {
 	if len(accountIDs) == 0 {
@@ -35,7 +34,7 @@ func mapRelationshipAccountSummaries(
 
 func loadRelationshipAccountSummary(
 	ctx context.Context,
-	accountRepo repos.RelationshipAccountRepository,
+	accountRepo AccountReadRepository,
 	accountID string,
 ) (out.RelationshipAccountSummaryResponse, error) {
 	accountID = strings.TrimSpace(accountID)

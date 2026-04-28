@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"wechat-clone/core/modules/relationship/domain/entity"
-	"wechat-clone/core/modules/relationship/domain/repos"
 	"wechat-clone/core/modules/relationship/infra/persistent/models"
 	"wechat-clone/core/shared/pkg/stackErr"
 
@@ -16,7 +15,7 @@ type friendshipRepo struct {
 	db *gorm.DB
 }
 
-func newFriendshipRepo(db *gorm.DB) repos.FriendshipRepository {
+func newFriendshipRepo(db *gorm.DB) friendshipStore {
 	return &friendshipRepo{db: db}
 }
 

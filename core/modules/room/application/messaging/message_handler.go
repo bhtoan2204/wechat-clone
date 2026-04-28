@@ -25,12 +25,12 @@ type MessageHandler interface {
 
 type messageHandler struct {
 	consumer    []infraMessaging.Consumer
-	accountRepo repos.RoomAccountRepository
+	accountRepo AccountProjectionRepository
 	baseRepo    repos.Repos
 	svc         service.RealtimeService
 }
 
-func NewMessageHandler(cfg *config.Config, baseRepo repos.Repos, accountRepo repos.RoomAccountRepository, svc service.RealtimeService) (MessageHandler, error) {
+func NewMessageHandler(cfg *config.Config, baseRepo repos.Repos, accountRepo AccountProjectionRepository, svc service.RealtimeService) (MessageHandler, error) {
 	instance := &messageHandler{
 		consumer:    make([]infraMessaging.Consumer, 0),
 		accountRepo: accountRepo,

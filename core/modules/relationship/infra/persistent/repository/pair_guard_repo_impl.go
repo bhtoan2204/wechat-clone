@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"wechat-clone/core/modules/relationship/domain/repos"
 	"wechat-clone/core/modules/relationship/infra/persistent/models"
 	"wechat-clone/core/shared/pkg/stackErr"
 
@@ -16,7 +15,7 @@ type relationshipPairGuardRepo struct {
 	db *gorm.DB
 }
 
-func newRelationshipPairGuardRepo(db *gorm.DB) repos.RelationshipPairGuardRepository {
+func newRelationshipPairGuardRepo(db *gorm.DB) relationshipPairGuardStore {
 	return &relationshipPairGuardRepo{db: db}
 }
 

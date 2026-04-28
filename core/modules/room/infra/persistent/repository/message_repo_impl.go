@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"wechat-clone/core/modules/room/domain/entity"
-	"wechat-clone/core/modules/room/domain/repos"
 	"wechat-clone/core/modules/room/infra/persistent/models"
 	"wechat-clone/core/shared/pkg/stackErr"
-	"wechat-clone/core/shared/utils"
 
 	"gorm.io/gorm"
 )
@@ -16,7 +14,7 @@ type messageRepoImpl struct {
 	db *gorm.DB
 }
 
-func NewMessageRepoImpl(db *gorm.DB) repos.MessageRepository {
+func NewMessageRepoImpl(db *gorm.DB) *messageRepoImpl {
 	return &messageRepoImpl{db: db}
 }
 
@@ -88,71 +86,4 @@ func (r *messageRepoImpl) GetLastMessageByRoomID(ctx context.Context, roomID str
 		return nil, stackErr.Error(err)
 	}
 	return entityMessage, nil
-}
-
-func (r *messageRepoImpl) toModel(e *entity.MessageEntity) (*models.MessageModel, error) {
-	mentionsJSON, err := marshalMessageMentions(e.Mentions)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-	reactionsJSON, err := marshalMessageReactions(e.Reactions)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-
-	return &models.MessageModel{
-		ID:                     e.ID,
-		RoomID:                 e.RoomID,
-		SenderID:               e.SenderID,
-		Message:                e.Message,
-		MessageType:            e.MessageType,
-		MentionsJSON:           mentionsJSON,
-		ReactionsJSON:          reactionsJSON,
-		MentionAll:             utils.BoolToSmallInt(e.MentionAll),
-		ReplyToMessageID:       utils.NullableString(e.ReplyToMessageID),
-		ForwardedFromMessageID: utils.NullableString(e.ForwardedFromMessageID),
-		FileName:               utils.NullableString(e.FileName),
-		FileSize:               utils.Int64Ptr(e.FileSize),
-		MimeType:               utils.NullableString(e.MimeType),
-		ObjectKey:              utils.NullableString(e.ObjectKey),
-		EditedAt:               e.EditedAt,
-		DeletedForEveryoneAt:   e.DeletedForEveryoneAt,
-		CreatedAt:              e.CreatedAt,
-	}, nil
-}
-
-func (r *messageRepoImpl) toEntity(m *models.MessageModel) (*entity.MessageEntity, error) {
-	mentions, err := unmarshalMessageMentions(m.MentionsJSON)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-	reactions, err := unmarshalMessageReactions(m.ReactionsJSON)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-
-	var fileSize int64
-	if m.FileSize != nil {
-		fileSize = *m.FileSize
-	}
-
-	return &entity.MessageEntity{
-		ID:                     m.ID,
-		RoomID:                 m.RoomID,
-		SenderID:               m.SenderID,
-		Message:                m.Message,
-		MessageType:            m.MessageType,
-		Mentions:               mentions,
-		Reactions:              reactions,
-		MentionAll:             m.MentionAll == 1,
-		ReplyToMessageID:       utils.StringValue(m.ReplyToMessageID),
-		ForwardedFromMessageID: utils.StringValue(m.ForwardedFromMessageID),
-		FileName:               utils.StringValue(m.FileName),
-		FileSize:               fileSize,
-		MimeType:               utils.StringValue(m.MimeType),
-		ObjectKey:              utils.StringValue(m.ObjectKey),
-		EditedAt:               m.EditedAt,
-		DeletedForEveryoneAt:   m.DeletedForEveryoneAt,
-		CreatedAt:              m.CreatedAt,
-	}, nil
 }

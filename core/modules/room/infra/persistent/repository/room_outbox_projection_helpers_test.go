@@ -6,18 +6,41 @@ import (
 	"time"
 
 	"wechat-clone/core/modules/room/domain/entity"
-	reposmock "wechat-clone/core/modules/room/domain/repos"
-
-	"go.uber.org/mock/gomock"
 )
+
+type accountProjectionStoreFake struct {
+	listByAccountIDs func(ctx context.Context, accountIDs []string) ([]*entity.AccountEntity, error)
+}
+
+func (f accountProjectionStoreFake) ProjectAccount(context.Context, *entity.AccountEntity) error {
+	return nil
+}
+
+func (f accountProjectionStoreFake) ListByAccountIDs(ctx context.Context, accountIDs []string) ([]*entity.AccountEntity, error) {
+	if f.listByAccountIDs == nil {
+		return nil, nil
+	}
+	return f.listByAccountIDs(ctx, accountIDs)
+}
 
 func TestEnrichRoomMembersWithAccountProjectionsFillsProfileFields(t *testing.T) {
 	t.Parallel()
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	accountRepo := reposmock.NewMockRoomAccountRepository(ctrl)
+	accountRepo := accountProjectionStoreFake{
+		listByAccountIDs: func(_ context.Context, accountIDs []string) ([]*entity.AccountEntity, error) {
+			if len(accountIDs) != 1 || accountIDs[0] != "acc-1" {
+				t.Fatalf("expected account ids [acc-1], got %#v", accountIDs)
+			}
+			return []*entity.AccountEntity{
+				{
+					AccountID:       "acc-1",
+					DisplayName:     "Alice",
+					Username:        "alice",
+					AvatarObjectKey: "avatars/alice.png",
+				},
+			}, nil
+		},
+	}
 
 	now := time.Date(2026, time.April, 14, 2, 15, 0, 0, time.UTC)
 	members := []*entity.RoomMemberEntity{
@@ -29,18 +52,6 @@ func TestEnrichRoomMembersWithAccountProjectionsFillsProfileFields(t *testing.T)
 			UpdatedAt: now,
 		},
 	}
-
-	accountRepo.EXPECT().
-		ListByAccountIDs(gomock.Any(), []string{"acc-1"}).
-		Return([]*entity.AccountEntity{
-			{
-				AccountID:       "acc-1",
-				DisplayName:     "Alice",
-				Username:        "alice",
-				AvatarObjectKey: "avatars/alice.png",
-			},
-		}, nil).
-		Times(1)
 
 	enriched, err := enrichRoomMembersWithAccountProjections(context.Background(), accountRepo, members)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"wechat-clone/core/modules/room/domain/aggregate"
 	"wechat-clone/core/modules/room/domain/entity"
 	"wechat-clone/core/modules/room/domain/repos"
+	eventpkg "wechat-clone/core/shared/pkg/event"
 	"wechat-clone/core/shared/pkg/stackErr"
 
 	"github.com/samber/lo"
@@ -19,19 +20,19 @@ const roomOutboxAggregateType = "RoomAggregate"
 
 type roomAggregateRepoImpl struct {
 	db              *gorm.DB
-	roomRepo        repos.RoomRepository
-	roomMemberRepo  repos.RoomMemberRepository
-	messageRepo     repos.MessageRepository
-	outboxRepo      repos.RoomOutboxEventsRepository
-	roomAccountRepo repos.RoomAccountRepository
+	roomRepo        roomStore
+	roomMemberRepo  roomMemberStore
+	messageRepo     messageStore
+	outboxRepo      eventpkg.Store
+	roomAccountRepo accountProjectionStore
 }
 
 func newRoomAggregateRepoImpl(db *gorm.DB,
-	roomRepo repos.RoomRepository,
-	roomMemberRepo repos.RoomMemberRepository,
-	messageRepo repos.MessageRepository,
-	outboxRepo repos.RoomOutboxEventsRepository,
-	accountRepo repos.RoomAccountRepository,
+	roomRepo roomStore,
+	roomMemberRepo roomMemberStore,
+	messageRepo messageStore,
+	outboxRepo eventpkg.Store,
+	accountRepo accountProjectionStore,
 ) repos.RoomAggregateRepository {
 	return &roomAggregateRepoImpl{
 		db:              db,

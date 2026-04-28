@@ -9,7 +9,6 @@ import (
 	roomprojection "wechat-clone/core/modules/room/application/projection"
 	"wechat-clone/core/modules/room/domain/aggregate"
 	"wechat-clone/core/modules/room/domain/entity"
-	"wechat-clone/core/modules/room/domain/repos"
 	"wechat-clone/core/modules/room/infra/persistent/models"
 	sharedevents "wechat-clone/core/shared/contracts/events"
 	eventpkg "wechat-clone/core/shared/pkg/event"
@@ -61,7 +60,7 @@ func loadLatestRoomOutboxVersion(ctx context.Context, db *gorm.DB, roomID string
 	return result.Version, nil
 }
 
-func appendRoomOutboxEvents(ctx context.Context, outboxRepo repos.RoomOutboxEventsRepository, roomID string, baseVersion int, events []pendingRoomOutboxEvent) (int, error) {
+func appendRoomOutboxEvents(ctx context.Context, outboxRepo eventpkg.Store, roomID string, baseVersion int, events []pendingRoomOutboxEvent) (int, error) {
 	if len(events) == 0 {
 		return baseVersion, nil
 	}
@@ -322,7 +321,7 @@ func sortRoomMembersByAccount(members []*entity.RoomMemberEntity) []*entity.Room
 
 func enrichRoomMembersWithAccountProjections(
 	ctx context.Context,
-	accountRepo repos.RoomAccountRepository,
+	accountRepo accountProjectionStore,
 	members []*entity.RoomMemberEntity,
 ) ([]*entity.RoomMemberEntity, error) {
 	if len(members) == 0 {

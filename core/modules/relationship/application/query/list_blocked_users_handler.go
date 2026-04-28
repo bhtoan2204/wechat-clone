@@ -6,20 +6,19 @@ import (
 	"wechat-clone/core/modules/relationship/application/dto/in"
 	"wechat-clone/core/modules/relationship/application/dto/out"
 	relationshipprojection "wechat-clone/core/modules/relationship/application/projection"
-	"wechat-clone/core/modules/relationship/domain/repos"
 	"wechat-clone/core/shared/pkg/cqrs"
 	"wechat-clone/core/shared/pkg/stackErr"
 )
 
 type listBlockedUsersHandler struct {
 	projRepo    relationshipprojection.ReadRepository
-	accountRepo repos.RelationshipAccountRepository
+	accountRepo AccountReadRepository
 }
 
 func NewListBlockedUsers(
 	appCtx *appCtx.AppContext,
 	projRepo relationshipprojection.ReadRepository,
-	accountRepo repos.RelationshipAccountRepository,
+	accountRepo AccountReadRepository,
 ) cqrs.Handler[*in.ListBlockedUsersRequest, *out.ListBlockedUsersResponse] {
 	return &listBlockedUsersHandler{projRepo: projRepo, accountRepo: accountRepo}
 }

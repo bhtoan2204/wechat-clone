@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"wechat-clone/core/modules/relationship/domain/entity"
-	"wechat-clone/core/modules/relationship/domain/repos"
 	"wechat-clone/core/modules/relationship/infra/persistent/models"
 	"wechat-clone/core/shared/pkg/stackErr"
 
@@ -16,7 +15,7 @@ type followRelationRepo struct {
 	db *gorm.DB
 }
 
-func newFollowRelationRepo(db *gorm.DB) repos.FollowRelationRepository {
+func newFollowRelationRepo(db *gorm.DB) followRelationStore {
 	return &followRelationRepo{db: db}
 }
 

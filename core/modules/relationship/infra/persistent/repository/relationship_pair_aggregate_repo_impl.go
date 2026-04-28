@@ -21,12 +21,12 @@ type relationshipPairAggregateRepo struct {
 	serializer                  eventpkg.Serializer
 	outboxPublisher             eventpkg.Publisher
 	friendRequestAggregateRepo  repos.FriendRequestAggregateRepository
-	friendshipRepo              repos.FriendshipRepository
-	followRelationRepo          repos.FollowRelationRepository
-	blockRelationRepo           repos.BlockRelationRepository
-	userRelationshipCounterRepo repos.UserRelationshipCounterRepository
-	accountProjectionRepo       repos.RelationshipAccountRepository
-	relationshipPairGuardRepo   repos.RelationshipPairGuardRepository
+	friendshipRepo              friendshipStore
+	followRelationRepo          followRelationStore
+	blockRelationRepo           blockRelationStore
+	userRelationshipCounterRepo userRelationshipCounterStore
+	accountProjectionRepo       relationshipAccountStore
+	relationshipPairGuardRepo   relationshipPairGuardStore
 }
 
 func newRelationshipPairAggregateRepo(db *gorm.DB) repos.RelationshipPairAggregateRepository {

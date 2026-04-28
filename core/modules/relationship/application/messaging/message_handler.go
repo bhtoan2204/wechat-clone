@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"wechat-clone/core/modules/relationship/domain/repos"
 	"wechat-clone/core/shared/config"
 	"wechat-clone/core/shared/contracts"
 	sharedevents "wechat-clone/core/shared/contracts/events"
@@ -24,13 +23,13 @@ type MessageHandler interface {
 
 type messageHandler struct {
 	consumer    []infraMessaging.Consumer
-	accountRepo repos.RelationshipAccountRepository
+	accountRepo AccountProjectionRepository
 }
 
-func NewMessageHandler(cfg *config.Config, baseRepo repos.Repos) (MessageHandler, error) {
+func NewMessageHandler(cfg *config.Config, accountRepo AccountProjectionRepository) (MessageHandler, error) {
 	instance := &messageHandler{
 		consumer:    make([]infraMessaging.Consumer, 0, 1),
-		accountRepo: baseRepo.RelationshipAccountRepository(),
+		accountRepo: accountRepo,
 	}
 
 	accountTopic := strings.TrimSpace(cfg.KafkaConfig.KafkaRelationshipConsumer.AccountTopic)

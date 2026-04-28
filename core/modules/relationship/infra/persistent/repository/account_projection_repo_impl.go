@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"wechat-clone/core/modules/relationship/domain/entity"
-	"wechat-clone/core/modules/relationship/domain/repos"
 	"wechat-clone/core/modules/relationship/infra/persistent/models"
 	"wechat-clone/core/shared/pkg/stackErr"
 
@@ -17,8 +16,12 @@ type RelationshipAccountRepo struct {
 	db *gorm.DB
 }
 
-func newRelationshipAccountRepo(db *gorm.DB) repos.RelationshipAccountRepository {
+func NewRelationshipAccountRepo(db *gorm.DB) *RelationshipAccountRepo {
 	return &RelationshipAccountRepo{db: db}
+}
+
+func newRelationshipAccountRepo(db *gorm.DB) relationshipAccountStore {
+	return NewRelationshipAccountRepo(db)
 }
 
 func (r *RelationshipAccountRepo) ProjectAccount(ctx context.Context, account *entity.AccountProjection) error {
