@@ -106,7 +106,7 @@ func TestVideoCallServiceRelaySignalRequiresParticipant(t *testing.T) {
 	}
 }
 
-func testRoomAggregate(t *testing.T, roomID string, memberIDs ...string) *aggregate.RoomStateAggregate {
+func testRoomAggregate(t *testing.T, roomID string, memberIDs ...string) *aggregate.RoomAggregate {
 	t.Helper()
 
 	room, err := entity.NewRoom(roomID, "Room", "", memberIDs[0], "group", "", time.Now().UTC())
@@ -133,9 +133,9 @@ func testRoomAggregate(t *testing.T, roomID string, memberIDs ...string) *aggreg
 		members = append(members, member)
 	}
 
-	agg, err := aggregate.RestoreRoomStateAggregate(room, members, 0)
+	agg, err := aggregate.RestoreRoomAggregate(room, members, 0)
 	if err != nil {
-		t.Fatalf("RestoreRoomStateAggregate() error = %v", err)
+		t.Fatalf("RestoreRoomAggregate() error = %v", err)
 	}
 	return agg
 }

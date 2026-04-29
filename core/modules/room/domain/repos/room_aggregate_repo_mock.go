@@ -56,10 +56,10 @@ func (mr *MockRoomAggregateRepositoryMockRecorder) Delete(ctx, roomID any) *gomo
 }
 
 // Load mocks base method.
-func (m *MockRoomAggregateRepository) Load(ctx context.Context, roomID string) (*aggregate.RoomStateAggregate, error) {
+func (m *MockRoomAggregateRepository) Load(ctx context.Context, roomID string) (*aggregate.RoomAggregate, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Load", ctx, roomID)
-	ret0, _ := ret[0].(*aggregate.RoomStateAggregate)
+	ret0, _ := ret[0].(*aggregate.RoomAggregate)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -71,10 +71,10 @@ func (mr *MockRoomAggregateRepositoryMockRecorder) Load(ctx, roomID any) *gomock
 }
 
 // LoadByDirectKey mocks base method.
-func (m *MockRoomAggregateRepository) LoadByDirectKey(ctx context.Context, directKey string) (*aggregate.RoomStateAggregate, error) {
+func (m *MockRoomAggregateRepository) LoadByDirectKey(ctx context.Context, directKey string) (*aggregate.RoomAggregate, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "LoadByDirectKey", ctx, directKey)
-	ret0, _ := ret[0].(*aggregate.RoomStateAggregate)
+	ret0, _ := ret[0].(*aggregate.RoomAggregate)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -86,7 +86,7 @@ func (mr *MockRoomAggregateRepositoryMockRecorder) LoadByDirectKey(ctx, directKe
 }
 
 // Save mocks base method.
-func (m *MockRoomAggregateRepository) Save(ctx context.Context, agg *aggregate.RoomStateAggregate) error {
+func (m *MockRoomAggregateRepository) Save(ctx context.Context, agg *aggregate.RoomAggregate) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Save", ctx, agg)
 	ret0, _ := ret[0].(error)

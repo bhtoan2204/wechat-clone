@@ -17,11 +17,11 @@ func NewRoomAggregate(roomID string) (*RoomAggregate, error) {
 }
 
 func (r *RoomAggregate) RecordRoomCreated(roomType roomtypes.RoomType, memberCount int) error {
-	return r.ApplyChange(r, &EventRoomCreated{
+	return stackErr.Error(r.recordEvent(&EventRoomCreated{
 		RoomID:      r.AggregateID(),
 		RoomType:    roomType,
 		MemberCount: memberCount,
-	})
+	}, time.Now().UTC()))
 }
 
 func (r *RoomAggregate) RecordMemberAdded(memberID string, memberRole roomtypes.RoomRole, joinedAt time.Time) error {
@@ -30,12 +30,12 @@ func (r *RoomAggregate) RecordMemberAdded(memberID string, memberRole roomtypes.
 		return stackErr.Error(err)
 	}
 
-	return r.ApplyChange(r, &EventRoomMemberAdded{
+	return stackErr.Error(r.recordEvent(&EventRoomMemberAdded{
 		RoomID:         r.AggregateID(),
 		MemberID:       memberID,
 		MemberRole:     memberRole,
 		MemberJoinedAt: joinedAt,
-	})
+	}, joinedAt))
 }
 
 func (r *RoomAggregate) RecordMemberRemoved(memberID string, memberRole roomtypes.RoomRole, removedAt time.Time) error {
@@ -44,12 +44,12 @@ func (r *RoomAggregate) RecordMemberRemoved(memberID string, memberRole roomtype
 		return stackErr.Error(err)
 	}
 
-	return r.ApplyChange(r, &EventRoomMemberRemoved{
+	return stackErr.Error(r.recordEvent(&EventRoomMemberRemoved{
 		RoomID:         r.AggregateID(),
 		MemberID:       memberID,
 		MemberRole:     memberRole,
 		MemberJoinedAt: removedAt,
-	})
+	}, removedAt))
 }
 
 func (r *RoomAggregate) RecordMessageCreated(
@@ -72,10 +72,17 @@ func (r *RoomAggregate) RecordMessageCreated(
 		normalizedAttachment = *attachment
 	}
 
-	return r.ApplyChange(r, &EventRoomMessageCreated{
+	roomName := ""
+	roomType := ""
+	if r.room != nil {
+		roomName = r.room.Name
+		roomType = string(r.room.RoomType)
+	}
+
+	return stackErr.Error(r.recordEvent(&EventRoomMessageCreated{
 		RoomID:                 r.AggregateID(),
-		RoomName:               r.RoomName,
-		RoomType:               r.RoomType.String(),
+		RoomName:               roomName,
+		RoomType:               roomType,
 		MessageID:              messageID,
 		MessageContent:         content,
 		MessageType:            messageType,
@@ -92,7 +99,7 @@ func (r *RoomAggregate) RecordMessageCreated(
 		Mentions:               mentions.Items,
 		MentionAll:             mentions.MentionAll,
 		MentionedAccountIDs:    mentions.AccountIDs,
-	})
+	}, sentAt))
 }
 
 func normalizeRoomEventOccurredAt(value time.Time) (time.Time, error) {

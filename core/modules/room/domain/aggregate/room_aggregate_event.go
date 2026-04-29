@@ -16,22 +16,50 @@ type EventRoomCreated struct {
 	LastMessageSenderID string         `json:"last_message_sender_id,omitempty"`
 }
 
+type EventRoomOwnerChanged struct {
+	RoomID          string    `json:"room_id"`
+	PreviousOwnerID string    `json:"previous_owner_id,omitempty"`
+	OwnerID         string    `json:"owner_id"`
+	ChangedAt       time.Time `json:"changed_at"`
+}
+
+type EventRoomDetailsUpdated struct {
+	RoomID      string         `json:"room_id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	RoomType    types.RoomType `json:"room_type"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+type EventRoomMessagePinned struct {
+	RoomID          string    `json:"room_id"`
+	PinnedMessageID string    `json:"pinned_message_id"`
+	PinnedAt        time.Time `json:"pinned_at"`
+}
+
 type EventRoomMemberAdded struct {
-	RoomID         string         `json:"room_id"`
-	MemberID       string         `json:"member_id"`
-	MemberName     string         `json:"member_name,omitempty"`
-	MemberEmail    string         `json:"member_email,omitempty"`
-	MemberRole     types.RoomRole `json:"member_role"`
-	MemberJoinedAt time.Time      `json:"member_joined_at"`
+	RoomID               string         `json:"room_id"`
+	MemberID             string         `json:"member_id"`
+	RoomMemberID         string         `json:"room_member_id,omitempty"`
+	MemberName           string         `json:"member_name,omitempty"`
+	MemberEmail          string         `json:"member_email,omitempty"`
+	MemberUsername       string         `json:"member_username,omitempty"`
+	MemberAvatarKey      string         `json:"member_avatar_key,omitempty"`
+	MemberRole           types.RoomRole `json:"member_role"`
+	MemberJoinedAt       time.Time      `json:"member_joined_at"`
+	MemberStateUpdatedAt time.Time      `json:"member_state_updated_at,omitempty"`
 }
 
 type EventRoomMemberRemoved struct {
 	RoomID         string         `json:"room_id"`
 	MemberID       string         `json:"member_id"`
+	RoomMemberID   string         `json:"room_member_id,omitempty"`
 	MemberName     string         `json:"member_name,omitempty"`
 	MemberEmail    string         `json:"member_email,omitempty"`
+	MemberUsername string         `json:"member_username,omitempty"`
 	MemberRole     types.RoomRole `json:"member_role"`
 	MemberJoinedAt time.Time      `json:"member_joined_at"`
+	RemovedAt      time.Time      `json:"removed_at"`
 }
 
 type EventRoomMessageCreated struct {

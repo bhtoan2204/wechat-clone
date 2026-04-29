@@ -44,7 +44,7 @@ func newRoomAggregateRepoImpl(db *gorm.DB,
 	}
 }
 
-func (r *roomAggregateRepoImpl) Load(ctx context.Context, roomID string) (*aggregate.RoomStateAggregate, error) {
+func (r *roomAggregateRepoImpl) Load(ctx context.Context, roomID string) (*aggregate.RoomAggregate, error) {
 	room, err := r.roomRepo.GetRoomByID(ctx, roomID)
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -80,10 +80,10 @@ func (r *roomAggregateRepoImpl) Load(ctx context.Context, roomID string) (*aggre
 		return nil, stackErr.Error(err)
 	}
 
-	return aggregate.RestoreRoomStateAggregate(room, members, version)
+	return aggregate.RestoreRoomAggregate(room, members, version)
 }
 
-func (r *roomAggregateRepoImpl) LoadByDirectKey(ctx context.Context, directKey string) (*aggregate.RoomStateAggregate, error) {
+func (r *roomAggregateRepoImpl) LoadByDirectKey(ctx context.Context, directKey string) (*aggregate.RoomAggregate, error) {
 	room, err := r.roomRepo.GetRoomByDirectKey(ctx, directKey)
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -91,7 +91,7 @@ func (r *roomAggregateRepoImpl) LoadByDirectKey(ctx context.Context, directKey s
 	return r.Load(ctx, room.ID)
 }
 
-func (r *roomAggregateRepoImpl) Save(ctx context.Context, agg *aggregate.RoomStateAggregate) error {
+func (r *roomAggregateRepoImpl) Save(ctx context.Context, agg *aggregate.RoomAggregate) error {
 	if agg == nil {
 		return stackErr.Error(aggregate.ErrRoomAggregateNil)
 	}
