@@ -1,4 +1,4 @@
-package service
+package command
 
 import (
 	"context"
@@ -27,33 +27,26 @@ type EmailVerificationTokenPayload struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-//go:generate mockgen -package=service -destination=email_verification_service_mock.go -source=email_verification_service.go
 type Mailer interface {
 	Send(ctx context.Context, to, subject, body string) error
 	SendTemplate(ctx context.Context, to, subject, templateName string, data any) error
 }
 
-//go:generate mockgen -package=service -destination=email_verification_service_mock.go -source=email_verification_service.go
-type EmailVerificationService interface {
-	SendVerificationEmail(ctx context.Context, account *entity.Account) (string, time.Time, error)
-	ConsumeVerificationToken(ctx context.Context, token string) (*EmailVerificationTokenPayload, error)
-}
-
-type emailVerificationService struct {
+type emailVerificationDependencies struct {
 	cache          sharedcache.Cache
 	smtp           Mailer
 	verifyEmailURL string
 }
 
-func NewEmailVerificationService(appCtx *appCtx.AppContext) EmailVerificationService {
-	return &emailVerificationService{
+func newEmailVerificationDependencies(appCtx *appCtx.AppContext) emailVerificationDependencies {
+	return emailVerificationDependencies{
 		cache:          appCtx.GetCache(),
 		smtp:           appCtx.GetSMTP(),
 		verifyEmailURL: strings.TrimSpace(appCtx.GetConfig().AuthConfig.VerifyEmailURL),
 	}
 }
 
-func (s *emailVerificationService) SendVerificationEmail(ctx context.Context, account *entity.Account) (string, time.Time, error) {
+func (s emailVerificationDependencies) SendVerificationEmail(ctx context.Context, account *entity.Account) (string, time.Time, error) {
 	if account == nil {
 		return "", time.Time{}, stackErr.Error(errors.New("account is nil"))
 	}
@@ -88,7 +81,7 @@ func (s *emailVerificationService) SendVerificationEmail(ctx context.Context, ac
 	return token, expiresAt, nil
 }
 
-func (s *emailVerificationService) ConsumeVerificationToken(ctx context.Context, token string) (*EmailVerificationTokenPayload, error) {
+func (s emailVerificationDependencies) ConsumeVerificationToken(ctx context.Context, token string) (*EmailVerificationTokenPayload, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return nil, stackErr.Error(ErrVerificationTokenInvalid)

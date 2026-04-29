@@ -9,7 +9,6 @@ import (
 	"wechat-clone/core/modules/account/application/dto/in"
 	"wechat-clone/core/modules/account/application/dto/out"
 	"wechat-clone/core/modules/account/application/projection"
-	"wechat-clone/core/modules/account/application/service"
 	"wechat-clone/core/shared/infra/storage"
 	"wechat-clone/core/shared/pkg/cqrs"
 	"wechat-clone/core/shared/pkg/logging"
@@ -25,7 +24,7 @@ type getAvatarHandler struct {
 	storage         storage.Storage
 }
 
-func NewGetAvatarHandler(appCtx *appCtx.AppContext, accountReadRepo projection.AccountReadRepository, services service.Services) cqrs.Handler[*in.GetAvatarRequest, *out.GetAvatarResponse] {
+func NewGetAvatarHandler(appCtx *appCtx.AppContext, accountReadRepo projection.AccountReadRepository) cqrs.Handler[*in.GetAvatarRequest, *out.GetAvatarResponse] {
 	return &getAvatarHandler{
 		accountReadRepo: accountReadRepo,
 		storage:         appCtx.GetStorage(),

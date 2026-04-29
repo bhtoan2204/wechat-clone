@@ -8,7 +8,6 @@ import (
 	appCtx "wechat-clone/core/context"
 	"wechat-clone/core/modules/account/application/dto/in"
 	"wechat-clone/core/modules/account/application/dto/out"
-	"wechat-clone/core/modules/account/application/service"
 	"wechat-clone/core/modules/account/application/support"
 	repos "wechat-clone/core/modules/account/domain/repos"
 	"wechat-clone/core/shared/infra/storage"
@@ -20,7 +19,7 @@ type createPresignedURLHandler struct {
 	storage storage.Storage
 }
 
-func NewCreatePresignedUrlHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos, services service.Services) cqrs.Handler[*in.CreatePresignedUrlRequest, *out.CreatePresignedUrlResponse] {
+func NewCreatePresignedUrlHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos) cqrs.Handler[*in.CreatePresignedUrlRequest, *out.CreatePresignedUrlResponse] {
 	return &createPresignedURLHandler{
 		storage: appCtx.GetStorage(),
 	}

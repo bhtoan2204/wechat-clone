@@ -8,7 +8,6 @@ import (
 	appCtx "wechat-clone/core/context"
 	"wechat-clone/core/modules/account/application/dto/in"
 	"wechat-clone/core/modules/account/application/dto/out"
-	"wechat-clone/core/modules/account/application/service"
 	"wechat-clone/core/modules/account/application/support"
 	repos "wechat-clone/core/modules/account/domain/repos"
 	"wechat-clone/core/modules/account/domain/rules"
@@ -21,14 +20,14 @@ import (
 )
 
 type verifyEmailHandler struct {
-	baseRepo            repos.Repos
-	verificationService service.EmailVerificationService
+	baseRepo     repos.Repos
+	verification emailVerificationDependencies
 }
 
-func NewVerifyEmailHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos, services service.Services) cqrs.Handler[*in.VerifyEmailRequest, *out.VerifyEmailResponse] {
+func NewVerifyEmailHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos) cqrs.Handler[*in.VerifyEmailRequest, *out.VerifyEmailResponse] {
 	return &verifyEmailHandler{
-		baseRepo:            baseRepo,
-		verificationService: services.EmailVerificationService(),
+		baseRepo:     baseRepo,
+		verification: newEmailVerificationDependencies(appCtx),
 	}
 }
 
@@ -62,7 +61,7 @@ func (u *verifyEmailHandler) Handle(ctx context.Context, req *in.VerifyEmailRequ
 		return nil, stackErr.Error(err)
 	}
 
-	token, _, err := u.verificationService.SendVerificationEmail(ctx, accountEntity)
+	token, _, err := u.verification.SendVerificationEmail(ctx, accountEntity)
 	if err != nil {
 		log.Errorw("Failed to send verification email", zap.Error(err))
 		return nil, stackErr.Error(err)

@@ -8,7 +8,6 @@ import (
 	appCtx "wechat-clone/core/context"
 	"wechat-clone/core/modules/account/application/dto/in"
 	"wechat-clone/core/modules/account/application/dto/out"
-	"wechat-clone/core/modules/account/application/service"
 	"wechat-clone/core/modules/account/application/support"
 	repos "wechat-clone/core/modules/account/domain/repos"
 	"wechat-clone/core/shared/pkg/cqrs"
@@ -22,7 +21,7 @@ type updateProfileHandler struct {
 	baseRepo repos.Repos
 }
 
-func NewUpdateProfileHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos, services service.Services) cqrs.Handler[*in.UpdateProfileRequest, *out.UpdateProfileResponse] {
+func NewUpdateProfileHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos) cqrs.Handler[*in.UpdateProfileRequest, *out.UpdateProfileResponse] {
 	return &updateProfileHandler{
 		baseRepo: baseRepo,
 	}

@@ -6,7 +6,6 @@ import (
 	"wechat-clone/core/modules/account/application/dto/in"
 	"wechat-clone/core/modules/account/application/dto/out"
 	"wechat-clone/core/modules/account/application/projection"
-	"wechat-clone/core/modules/account/application/service"
 	"wechat-clone/core/modules/account/application/support"
 	"wechat-clone/core/shared/pkg/cqrs"
 	"wechat-clone/core/shared/pkg/logging"
@@ -19,7 +18,7 @@ type getProfileHandler struct {
 	accountReadRepo projection.AccountReadRepository
 }
 
-func NewGetProfileHandler(appCtx *appCtx.AppContext, accountReadRepo projection.AccountReadRepository, services service.Services) cqrs.Handler[*in.GetProfileRequest, *out.GetProfileResponse] {
+func NewGetProfileHandler(appCtx *appCtx.AppContext, accountReadRepo projection.AccountReadRepository) cqrs.Handler[*in.GetProfileRequest, *out.GetProfileResponse] {
 	return &getProfileHandler{
 		accountReadRepo: accountReadRepo,
 	}

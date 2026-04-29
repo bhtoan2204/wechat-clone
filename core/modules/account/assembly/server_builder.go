@@ -7,7 +7,6 @@ import (
 	"wechat-clone/core/modules/account/application/provider"
 	"wechat-clone/core/modules/account/application/provider/google"
 	"wechat-clone/core/modules/account/application/query"
-	accountservice "wechat-clone/core/modules/account/application/service"
 	accountrepo "wechat-clone/core/modules/account/infra/persistent/repository"
 	accountes "wechat-clone/core/modules/account/infra/projection/elasticsearch"
 	accountserver "wechat-clone/core/modules/account/transport/server"
@@ -23,24 +22,23 @@ func buildHTTPServer(ctx context.Context, appContext *appCtx.AppContext) (http.H
 	}
 	accountRepos := accountrepo.NewRepoImpl(appContext.GetDB(), appContext.GetCache())
 	accountReadRepo := accountrepo.NewAccountRepoImpl(appContext.GetDB(), appContext.GetCache(), true, nil, searchRepository)
-	accountServices := accountservice.NewServices(appContext, accountRepos)
 	authProviderRegistry := provider.NewProviderRegistry()
 	authProviderRegistry.Register(google.NewGoogleProvider(ctx, appContext.GetConfig()))
 
-	login := cqrs.NewDispatcher(command.NewLoginHandler(appContext, accountRepos, accountServices))
-	register := cqrs.NewDispatcher(command.NewRegisterHandler(appContext, accountRepos, accountServices))
-	logout := cqrs.NewDispatcher(command.NewLogoutHandler(appContext, accountRepos, accountServices))
-	getProfile := cqrs.NewDispatcher(query.NewGetProfileHandler(appContext, accountReadRepo, accountServices))
-	getAvatar := cqrs.NewDispatcher(query.NewGetAvatarHandler(appContext, accountReadRepo, accountServices))
-	getPresignedUrl := cqrs.NewDispatcher(command.NewCreatePresignedUrlHandler(appContext, accountRepos, accountServices))
-	updateProfile := cqrs.NewDispatcher(command.NewUpdateProfileHandler(appContext, accountRepos, accountServices))
-	verifyEmail := cqrs.NewDispatcher(command.NewVerifyEmailHandler(appContext, accountRepos, accountServices))
-	confirmVerifyEmail := cqrs.NewDispatcher(command.NewConfirmVerifyEmailHandler(appContext, accountRepos, accountServices))
-	changePassword := cqrs.NewDispatcher(command.NewChangePasswordHandler(appContext, accountRepos, accountServices))
-	searchUsers := cqrs.NewDispatcher(query.NewSearchUsers(appContext, accountReadRepo, accountServices))
-	refresh := cqrs.NewDispatcher(command.NewRefresh(appContext, accountRepos, accountServices))
-	loginGoogle := cqrs.NewDispatcher(command.NewLoginGoogle(appContext, accountRepos, accountServices, authProviderRegistry))
-	callbackGoogle := cqrs.NewDispatcher(command.NewCallbackGoogle(appContext, accountRepos, accountServices, authProviderRegistry))
+	login := cqrs.NewDispatcher(command.NewLoginHandler(appContext, accountRepos))
+	register := cqrs.NewDispatcher(command.NewRegisterHandler(appContext, accountRepos))
+	logout := cqrs.NewDispatcher(command.NewLogoutHandler(appContext, accountRepos))
+	getProfile := cqrs.NewDispatcher(query.NewGetProfileHandler(appContext, accountReadRepo))
+	getAvatar := cqrs.NewDispatcher(query.NewGetAvatarHandler(appContext, accountReadRepo))
+	getPresignedUrl := cqrs.NewDispatcher(command.NewCreatePresignedUrlHandler(appContext, accountRepos))
+	updateProfile := cqrs.NewDispatcher(command.NewUpdateProfileHandler(appContext, accountRepos))
+	verifyEmail := cqrs.NewDispatcher(command.NewVerifyEmailHandler(appContext, accountRepos))
+	confirmVerifyEmail := cqrs.NewDispatcher(command.NewConfirmVerifyEmailHandler(appContext, accountRepos))
+	changePassword := cqrs.NewDispatcher(command.NewChangePasswordHandler(appContext, accountRepos))
+	searchUsers := cqrs.NewDispatcher(query.NewSearchUsers(appContext, accountReadRepo))
+	refresh := cqrs.NewDispatcher(command.NewRefresh(appContext, accountRepos))
+	loginGoogle := cqrs.NewDispatcher(command.NewLoginGoogle(appContext, accountRepos, authProviderRegistry))
+	callbackGoogle := cqrs.NewDispatcher(command.NewCallbackGoogle(appContext, accountRepos, authProviderRegistry))
 	server, err := accountserver.NewHTTPServer(
 		login,
 		register,

@@ -8,7 +8,6 @@ import (
 	"wechat-clone/core/modules/account/application/dto/in"
 	"wechat-clone/core/modules/account/application/dto/out"
 	"wechat-clone/core/modules/account/application/projection"
-	"wechat-clone/core/modules/account/application/service"
 	"wechat-clone/core/modules/account/domain/entity"
 	"wechat-clone/core/shared/pkg/cqrs"
 	"wechat-clone/core/shared/pkg/stackErr"
@@ -23,7 +22,6 @@ type searchUsersHandler struct {
 func NewSearchUsers(
 	appCtx *appCtx.AppContext,
 	accountReadRepo projection.AccountReadRepository,
-	services service.Services,
 ) cqrs.Handler[*in.SearchUsersRequest, *out.SearchUsersResponse] {
 	return &searchUsersHandler{
 		accountReadRepo: accountReadRepo,

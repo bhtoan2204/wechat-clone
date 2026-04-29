@@ -6,7 +6,6 @@ import (
 	"wechat-clone/core/modules/account/application/dto/in"
 	"wechat-clone/core/modules/account/application/dto/out"
 	"wechat-clone/core/modules/account/application/provider"
-	"wechat-clone/core/modules/account/application/service"
 	repos "wechat-clone/core/modules/account/domain/repos"
 	"wechat-clone/core/shared/pkg/cqrs"
 	"wechat-clone/core/shared/pkg/stackErr"
@@ -19,7 +18,6 @@ type loginGoogleHandler struct {
 func NewLoginGoogle(
 	appCtx *appCtx.AppContext,
 	baseRepo repos.Repos,
-	services service.Services,
 	authProviderRegistry *provider.AuthProviderRegistry,
 ) cqrs.Handler[*in.LoginGoogleRequest, *out.LoginGoogleResponse] {
 	return &loginGoogleHandler{

@@ -8,7 +8,6 @@ import (
 	appCtx "wechat-clone/core/context"
 	"wechat-clone/core/modules/account/application/dto/in"
 	"wechat-clone/core/modules/account/application/dto/out"
-	"wechat-clone/core/modules/account/application/service"
 	repos "wechat-clone/core/modules/account/domain/repos"
 	"wechat-clone/core/modules/account/domain/rules"
 	valueobject "wechat-clone/core/modules/account/domain/value_object"
@@ -22,21 +21,21 @@ import (
 )
 
 type confirmVerifyEmailHandler struct {
-	baseRepo            repos.Repos
-	verificationService service.EmailVerificationService
+	baseRepo     repos.Repos
+	verification emailVerificationDependencies
 }
 
-func NewConfirmVerifyEmailHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos, services service.Services) cqrs.Handler[*in.ConfirmVerifyEmailRequest, *out.ConfirmVerifyEmailResponse] {
+func NewConfirmVerifyEmailHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos) cqrs.Handler[*in.ConfirmVerifyEmailRequest, *out.ConfirmVerifyEmailResponse] {
 	return &confirmVerifyEmailHandler{
-		baseRepo:            baseRepo,
-		verificationService: services.EmailVerificationService(),
+		baseRepo:     baseRepo,
+		verification: newEmailVerificationDependencies(appCtx),
 	}
 }
 
 func (u *confirmVerifyEmailHandler) Handle(ctx context.Context, req *in.ConfirmVerifyEmailRequest) (*out.ConfirmVerifyEmailResponse, error) {
 	log := logging.FromContext(ctx).Named("ConfirmVerifyEmail")
 
-	tokenPayload, err := u.verificationService.ConsumeVerificationToken(ctx, req.Token)
+	tokenPayload, err := u.verification.ConsumeVerificationToken(ctx, req.Token)
 	if err != nil {
 		log.Errorw("Failed to consume verification token", zap.Error(err))
 		return nil, stackErr.Error(ErrInvalidVerificationToken)

@@ -6,7 +6,6 @@ import (
 	appCtx "wechat-clone/core/context"
 	"wechat-clone/core/modules/account/application/dto/in"
 	"wechat-clone/core/modules/account/application/dto/out"
-	"wechat-clone/core/modules/account/application/service"
 	"wechat-clone/core/modules/account/application/support"
 	repos "wechat-clone/core/modules/account/domain/repos"
 	domainservice "wechat-clone/core/modules/account/domain/service"
@@ -25,7 +24,7 @@ type changePasswordHandler struct {
 	hasher   hasher.Hasher
 }
 
-func NewChangePasswordHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos, services service.Services) cqrs.Handler[*in.ChangePasswordRequest, *out.ChangePasswordResponse] {
+func NewChangePasswordHandler(appCtx *appCtx.AppContext, baseRepo repos.Repos) cqrs.Handler[*in.ChangePasswordRequest, *out.ChangePasswordResponse] {
 	return &changePasswordHandler{
 		baseRepo: baseRepo,
 		hasher:   appCtx.GetHasher(),
