@@ -15,30 +15,15 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type deviceRepoImpl struct {
+type deviceAggregateRepoImpl struct {
 	db *gorm.DB
 }
 
-func NewDeviceRepoImpl(db *gorm.DB) accountrepos.DeviceRepository {
-	return &deviceRepoImpl{db: db}
+func NewDeviceAggregateRepoImpl(db *gorm.DB) accountrepos.DeviceAggregateRepository {
+	return &deviceAggregateRepoImpl{db: db}
 }
 
-func (r *deviceRepoImpl) FindByAccountAndUID(ctx context.Context, accountID string, deviceUID string) (*aggregate.DeviceAggregate, error) {
-	var model models.DeviceModel
-	if err := r.db.WithContext(ctx).
-		Where("account_id = ? AND device_uid = ?", accountID, deviceUID).
-		First(&model).Error; err != nil {
-		return nil, stackErr.Error(err)
-	}
-
-	device, err := r.toEntity(&model)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-	return r.toAggregate(device)
-}
-
-func (r *deviceRepoImpl) GetByAccountAndID(ctx context.Context, accountID string, deviceID string) (*aggregate.DeviceAggregate, error) {
+func (r *deviceAggregateRepoImpl) GetByAccountAndID(ctx context.Context, accountID string, deviceID string) (*aggregate.DeviceAggregate, error) {
 	var model models.DeviceModel
 	if err := r.db.WithContext(ctx).
 		Where("account_id = ? AND id = ?", accountID, deviceID).
@@ -53,7 +38,7 @@ func (r *deviceRepoImpl) GetByAccountAndID(ctx context.Context, accountID string
 	return r.toAggregate(device)
 }
 
-func (r *deviceRepoImpl) Save(ctx context.Context, device *aggregate.DeviceAggregate) error {
+func (r *deviceAggregateRepoImpl) Save(ctx context.Context, device *aggregate.DeviceAggregate) error {
 	if device == nil {
 		return stackErr.Error(fmt.Errorf("device is nil"))
 	}
@@ -89,7 +74,7 @@ func (r *deviceRepoImpl) Save(ctx context.Context, device *aggregate.DeviceAggre
 	return nil
 }
 
-func (r *deviceRepoImpl) toAggregate(device *entity.Device) (*aggregate.DeviceAggregate, error) {
+func (r *deviceAggregateRepoImpl) toAggregate(device *entity.Device) (*aggregate.DeviceAggregate, error) {
 	agg, err := aggregate.NewDeviceAggregate(device.ID)
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -100,7 +85,7 @@ func (r *deviceRepoImpl) toAggregate(device *entity.Device) (*aggregate.DeviceAg
 	return agg, nil
 }
 
-func (r *deviceRepoImpl) toEntity(model *models.DeviceModel) (*entity.Device, error) {
+func (r *deviceAggregateRepoImpl) toEntity(model *models.DeviceModel) (*entity.Device, error) {
 	if model == nil {
 		return nil, stackErr.Error(fmt.Errorf("device model is nil"))
 	}
@@ -123,7 +108,7 @@ func (r *deviceRepoImpl) toEntity(model *models.DeviceModel) (*entity.Device, er
 	}, nil
 }
 
-func (r *deviceRepoImpl) toModel(device *entity.Device) *models.DeviceModel {
+func (r *deviceAggregateRepoImpl) toModel(device *entity.Device) *models.DeviceModel {
 	isTrusted := int8(0)
 	if device.IsTrusted {
 		isTrusted = 1

@@ -9,8 +9,6 @@ type Repos interface {
 	AccountAggregateRepository() AccountAggregateRepository
 	DeviceAggregateRepository() DeviceAggregateRepository
 	SessionAggregateRepository() SessionAggregateRepository
-	DeviceRepository() DeviceRepository
-	SessionRepository() SessionRepository
 
 	WithTransaction(ctx context.Context, fn func(Repos) error) error
 }

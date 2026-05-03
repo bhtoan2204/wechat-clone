@@ -41,21 +41,6 @@ func (m *MockDeviceAggregateRepository) EXPECT() *MockDeviceAggregateRepositoryM
 	return m.recorder
 }
 
-// FindByAccountAndUID mocks base method.
-func (m *MockDeviceAggregateRepository) FindByAccountAndUID(ctx context.Context, accountID, deviceUID string) (*aggregate.DeviceAggregate, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindByAccountAndUID", ctx, accountID, deviceUID)
-	ret0, _ := ret[0].(*aggregate.DeviceAggregate)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FindByAccountAndUID indicates an expected call of FindByAccountAndUID.
-func (mr *MockDeviceAggregateRepositoryMockRecorder) FindByAccountAndUID(ctx, accountID, deviceUID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByAccountAndUID", reflect.TypeOf((*MockDeviceAggregateRepository)(nil).FindByAccountAndUID), ctx, accountID, deviceUID)
-}
-
 // GetByAccountAndID mocks base method.
 func (m *MockDeviceAggregateRepository) GetByAccountAndID(ctx context.Context, accountID, deviceID string) (*aggregate.DeviceAggregate, error) {
 	m.ctrl.T.Helper()

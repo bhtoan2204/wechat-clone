@@ -102,7 +102,7 @@ func (u *callbackGoogleHandler) Handle(ctx context.Context, req *in.CallbackGoog
 			OSName: req.OsName, OSVersion: req.OsVersion, AppVersion: req.AppVersion,
 			UserAgent: req.UserAgent, IPAddress: req.IpAddress,
 		}
-		deviceAgg, err := txRepos.DeviceAggregateRepository().FindByAccountAndUID(ctx, snapshot.ID, req.DeviceUid)
+		deviceAgg, err := txRepos.DeviceAggregateRepository().GetByAccountAndID(ctx, snapshot.ID, req.DeviceUid)
 		if err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
 				return stackErr.Error(fmt.Errorf("load device: %w", err))

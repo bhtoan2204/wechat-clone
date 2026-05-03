@@ -20,8 +20,8 @@ type repoImpl struct {
 	afterCommit   []func(context.Context)
 
 	accountAggregateRepo repos.AccountAggregateRepository
-	deviceRepo           repos.DeviceAggregateRepository
-	sessionRepo          repos.SessionAggregateRepository
+	deviceAggregateRepo  repos.DeviceAggregateRepository
+	sessionAggregateRepo repos.SessionAggregateRepository
 }
 
 func NewRepoImpl(db *gorm.DB, cache sharedcache.Cache) repos.Repos {
@@ -39,8 +39,8 @@ func newRepoImplWithDB(
 		inTransaction: inTransaction,
 	}
 	r.accountAggregateRepo = NewAccountAggregateRepoImpl(db, cache, r.runAfterCommit, !inTransaction)
-	r.deviceRepo = NewDeviceRepoImpl(db)
-	r.sessionRepo = NewSessionRepoImpl(db, cache, !inTransaction, r.runAfterCommit)
+	r.deviceAggregateRepo = NewDeviceAggregateRepoImpl(db)
+	r.sessionAggregateRepo = NewSessionAggregateRepoImpl(db, cache, !inTransaction, r.runAfterCommit)
 	return r
 }
 
@@ -49,19 +49,11 @@ func (r *repoImpl) AccountAggregateRepository() repos.AccountAggregateRepository
 }
 
 func (r *repoImpl) DeviceAggregateRepository() repos.DeviceAggregateRepository {
-	return r.deviceRepo
+	return r.deviceAggregateRepo
 }
 
 func (r *repoImpl) SessionAggregateRepository() repos.SessionAggregateRepository {
-	return r.sessionRepo
-}
-
-func (r *repoImpl) DeviceRepository() repos.DeviceRepository {
-	return r.deviceRepo
-}
-
-func (r *repoImpl) SessionRepository() repos.SessionRepository {
-	return r.sessionRepo
+	return r.sessionAggregateRepo
 }
 
 func (r *repoImpl) WithTransaction(ctx context.Context, fn func(repos.Repos) error) (err error) {

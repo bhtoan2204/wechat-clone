@@ -97,7 +97,7 @@ func (u *changePasswordHandler) Handle(ctx context.Context, req *in.ChangePasswo
 		if err := txRepos.AccountAggregateRepository().Save(ctx, accountAggregate); err != nil {
 			return stackErr.Error(err)
 		}
-		sessionAggs, err := txRepos.SessionRepository().ListByAccountID(ctx, accountID)
+		sessionAggs, err := txRepos.SessionAggregateRepository().ListByAccountID(ctx, accountID)
 		if err != nil {
 			return stackErr.Error(err)
 		}
@@ -109,7 +109,7 @@ func (u *changePasswordHandler) Handle(ctx context.Context, req *in.ChangePasswo
 			if !changed {
 				continue
 			}
-			if err := txRepos.SessionRepository().Save(ctx, sessionAgg); err != nil {
+			if err := txRepos.SessionAggregateRepository().Save(ctx, sessionAgg); err != nil {
 				return stackErr.Error(err)
 			}
 		}

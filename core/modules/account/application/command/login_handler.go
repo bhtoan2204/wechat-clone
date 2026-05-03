@@ -81,7 +81,7 @@ func (u *loginHandler) Handle(ctx context.Context, req *in.LoginRequest) (*out.L
 
 	var res out.LoginResponse
 	if txErr := u.baseRepo.WithTransaction(ctx, func(txRepos repos.Repos) error {
-		deviceAgg, err := txRepos.DeviceAggregateRepository().FindByAccountAndUID(ctx, snapshot.ID, req.DeviceUid)
+		deviceAgg, err := txRepos.DeviceAggregateRepository().GetByAccountAndID(ctx, snapshot.ID, req.DeviceUid)
 		if err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
 				return stackErr.Error(fmt.Errorf("load device: %w", err))

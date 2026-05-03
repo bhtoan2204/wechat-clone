@@ -17,14 +17,14 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-type sessionRepoImpl struct {
+type sessionAggregateRepoImpl struct {
 	db            *gorm.DB
 	sessionCache  accountcache.SessionCache
 	readFromCache bool
 	afterCommit   afterCommitRegistrar
 }
 
-func NewSessionRepoImpl(
+func NewSessionAggregateRepoImpl(
 	db *gorm.DB,
 	cache sharedcache.Cache,
 	readFromCache bool,
@@ -38,7 +38,7 @@ func NewSessionRepoImpl(
 		}
 	}
 
-	return &sessionRepoImpl{
+	return &sessionAggregateRepoImpl{
 		db:            db,
 		sessionCache:  accountcache.NewSessionCache(cache),
 		readFromCache: readFromCache,
@@ -46,7 +46,7 @@ func NewSessionRepoImpl(
 	}
 }
 
-func (r *sessionRepoImpl) Load(ctx context.Context, sessionID string) (*aggregate.SessionAggregate, error) {
+func (r *sessionAggregateRepoImpl) Load(ctx context.Context, sessionID string) (*aggregate.SessionAggregate, error) {
 	if r.readFromCache {
 		if cached, ok, err := r.sessionCache.Get(ctx, sessionID); err == nil && ok {
 			return r.toAggregate(cached)
@@ -72,7 +72,7 @@ func (r *sessionRepoImpl) Load(ctx context.Context, sessionID string) (*aggregat
 	return r.toAggregate(session)
 }
 
-func (r *sessionRepoImpl) Save(ctx context.Context, session *aggregate.SessionAggregate) error {
+func (r *sessionAggregateRepoImpl) Save(ctx context.Context, session *aggregate.SessionAggregate) error {
 	if session == nil {
 		return stackErr.Error(fmt.Errorf("session is nil"))
 	}
@@ -107,7 +107,7 @@ func (r *sessionRepoImpl) Save(ctx context.Context, session *aggregate.SessionAg
 	return nil
 }
 
-func (r *sessionRepoImpl) ListByAccountID(ctx context.Context, accountID string) ([]*aggregate.SessionAggregate, error) {
+func (r *sessionAggregateRepoImpl) ListByAccountID(ctx context.Context, accountID string) ([]*aggregate.SessionAggregate, error) {
 	var modelsList []models.SessionModel
 	if err := r.db.WithContext(ctx).
 		Where("account_id = ?", accountID).
@@ -130,7 +130,7 @@ func (r *sessionRepoImpl) ListByAccountID(ctx context.Context, accountID string)
 	return result, nil
 }
 
-func (r *sessionRepoImpl) toEntity(model *models.SessionModel) (*entity.Session, error) {
+func (r *sessionAggregateRepoImpl) toEntity(model *models.SessionModel) (*entity.Session, error) {
 	if model == nil {
 		return nil, stackErr.Error(fmt.Errorf("session model is nil"))
 	}
@@ -152,7 +152,7 @@ func (r *sessionRepoImpl) toEntity(model *models.SessionModel) (*entity.Session,
 	}, nil
 }
 
-func (r *sessionRepoImpl) toAggregate(session *entity.Session) (*aggregate.SessionAggregate, error) {
+func (r *sessionAggregateRepoImpl) toAggregate(session *entity.Session) (*aggregate.SessionAggregate, error) {
 	agg, err := aggregate.NewSessionAggregate(session.ID)
 	if err != nil {
 		return nil, stackErr.Error(err)
@@ -163,7 +163,7 @@ func (r *sessionRepoImpl) toAggregate(session *entity.Session) (*aggregate.Sessi
 	return agg, nil
 }
 
-func (r *sessionRepoImpl) toModel(session *entity.Session) *models.SessionModel {
+func (r *sessionAggregateRepoImpl) toModel(session *entity.Session) *models.SessionModel {
 	return &models.SessionModel{
 		ID:               session.ID,
 		AccountID:        session.AccountID,
@@ -181,7 +181,7 @@ func (r *sessionRepoImpl) toModel(session *entity.Session) *models.SessionModel 
 	}
 }
 
-func (r *sessionRepoImpl) syncCacheAfterCommit(ctx context.Context, session *entity.Session) {
+func (r *sessionAggregateRepoImpl) syncCacheAfterCommit(ctx context.Context, session *entity.Session) {
 	if session == nil {
 		return
 	}
