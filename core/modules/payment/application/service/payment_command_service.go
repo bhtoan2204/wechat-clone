@@ -101,9 +101,9 @@ func (s *paymentCommandService) CreatePayment(
 	if err := s.baseRepo.WithTransaction(ctx, func(tx repos.Repos) error {
 		return stackErr.Error(tx.PaymentIntentAggregateRepository().Save(ctx, paymentAggregate))
 	}); err != nil {
-		if errors.Is(err, repos.ErrProviderPaymentDuplicateIntent) {
-			return nil, stackErr.Error(fmt.Errorf("%w: %s", ErrDuplicatePayment, paymentAggregate.TransactionID()))
-		}
+		// if errors.Is(err, repos.ErrProviderPaymentDuplicateIntent) {
+		// 	return nil, stackErr.Error(fmt.Errorf("%w: %s", ErrDuplicatePayment, paymentAggregate.TransactionID()))
+		// }
 		return nil, stackErr.Error(err)
 	}
 
@@ -172,9 +172,9 @@ func (s *paymentCommandService) CreateWithdrawal(
 	if err := s.baseRepo.WithTransaction(ctx, func(tx repos.Repos) error {
 		return stackErr.Error(tx.PaymentIntentAggregateRepository().Save(ctx, paymentAggregate))
 	}); err != nil {
-		if errors.Is(err, repos.ErrProviderPaymentDuplicateIntent) {
-			return nil, stackErr.Error(fmt.Errorf("%w: %s", ErrDuplicatePayment, paymentAggregate.TransactionID()))
-		}
+		// if errors.Is(err, repos.ErrProviderPaymentDuplicateIntent) {
+		// 	return nil, stackErr.Error(fmt.Errorf("%w: %s", ErrDuplicatePayment, paymentAggregate.TransactionID()))
+		// }
 		return nil, stackErr.Error(err)
 	}
 
@@ -438,16 +438,16 @@ func (s *paymentCommandService) applyProviderOutcome(
 
 	if persistErr := s.baseRepo.WithTransaction(ctx, func(tx repos.Repos) error {
 		if err := tx.PaymentIntentAggregateRepository().Save(ctx, paymentAggregate); err != nil {
-			if errors.Is(err, repos.ErrProviderPaymentDuplicateProcessed) {
-				return stackErr.Error(err)
-			}
+			// if errors.Is(err, repos.ErrProviderPaymentDuplicateProcessed) {
+			// 	return stackErr.Error(err)
+			// }
 			return stackErr.Error(err)
 		}
 		return nil
 	}); persistErr != nil {
-		if errors.Is(persistErr, repos.ErrProviderPaymentDuplicateProcessed) {
-			return paymentProviderOutcome{Duplicate: true}, nil
-		}
+		// if errors.Is(persistErr, repos.ErrProviderPaymentDuplicateProcessed) {
+		// 	return paymentProviderOutcome{Duplicate: true}, nil
+		// }
 		return paymentProviderOutcome{}, stackErr.Error(persistErr)
 	}
 
@@ -489,9 +489,9 @@ func (s *paymentCommandService) findPaymentAggregate(
 		if err == nil {
 			return paymentAggregate, nil
 		}
-		if !errors.Is(err, repos.ErrProviderPaymentNotFound) {
-			return nil, stackErr.Error(err)
-		}
+		// if !errors.Is(err, repos.ErrProviderPaymentNotFound) {
+		// 	return nil, stackErr.Error(err)
+		// }
 	}
 
 	if strings.TrimSpace(result.ExternalRef) != "" {
@@ -499,9 +499,9 @@ func (s *paymentCommandService) findPaymentAggregate(
 		if err == nil {
 			return paymentAggregate, nil
 		}
-		if !errors.Is(err, repos.ErrProviderPaymentNotFound) {
-			return nil, stackErr.Error(err)
-		}
+		// if !errors.Is(err, repos.ErrProviderPaymentNotFound) {
+		// 	return nil, stackErr.Error(err)
+		// }
 	}
 
 	return nil, stackErr.Error(fmt.Errorf(

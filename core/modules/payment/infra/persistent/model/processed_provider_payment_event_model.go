@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-type ProcessedProviderPaymentEventModel struct {
+type ProcessedPaymentEventModel struct {
 	ID             int64     `gorm:"column:id;primaryKey;autoIncrement"`
 	Provider       string    `gorm:"column:provider;not null"`
 	IdempotencyKey string    `gorm:"column:idempotency_key;not null"`
@@ -10,6 +10,6 @@ type ProcessedProviderPaymentEventModel struct {
 	CreatedAt      time.Time `gorm:"column:created_at;autoCreateTime"`
 }
 
-func (ProcessedProviderPaymentEventModel) TableName() string {
+func (ProcessedPaymentEventModel) TableName() string {
 	return "processed_payment_events"
 }

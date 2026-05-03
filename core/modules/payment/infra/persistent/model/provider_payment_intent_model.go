@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-type ProviderPaymentIntentModel struct {
+type PaymentIntentModel struct {
 	TransactionID        string `gorm:"primaryKey"`
 	Workflow             string `gorm:"not null"`
 	Provider             string `gorm:"not null"`
@@ -21,6 +21,6 @@ type ProviderPaymentIntentModel struct {
 	UpdatedAt            time.Time `gorm:"autoUpdateTime"`
 }
 
-func (ProviderPaymentIntentModel) TableName() string {
+func (PaymentIntentModel) TableName() string {
 	return "payment_intents"
 }
