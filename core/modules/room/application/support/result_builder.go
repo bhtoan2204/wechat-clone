@@ -278,8 +278,33 @@ func (b *messageQueryBuilder) Build(ctx context.Context, input MessageBuildInput
 		return nil, stackErr.Error(errors.New("message is required"))
 	}
 
-	status, err := b.resolveViewerStatus(ctx, input.ViewerID, input.Message)
-	if err != nil {
+	var (
+		status        string
+		replyTo       *apptypes.MessagePreviewResult
+		forwardedFrom *apptypes.MessagePreviewResult
+	)
+	eg, egCtx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		var runErr error
+		status, runErr = b.resolveViewerStatus(egCtx, input.ViewerID, input.Message)
+		if runErr != nil {
+			return stackErr.Error(runErr)
+		}
+		return nil
+	})
+	if input.Message.ReplyToMessageID != "" {
+		eg.Go(func() error {
+			replyTo = b.buildMessagePreview(egCtx, input.Message.ReplyToMessageID)
+			return nil
+		})
+	}
+	if input.Message.ForwardedFromMessageID != "" {
+		eg.Go(func() error {
+			forwardedFrom = b.buildMessagePreview(egCtx, input.Message.ForwardedFromMessageID)
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
 		return nil, stackErr.Error(err)
 	}
 
@@ -318,12 +343,8 @@ func (b *messageQueryBuilder) Build(ctx context.Context, input MessageBuildInput
 		})
 	}
 
-	if input.Message.ReplyToMessageID != "" {
-		result.ReplyTo = b.buildMessagePreview(ctx, input.Message.ReplyToMessageID)
-	}
-	if input.Message.ForwardedFromMessageID != "" {
-		result.ForwardedFrom = b.buildMessagePreview(ctx, input.Message.ForwardedFromMessageID)
-	}
+	result.ReplyTo = replyTo
+	result.ForwardedFrom = forwardedFrom
 
 	return result, nil
 }

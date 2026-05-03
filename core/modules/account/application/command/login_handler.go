@@ -113,14 +113,14 @@ func (u *loginHandler) Handle(ctx context.Context, req *in.LoginRequest) (*out.L
 		}
 
 		sessionID := uuid.NewString()
-		accessToken, accessExp, refreshToken, refreshExp, err := u.issueTokenPair(ctx, u.paseto, *snapshot, xpaseto.RefreshTokenSubject{
+		tokenPair, err := issueAccountTokenPair(ctx, u.paseto, *snapshot, xpaseto.RefreshTokenSubject{
 			SessionID: sessionID,
 			DeviceID:  deviceAgg.DeviceID(),
 		})
 		if err != nil {
 			return stackErr.Error(err)
 		}
-		refreshTokenHash, err := u.hasher.Hash(ctx, refreshToken)
+		refreshTokenHash, err := u.hasher.Hash(ctx, tokenPair.refreshToken)
 		if err != nil {
 			return stackErr.Error(err)
 		}
@@ -129,7 +129,7 @@ func (u *loginHandler) Handle(ctx context.Context, req *in.LoginRequest) (*out.L
 		if err != nil {
 			return stackErr.Error(err)
 		}
-		if err := sessionAgg.Create(snapshot.ID, deviceAgg.DeviceID(), refreshTokenHash, refreshExp, now, req.IpAddress, req.UserAgent); err != nil {
+		if err := sessionAgg.Create(snapshot.ID, deviceAgg.DeviceID(), refreshTokenHash, tokenPair.refreshExpiresAt, now, req.IpAddress, req.UserAgent); err != nil {
 			return stackErr.Error(err)
 		}
 		if err := txRepos.SessionAggregateRepository().Save(ctx, sessionAgg); err != nil {
@@ -137,10 +137,10 @@ func (u *loginHandler) Handle(ctx context.Context, req *in.LoginRequest) (*out.L
 		}
 
 		res = out.LoginResponse{
-			AccessToken:      accessToken,
-			AccessExpiresAt:  accessExp.UnixMilli(),
-			RefreshToken:     refreshToken,
-			RefreshExpiresAt: refreshExp.UnixMilli(),
+			AccessToken:      tokenPair.accessToken,
+			AccessExpiresAt:  tokenPair.accessExpiresAt.UnixMilli(),
+			RefreshToken:     tokenPair.refreshToken,
+			RefreshExpiresAt: tokenPair.refreshExpiresAt.UnixMilli(),
 		}
 		return nil
 	}); txErr != nil {
@@ -149,27 +149,4 @@ func (u *loginHandler) Handle(ctx context.Context, req *in.LoginRequest) (*out.L
 	}
 
 	return &res, nil
-}
-
-func (u *loginHandler) issueTokenPair(
-	ctx context.Context,
-	pasetoSvc xpaseto.PasetoService,
-	account entity.Account,
-	subject xpaseto.RefreshTokenSubject,
-) (string, time.Time, string, time.Time, error) {
-	if account.ID == "" {
-		return "", time.Time{}, "", time.Time{}, stackErr.Error(fmt.Errorf("account snapshot is required"))
-	}
-
-	accessToken, accessExpiresAt, err := pasetoSvc.GenerateAccessToken(ctx, &account)
-	if err != nil {
-		return "", time.Time{}, "", time.Time{}, stackErr.Error(fmt.Errorf("generate access token failed: %w", err))
-	}
-
-	refreshToken, refreshExpiresAt, err := pasetoSvc.GenerateRefreshToken(ctx, &account, subject)
-	if err != nil {
-		return "", time.Time{}, "", time.Time{}, stackErr.Error(fmt.Errorf("generate refresh token failed: %w", err))
-	}
-
-	return accessToken, accessExpiresAt, refreshToken, refreshExpiresAt, nil
 }

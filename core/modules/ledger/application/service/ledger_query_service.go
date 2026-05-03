@@ -9,9 +9,12 @@ import (
 
 	ledgerout "wechat-clone/core/modules/ledger/application/dto/out"
 	ledgerprojection "wechat-clone/core/modules/ledger/application/projection"
+	"wechat-clone/core/modules/ledger/domain/entity"
 	ledgerrepos "wechat-clone/core/modules/ledger/domain/repos"
 	"wechat-clone/core/shared/pkg/stackErr"
 	"wechat-clone/core/shared/utils"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type LedgerQueryService interface {
@@ -121,12 +124,7 @@ func (s *ledgerQueryService) ListTransactions(
 		filter.CursorTransactionID = transactionID
 	}
 
-	total, err := s.readRepo.CountTransactions(ctx, accountID, currency)
-	if err != nil {
-		return nil, stackErr.Error(err)
-	}
-
-	transactions, err := s.readRepo.ListTransactions(ctx, filter)
+	total, transactions, err := s.loadTransactionPage(ctx, accountID, currency, filter)
 	if err != nil {
 		return nil, stackErr.Error(err)
 	}
@@ -180,4 +178,39 @@ func (s *ledgerQueryService) ListTransactions(
 		NextCursor: nextCursor,
 		Records:    records,
 	}, nil
+}
+
+func (s *ledgerQueryService) loadTransactionPage(
+	ctx context.Context,
+	accountID string,
+	currency string,
+	filter ledgerprojection.ListTransactionsFilter,
+) (int64, []*entity.LedgerTransaction, error) {
+	var (
+		total        int64
+		transactions []*entity.LedgerTransaction
+	)
+
+	eg, egCtx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		var runErr error
+		total, runErr = s.readRepo.CountTransactions(egCtx, accountID, currency)
+		if runErr != nil {
+			return stackErr.Error(runErr)
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		var runErr error
+		transactions, runErr = s.readRepo.ListTransactions(egCtx, filter)
+		if runErr != nil {
+			return stackErr.Error(runErr)
+		}
+		return nil
+	})
+	if err := eg.Wait(); err != nil {
+		return 0, nil, stackErr.Error(err)
+	}
+
+	return total, transactions, nil
 }
